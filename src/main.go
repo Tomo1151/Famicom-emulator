@@ -4,12 +4,20 @@ import (
 	"fmt"
 	"log"
 
+	"Famicom-emulator/cpu"
+
 	"github.com/veandco/go-sdl2/sdl"
 )
 
 func main() {
 	fmt.Println("Hello, world!")
+	cpu := cpu.CPU{}.Init()
 
+	fmt.Println(cpu.Registers.A, cpu.Registers.X, cpu.Registers.P, cpu.Registers.P.Break)
+
+}
+
+func createWindow() {
 	if err := sdl.Init(sdl.INIT_VIDEO); err != nil {
 		log.Fatalf("Failed to initialize SDL: %s", err)
 	}
