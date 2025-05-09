@@ -11,7 +11,7 @@ import (
 
 func main() {
 	fmt.Println("Hello, world!")
-	cpu := cpu.CPU{}.Init()
+	cpu := cpu.CreateCPU()
 
 	fmt.Println(cpu.Registers.A, cpu.Registers.X, cpu.Registers.P, cpu.Registers.P.Break)
 
