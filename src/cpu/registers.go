@@ -2,6 +2,7 @@ package cpu
 
 // レジスタ関連の定数
 const (
+	// ステータスレジスタのビット位置
 	STATUS_REG_NEGATIVE_POS  uint8 = 7
 	STATUS_REG_OVERFLOW_POS  uint8 = 6
 	STATUS_REG_RESERVED_POS  uint8 = 5
