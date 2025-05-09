@@ -1,5 +1,18 @@
 package cpu
 
+// レジスタ関連の定数
+const (
+	STATUS_REG_NEGATIVE_POS  uint8 = 7
+	STATUS_REG_OVERFLOW_POS  uint8 = 6
+	STATUS_REG_RESERVED_POS  uint8 = 5
+	STATUS_REG_BREAK_POS     uint8 = 4
+	STATUS_REG_DECIMAL_POS   uint8 = 3
+	STATUS_REG_INTERRUPT_POS uint8 = 2
+	STATUS_REG_ZERO_POS      uint8 = 1
+	STATUS_REG_CARRY_POS     uint8 = 0
+)
+
+// レジスタの定義
 type registers struct {
 	A  uint8          // アキュムレータ: 8bit
 	X  uint8          // インデックスレジスタ: 8bit
@@ -9,6 +22,7 @@ type registers struct {
 	P  statusRegister // ステータスレジスタ: 8bit
 }
 
+// ステータスレジスタ(P)の定義
 type statusRegister struct {
 	Negative  bool // N: 演算結果の最上位ビットが1の時にセット
 	Overflow  bool // V: P演算結果がオーバーフローした時にセット
@@ -18,4 +32,48 @@ type statusRegister struct {
 	Interrupt bool // I: 0 -> IRQ許可， 1 -> IRQ禁止
 	Zero      bool // Z: 演算結果が0の時にセット
 	Carry     bool // C: キャリー発生時にセット
+}
+
+// ステータスレジスタ(P)をuint8へ変換するメソッド
+func (s *statusRegister) ToByte() uint8 {
+	var value uint8 = 0x00
+
+	if s.Negative {
+		value |= 1 << STATUS_REG_NEGATIVE_POS
+	}
+	if s.Overflow {
+		value |= 1 << STATUS_REG_OVERFLOW_POS
+	}
+	if s.Reserved {
+		value |= 1 << STATUS_REG_RESERVED_POS
+	}
+	if s.Break {
+		value |= 1 << STATUS_REG_BREAK_POS
+	}
+	if s.Decimal {
+		value |= 1 << STATUS_REG_DECIMAL_POS
+	}
+	if s.Interrupt {
+		value |= 1 << STATUS_REG_INTERRUPT_POS
+	}
+	if s.Zero {
+		value |= 1 << STATUS_REG_ZERO_POS
+	}
+	if s.Carry {
+		value |= 1 << STATUS_REG_CARRY_POS
+	}
+
+	return value
+}
+
+// uint8からステータスレジスタオブジェクトへ変換するメソッド
+func (s *statusRegister) FromByte(value uint8) {
+	s.Negative = (value & (1 << STATUS_REG_NEGATIVE_POS)) != 0
+	s.Overflow = (value & (1 << STATUS_REG_OVERFLOW_POS)) != 0
+	s.Reserved = (value & (1 << STATUS_REG_RESERVED_POS)) != 0
+	s.Break = (value & (1 << STATUS_REG_BREAK_POS)) != 0
+	s.Decimal = (value & (1 << STATUS_REG_DECIMAL_POS)) != 0
+	s.Interrupt = (value & (1 << STATUS_REG_INTERRUPT_POS)) != 0
+	s.Zero = (value & (1 << STATUS_REG_ZERO_POS)) != 0
+	s.Carry = (value & (1 << STATUS_REG_CARRY_POS)) != 0
 }
