@@ -167,6 +167,155 @@ func (c *CPU) adc(mode AddressingMode) {
 	// @TODO 実装
 }
 
+// MARK: AND命令の実装
+func (c *CPU) and(mode AddressingMode) {
+	// @TODO 実装
+}
+
+// MARK: ASL命令の実装
+func (c *CPU) asl(mode AddressingMode) {
+	// @TODO 実装
+}
+
+// MARK: BCC命令の実装
+func (c *CPU) bcc(mode AddressingMode) {
+	// @TODO 実装
+}
+
+// MARK: BCS命令の実装
+func (c *CPU) bcs(mode AddressingMode) {
+	// @TODO 実装
+}
+
+// MARK: BEQ命令の実装
+func (c *CPU) beq(mode AddressingMode) {
+	// @TODO 実装
+}
+
+// MARK: BIT命令の実装
+func (c *CPU) bit(mode AddressingMode) {
+	// @TODO 実装
+}
+
+// MARK: BMI命令の実装
+func (c *CPU) bmi(mode AddressingMode) {
+	// @TODO 実装
+}
+
+// MARK: BNE命令の実装
+func (c *CPU) bne(mode AddressingMode) {
+	// @TODO 実装
+}
+
+// MARK: BPL命令の実装
+func (c *CPU) bpl(mode AddressingMode) {
+	// @TODO 実装
+}
+
+// MARK: BRK命令の実装
+func (c *CPU) brk(mode AddressingMode) {
+}
+
+// MARK: BVC命令の実装
+func (c *CPU) bvc(mode AddressingMode) {
+	// @TODO 実装
+}
+
+// MARK: BVS命令の実装
+func (c *CPU) bvs(mode AddressingMode) {
+	// @TODO 実装
+}
+
+// MARK: CLC命令の実装
+func (c *CPU) clc(mode AddressingMode) {
+	c.Registers.P.Carry = false
+}
+
+// MARK: CLD命令の実装
+func (c *CPU) cld(mode AddressingMode) {
+	c.Registers.P.Decimal = false
+}
+
+// MARK: CLI命令の実装
+func (c *CPU) cli(mode AddressingMode) {
+	c.Registers.P.Interrupt = false
+}
+
+// MARK: CLV命令の実装
+func (c *CPU) clv(mode AddressingMode) {
+	c.Registers.P.Overflow = false
+}
+
+// MARK: CMP命令の実装
+func (c *CPU) cmp(mode AddressingMode) {
+	// @TODO 実装
+}
+
+// MARK: CPX命令の実装
+func (c *CPU) cpx(mode AddressingMode) {
+	// @TODO 実装
+}
+
+// MARK: CPY命令の実装
+func (c *CPU) cpy(mode AddressingMode) {
+	// @TODO 実装
+}
+
+// MARK: DEC命令の実装
+func (c *CPU) dec(mode AddressingMode) {
+	addr := c.getOperandAddress(mode)
+	value := c.ReadByteFromWRAM(addr)
+	c.WriteByteToWRAM(addr, value - 1)
+}
+
+// MARK: DEX命令の実装
+func (c *CPU) dex(mode AddressingMode) {
+	c.Registers.X--
+	c.updateNZFlags(c.Registers.X)
+}
+
+// MARK: DEY命令の実装
+func (c *CPU) dey(mode AddressingMode) {
+	c.Registers.Y--
+	c.updateNZFlags(c.Registers.Y)
+}
+
+// MARK: EOR命令の実装
+func (c *CPU) eor(mode AddressingMode) {
+	addr := c.getOperandAddress(mode)
+	value := c.ReadByteFromWRAM(addr)
+	c.Registers.A ^= value
+}
+
+// MARK: INC命令の実装
+func (c *CPU) inc(mode AddressingMode) {
+	addr := c.getOperandAddress(mode)
+	value := c.ReadByteFromWRAM(addr)
+	c.WriteByteToWRAM(addr, value + 1)
+}
+
+// MARK: INX命令の実装
+func (c *CPU) inx(mode AddressingMode) {
+	c.Registers.X++
+	c.updateNZFlags(c.Registers.X)
+}
+
+// MARK: INY命令の実装
+func (c *CPU) iny(mode AddressingMode) {
+	c.Registers.Y++
+	c.updateNZFlags(c.Registers.Y)
+}
+
+// MARK: JMP命令の実装
+func (c *CPU) jmp(mode AddressingMode) {
+	// @TODO 実装
+}
+
+// MARK: JSR命令の実装
+func (c *CPU) jsr(mode AddressingMode) {
+	// @TODO 実装
+}
+
 // MARK: LDA命令の実装
 func (c *CPU) lda(mode AddressingMode) {
 	addr := c.getOperandAddress(mode)
@@ -322,9 +471,6 @@ func (c *CPU) tya(mode AddressingMode) {
 	c.updateNZFlags(c.Registers.A)
 }
 
-// MARK: BRK命令
-func (c *CPU) brk(mode AddressingMode) {
-}
 
 
 // MARK: デバッグ用実行メソッド
