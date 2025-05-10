@@ -1,6 +1,8 @@
 package cpu
 
-import "fmt"
+import (
+	"fmt"
+)
 
 // CPUの定義
 type CPU struct {
@@ -44,7 +46,7 @@ func (c *CPU) Init(debug bool) {
 
 // 命令の実行
 func (c *CPU) Execute() {
-	opecode := c.ReadWRAM(c.Registers.PC)
+	opecode := c.ReadByteFromWRAM(c.Registers.PC)
 	instruction := c.InstructionSet[opecode]
 
 	if c.log {
@@ -62,16 +64,34 @@ func (c *CPU) Execute() {
 	}
 }
 
-// ワーキングメモリの参照
-func (c *CPU) ReadWRAM(address uint16) uint8 {
+// ワーキングメモリの参照 (1byte)
+func (c *CPU) ReadByteFromWRAM(address uint16) uint8 {
 	return c.wram[address]
 }
 
-// ワーキングメモリへの書き込み
-func (c *CPU) WriteWRAM(address uint16, data uint8) {
+// ワーキングメモリの参照 (2byte)
+func (c *CPU) ReadWordFromWRAM(address uint16) uint16 {
+	lower := c.ReadByteFromWRAM(address)
+	upper := c.ReadByteFromWRAM(address + 1)
+
+	return uint16(upper) << 8 | uint16((lower))
+}
+
+// ワーキングメモリへの書き込み (1byte)
+func (c *CPU) WriteByteToWRAM(address uint16, data uint8) {
 	c.wram[address] = data
 }
 
+// ワーキングメモリへの書き込み (2byte)
+func (c *CPU) WriteWordToWRAM(address uint16, data uint16) {
+	upper := uint8(data >> 8)
+	lower := uint8(data & 0xFF)
+	c.WriteByteToWRAM(address, lower)
+	c.WriteByteToWRAM(address + 1, upper)
+}
+
+
+// 命令ADCの実装
 func (c *CPU) adc(addressing AddressingMode, operand uint16) {
 	if c.log {
 		fmt.Printf("*ADC* mode: $%02X operand: $%04X", addressing, operand)
