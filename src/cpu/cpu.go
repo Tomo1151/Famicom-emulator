@@ -133,8 +133,8 @@ func (c *CPU) getOperandAddress(mode AddressingMode) uint16 {
 }
 
 
-// MARK: 計算フラグ(N, V, Z, C)の更新
-func (c *CPU) updateCalcFlags(result uint8) {
+// MARK: フラグ(N, Z)の更新
+func (c *CPU) updateNZFlags(result uint8) {
 	// Nフラグの更新
 	if (result >> 7) != 0  {
 		c.Registers.P.Negative = true
@@ -142,15 +142,18 @@ func (c *CPU) updateCalcFlags(result uint8) {
 		c.Registers.P.Negative = false
 	}
 
-	// Vフラグの更新 @TODO 実装
-
 	// Zフラグの更新
 	if result == 0 {
 		c.Registers.P.Zero = true
-	} else {
-		c.Registers.P.Zero = false
+		} else {
+			c.Registers.P.Zero = false
+		}
 	}
 
+
+	// MARK: フラグ(V, C)の更新
+	func (c *CPU) updateVCFlags(prev uint8, result uint8) {
+	// Vフラグの更新 @TODO 実装
 	// Cフラグの更新 @TODO 実装
 }
 
@@ -170,7 +173,92 @@ func (c *CPU) lda(mode AddressingMode) {
 	operand := c.ReadByteFromWRAM(addr)
 
 	c.Registers.A = uint8(operand)
-	c.updateCalcFlags(c.Registers.A)
+	c.updateNZFlags(c.Registers.A)
+}
+
+// MARK: LDX命令の実装
+func (c *CPU) ldx(mode AddressingMode) {
+	// @TODO 実装
+}
+
+// MARK: LDY命令の実装
+func (c *CPU) ldy(mode AddressingMode) {
+	// @TODO 実装
+}
+
+// MARK: LSR命令の実装
+func (c *CPU) lsr(mode AddressingMode) {
+	// @TODO 実装
+}
+
+// MARK: NOP命令の実装
+func (c *CPU) nop(mode AddressingMode) {
+	// @TODO 実装
+}
+
+// MARK: ORA命令の実装
+func (c *CPU) ora(mode AddressingMode) {
+	// @TODO 実装
+}
+
+// MARK: PHA命令の実装
+func (c *CPU) pha(mode AddressingMode) {
+	// @TODO 実装
+}
+
+// MARK: PHP命令の実装
+func (c *CPU) php(mode AddressingMode) {
+	// @TODO 実装
+}
+
+// MARK: PLA命令の実装
+func (c *CPU) pla(mode AddressingMode) {
+	// @TODO 実装
+}
+
+// MARK: PLP命令の実装
+func (c *CPU) plp(mode AddressingMode) {
+	// @TODO 実装
+}
+
+// MARK: ROL命令の実装
+func (c *CPU) rol(mode AddressingMode) {
+	// @TODO 実装
+}
+
+// MARK: ROR命令の実装
+func (c *CPU) ror(mode AddressingMode) {
+	// @TODO 実装
+}
+
+// MARK: RTI命令の実装
+func (c *CPU) rti(mode AddressingMode) {
+	// @TODO 実装
+}
+
+// MARK: RTS命令の実装
+func (c *CPU) rts(mode AddressingMode) {
+	// @TODO 実装
+}
+
+// MARK: SBC命令の実装
+func (c *CPU) sbc(mode AddressingMode) {
+	// @TODO 実装
+}
+
+// MARK: SEC命令の実装
+func (c *CPU) sec(mode AddressingMode) {
+	c.Registers.P.Carry = true
+}
+
+// MARK: SED命令の実装
+func (c *CPU) sed(mode AddressingMode) {
+	c.Registers.P.Decimal = true
+}
+
+// MARK: SEI命令の実装
+func (c *CPU) sei(mode AddressingMode) {
+	c.Registers.P.Interrupt = true
 }
 
 // MARK: STA命令の実装
@@ -179,10 +267,51 @@ func (c *CPU) sta(mode AddressingMode) {
 	c.WriteByteToWRAM(addr, c.Registers.A)
 }
 
+// MARK: STX命令の実装
+func (c *CPU) stx(mode AddressingMode) {
+	addr := c.getOperandAddress(mode)
+	c.WriteByteToWRAM(addr, c.Registers.X)
+}
+
+// MARK: STY命令の実装
+func (c *CPU) sty(mode AddressingMode) {
+	addr := c.getOperandAddress(mode)
+	c.WriteByteToWRAM(addr, c.Registers.Y)
+}
+
 // MARK: TAX命令の実装
 func (c *CPU) tax(mode AddressingMode) {
 	c.Registers.X = c.Registers.A
-	c.updateCalcFlags(c.Registers.X)
+	c.updateNZFlags(c.Registers.X)
+}
+
+// MARK: TAY命令の実装
+func (c *CPU) tay(mode AddressingMode) {
+	c.Registers.Y = c.Registers.A
+	c.updateNZFlags(c.Registers.Y)
+}
+
+// MARK: TSX命令の実装
+func (c *CPU) tsx(mode AddressingMode) {
+	c.Registers.X = c.Registers.SP
+	c.updateNZFlags(c.Registers.X)
+}
+
+// MARK: TXA命令
+func (c *CPU) txa(mode AddressingMode) {
+	c.Registers.A = c.Registers.X
+	c.updateNZFlags(c.Registers.A)
+}
+
+// MARK: TXS命令
+func (c *CPU) txs(mode AddressingMode) {
+	c.Registers.SP = c.Registers.X
+}
+
+// MARK: TYA命令
+func (c *CPU) tya(mode AddressingMode) {
+	c.Registers.A = c.Registers.Y
+	c.updateNZFlags(c.Registers.A)
 }
 
 // MARK: BRK命令
