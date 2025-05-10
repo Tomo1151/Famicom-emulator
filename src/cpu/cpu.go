@@ -36,9 +36,9 @@ func (c *CPU) Init() {
 }
 
 // 命令の実行
-func (c * CPU) execute(opecode uint8) {
-	switch opecode {
+func (c * CPU) execute(instruction Instruction) {
+	switch instruction.Code {
 	default:
-		fmt.Println(opecode)
+		fmt.Println(instruction.Code, ": ", instruction.Opecode)
 	}
 }
