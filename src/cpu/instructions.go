@@ -118,6 +118,7 @@ func generateInstructionSet(c *CPU) instructionSet {
 		Handler: c.adc,
 	}
 
+
 	// MARK: LDA命令
 	instructionSet[0xA9] = Instruction{
 		Opecode: 0xA9,
@@ -199,6 +200,79 @@ func generateInstructionSet(c *CPU) instructionSet {
 		Handler: c.lda,
 	}
 
+
+	// MARK: STA命令
+	instructionSet[0x85] = Instruction{
+		Opecode: 0x85,
+		Code: STA,
+		AddressingMode: ZeroPage,
+		Bytes: 2,
+		Cycles: 3,
+		PageCycles: 0,
+		Handler: c.sta,
+	}
+
+	instructionSet[0x95] = Instruction{
+		Opecode: 0x95,
+		Code: STA,
+		AddressingMode: ZeroPageXIndexed,
+		Bytes: 2,
+		Cycles: 4,
+		PageCycles: 0,
+		Handler: c.sta,
+	}
+
+	instructionSet[0x8D] = Instruction{
+		Opecode: 0x8D,
+		Code: STA,
+		AddressingMode: Absolute,
+		Bytes: 3,
+		Cycles: 4,
+		PageCycles: 0,
+		Handler: c.sta,
+	}
+
+	instructionSet[0x9D] = Instruction{
+		Opecode: 0x9D,
+		Code: STA,
+		AddressingMode: AbsoluteXIndexed,
+		Bytes: 3,
+		Cycles: 5,
+		PageCycles: 0,
+		Handler: c.sta,
+	}
+
+	instructionSet[0x99] = Instruction{
+		Opecode: 0x99,
+		Code: STA,
+		AddressingMode: AbsoluteYIndexed,
+		Bytes: 3,
+		Cycles: 5,
+		PageCycles: 0,
+		Handler: c.sta,
+	}
+
+	instructionSet[0x81] = Instruction{
+		Opecode: 0x81,
+		Code: STA,
+		AddressingMode: IndirectXIndexed,
+		Bytes: 2,
+		Cycles: 6,
+		PageCycles: 0,
+		Handler: c.sta,
+	}
+
+	instructionSet[0x91] = Instruction{
+		Opecode: 0x91,
+		Code: STA,
+		AddressingMode: IndirectYIndexed,
+		Bytes: 2,
+		Cycles: 6,
+		PageCycles: 0,
+		Handler: c.sta,
+	}
+
+
 	// MARK: TAX命令
 	instructionSet[0xAA] = Instruction{
 		Opecode: 0xAA,
@@ -209,6 +283,7 @@ func generateInstructionSet(c *CPU) instructionSet {
 		PageCycles: 0,
 		Handler: c.tax,
 	}
+
 
 	// BRK命令
 	instructionSet[0x00] = Instruction{

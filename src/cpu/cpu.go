@@ -173,6 +173,12 @@ func (c *CPU) lda(mode AddressingMode) {
 	c.updateCalcFlags(c.Registers.A)
 }
 
+// MARK: STA命令の実装
+func (c *CPU) sta(mode AddressingMode) {
+	addr := c.getOperandAddress(mode)
+	c.WriteByteToWRAM(addr, c.Registers.A)
+}
+
 // MARK: TAX命令の実装
 func (c *CPU) tax(mode AddressingMode) {
 	c.Registers.X = c.Registers.A
