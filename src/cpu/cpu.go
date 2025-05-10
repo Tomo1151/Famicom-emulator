@@ -178,12 +178,20 @@ func (c *CPU) lda(mode AddressingMode) {
 
 // MARK: LDX命令の実装
 func (c *CPU) ldx(mode AddressingMode) {
-	// @TODO 実装
+	addr := c.getOperandAddress(mode)
+	operand := c.ReadByteFromWRAM(addr)
+
+	c.Registers.X = uint8(operand)
+	c.updateNZFlags(c.Registers.X)
 }
 
 // MARK: LDY命令の実装
 func (c *CPU) ldy(mode AddressingMode) {
-	// @TODO 実装
+	addr := c.getOperandAddress(mode)
+	operand := c.ReadByteFromWRAM(addr)
+
+	c.Registers.Y = uint8(operand)
+	c.updateNZFlags(c.Registers.Y)
 }
 
 // MARK: LSR命令の実装
