@@ -18,7 +18,7 @@ type InstructionCode uint8
 // アドレッシングモード型の定義
 type AddressingMode uint8
 
-type InstructionHandler func(addressing AddressingMode, operand uint16)
+type InstructionHandler func(mode AddressingMode)
 
 // 命令セット型の定義
 type instructionSet map[uint8]Instruction
@@ -107,15 +107,118 @@ const (
 func generateInstructionSet(c *CPU) instructionSet {
 	instructionSet := make(instructionSet)
 
-	// ADC命令
+	// MARK: ADC命令
 	instructionSet[0x69] = Instruction{
 		Opecode: 0x69,
 		Code: ADC,
 		AddressingMode: Immediate,
 		Bytes: 2,
 		Cycles: 2,
-		PageCycles: 1,
+		PageCycles: 0,
 		Handler: c.adc,
+	}
+
+	// MARK: LDA命令
+	instructionSet[0xA9] = Instruction{
+		Opecode: 0xA9,
+		Code: LDA,
+		AddressingMode: Immediate,
+		Bytes: 2,
+		Cycles: 2,
+		PageCycles: 0,
+		Handler: c.lda,
+	}
+
+	instructionSet[0xA5] = Instruction{
+		Opecode: 0xA5,
+		Code: LDA,
+		AddressingMode: ZeroPage,
+		Bytes: 2,
+		Cycles: 3,
+		PageCycles: 0,
+		Handler: c.lda,
+	}
+
+	instructionSet[0xB5] = Instruction{
+		Opecode: 0xB5,
+		Code: LDA,
+		AddressingMode: ZeroPageXIndexed,
+		Bytes: 2,
+		Cycles: 4,
+		PageCycles: 0,
+		Handler: c.lda,
+	}
+
+	instructionSet[0xAD] = Instruction{
+		Opecode: 0xAD,
+		Code: LDA,
+		AddressingMode: Absolute,
+		Bytes: 3,
+		Cycles: 4,
+		PageCycles: 0,
+		Handler: c.lda,
+	}
+
+	instructionSet[0xBD] = Instruction{
+		Opecode: 0xBD,
+		Code: LDA,
+		AddressingMode: AbsoluteXIndexed,
+		Bytes: 3,
+		Cycles: 4,
+		PageCycles: 1,
+		Handler: c.lda,
+	}
+
+	instructionSet[0xB9] = Instruction{
+		Opecode: 0xB9,
+		Code: LDA,
+		AddressingMode: AbsoluteYIndexed,
+		Bytes: 3,
+		Cycles: 4,
+		PageCycles: 1,
+		Handler: c.lda,
+	}
+
+	instructionSet[0xA1] = Instruction{
+		Opecode: 0xA1,
+		Code: LDA,
+		AddressingMode: IndirectXIndexed,
+		Bytes: 2,
+		Cycles: 6,
+		PageCycles: 0,
+		Handler: c.lda,
+	}
+
+	instructionSet[0xB1] = Instruction{
+		Opecode: 0xB1,
+		Code: LDA,
+		AddressingMode: IndirectYIndexed,
+		Bytes: 2,
+		Cycles: 5,
+		PageCycles: 1,
+		Handler: c.lda,
+	}
+
+	// MARK: TAX命令
+	instructionSet[0xAA] = Instruction{
+		Opecode: 0xAA,
+		Code: TAX,
+		AddressingMode: Implied,
+		Bytes: 1,
+		Cycles: 2,
+		PageCycles: 0,
+		Handler: c.tax,
+	}
+
+	// BRK命令
+	instructionSet[0x00] = Instruction{
+		Opecode: 0x00,
+		Code: BRK,
+		AddressingMode: Implied,
+		Bytes: 1,
+		Cycles: 7,
+		PageCycles: 0,
+		Handler: c.brk,
 	}
 
 	return instructionSet
