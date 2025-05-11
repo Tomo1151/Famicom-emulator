@@ -16,8 +16,8 @@ type CPU struct {
 }
 
 // MARK: CPUの作成関数
-func CreateCPU(debug bool) CPU {
-	cpu := CPU{}
+func CreateCPU(debug bool) *CPU {
+	cpu := &CPU{}
 	cpu.Init(debug)
 	return cpu
 }
@@ -48,7 +48,11 @@ func (c *CPU) Init(debug bool) {
 // MARK:  命令の実行
 func (c *CPU) Execute() {
 	opecode := c.ReadByteFromWRAM(c.Registers.PC)
-	instruction := c.InstructionSet[opecode]
+	instruction, exists := c.InstructionSet[opecode]
+
+	if !exists {
+		log.Fatalf("Error: Unknown opecode $%02X at PC=%04X", opecode, c.Registers.PC)
+	}
 
 	if c.log {
 		fmt.Printf("opecode: $%02X (%s) from: $%04X\n", opecode, instruction.Code.ToString(), c.Registers.PC)
@@ -59,7 +63,7 @@ func (c *CPU) Execute() {
 	instruction.Handler(instruction.AddressingMode)
 
 	// オペランド分プログラムカウンタを進める (オペコードの分 -1)
-	c.Registers.PC = uint16(c.Registers.PC + uint16(instruction.Bytes-1))
+	c.Registers.PC += uint16(instruction.Bytes-1)
 
 	if c.log {
 		fmt.Printf("PC: $%04X\n\n", c.Registers.PC)
@@ -122,10 +126,9 @@ func (c *CPU) getOperandAddress(mode AddressingMode) uint16 {
 		return uint16(upper) << 8 | uint16(lower)
 	case IndirectYIndexed:
 		base := c.ReadByteFromWRAM(c.Registers.PC)
-		ptr := base + c.Registers.Y
-		lower := c.ReadByteFromWRAM(uint16(ptr))
-		upper := c.ReadByteFromWRAM(uint16(ptr + 1))
-		return uint16(upper) << 8 | uint16(lower)
+		lower := c.ReadByteFromWRAM(uint16(base))
+		upper := c.ReadByteFromWRAM(uint16(base + 1) & 0xFF)
+		return (uint16(upper) << 8 | uint16(lower)) + uint16(c.Registers.Y)
 	default:
 		log.Fatalf("Unsupported addressing type: %v", mode)
 		return 0x0000
@@ -650,6 +653,19 @@ func (c *CPU) tya(mode AddressingMode) {
 	c.updateNZFlags(c.Registers.A)
 }
 
+
+// MARK: デバッグ用表示メソッド
+func (c *CPU) Dump() {
+	fmt.Printf("REG_A: $%02X\n", c.Registers.A)
+	fmt.Printf("REG_X: $%02X\n", c.Registers.X)
+	fmt.Printf("REG_Y: $%02X\n", c.Registers.Y)
+	fmt.Printf("REG_SP: $%02X\n", c.Registers.SP)
+	fmt.Printf("REG_PC: $%04X\n", c.Registers.PC)
+	fmt.Println("P.Negative: ", c.Registers.P.Negative)
+	fmt.Println("P.Zero: ", c.Registers.P.Zero)
+	fmt.Println("P.Carry: ", c.Registers.P.Carry)
+	fmt.Printf("P.Overflow: %v\n\n", c.Registers.P.Overflow)
+}
 
 
 // MARK: デバッグ用実行メソッド
