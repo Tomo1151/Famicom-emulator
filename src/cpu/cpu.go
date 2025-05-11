@@ -232,8 +232,7 @@ func (c *CPU) asl(mode AddressingMode) {
 		value := c.ReadByteFromWRAM(addr)
 		c.Registers.P.Carry = (value >> 7) != 0
 		c.WriteByteToWRAM(addr, value << 1)
-		c.Registers.P.Zero = c.Registers.A == 0x00 // @FIXME もしかしたらvalueを見るべきかも
-		c.Registers.P.Negative = (c.ReadByteFromWRAM(addr) >> 7) != 0
+		c.updateNZFlags(c.Registers.A)
 	}
 }
 
@@ -421,7 +420,17 @@ func (c *CPU) ldy(mode AddressingMode) {
 
 // MARK: LSR命令の実装
 func (c *CPU) lsr(mode AddressingMode) {
-	// @TODO 実装
+	if mode == Accumulator {
+		c.Registers.P.Carry = (c.Registers.A & 0x01) != 0
+		c.Registers.A = c.Registers.A >> 1
+		c.updateNZFlags(c.Registers.A)
+	} else {
+		addr := c.getOperandAddress(mode)
+		value := c.ReadByteFromWRAM(addr)
+		c.Registers.P.Carry = (value & 0x01) != 0
+		c.WriteByteToWRAM(addr, value >> 1)
+		c.updateNZFlags(c.ReadByteFromWRAM(addr))
+	}
 }
 
 // MARK: NOP命令の実装
