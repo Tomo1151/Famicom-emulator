@@ -253,7 +253,13 @@ func (c *CPU) beq(mode AddressingMode) {
 
 // MARK: BIT命令の実装
 func (c *CPU) bit(mode AddressingMode) {
-	// @TODO 実装
+	addr := c.getOperandAddress(mode)
+	value := c.ReadByteFromWRAM(addr)
+	mask := c.Registers.A
+
+	c.Registers.P.Zero = (value & mask) == 0x00
+	c.Registers.P.Overflow = (value >> 6) != 0
+	c.Registers.P.Negative = (value >> 7) != 0
 }
 
 // MARK: BMI命令の実装
