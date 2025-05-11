@@ -229,10 +229,10 @@ func (c *CPU) asl(mode AddressingMode) {
 		c.updateNZFlags(c.Registers.A)
 	} else {
 		addr := c.getOperandAddress(mode)
-		value := c.ReadByteFromWRAM(addr)
+		value := c.ReadByteFromWRAM(addr) << 1
 		c.Registers.P.Carry = (value >> 7) != 0
-		c.WriteByteToWRAM(addr, value << 1)
-		c.updateNZFlags(c.Registers.A)
+		c.WriteByteToWRAM(addr, value)
+		c.updateNZFlags(value)
 	}
 }
 
@@ -344,8 +344,9 @@ func (c *CPU) cpy(mode AddressingMode) {
 // MARK: DEC命令の実装
 func (c *CPU) dec(mode AddressingMode) {
 	addr := c.getOperandAddress(mode)
-	value := c.ReadByteFromWRAM(addr)
-	c.WriteByteToWRAM(addr, value - 1)
+	value := c.ReadByteFromWRAM(addr) - 1
+	c.WriteByteToWRAM(addr, value)
+	c.updateNZFlags(value)
 }
 
 // MARK: DEX命令の実装
@@ -365,6 +366,7 @@ func (c *CPU) eor(mode AddressingMode) {
 	addr := c.getOperandAddress(mode)
 	value := c.ReadByteFromWRAM(addr)
 	c.Registers.A ^= value
+	c.updateNZFlags(c.Registers.A)
 }
 
 // MARK: INC命令の実装
@@ -388,9 +390,12 @@ func (c *CPU) iny(mode AddressingMode) {
 
 // MARK: JMP命令の実装
 func (c *CPU) jmp(mode AddressingMode) {
-	addr := c.getOperandAddress(mode)
-	value := c.ReadWordFromWRAM(addr)
-	c.Registers.PC = value
+	if mode == Indirect {
+		addr := c.getOperandAddress(mode)
+		c.Registers.PC = c.ReadWordFromWRAM(addr)
+	} else {
+		c.Registers.PC = c.getOperandAddress(mode)
+	}
 }
 
 // MARK: JSR命令の実装
@@ -436,10 +441,10 @@ func (c *CPU) lsr(mode AddressingMode) {
 		c.updateNZFlags(c.Registers.A)
 	} else {
 		addr := c.getOperandAddress(mode)
-		value := c.ReadByteFromWRAM(addr)
+		value := c.ReadByteFromWRAM(addr) >> 1
 		c.Registers.P.Carry = (value & 0x01) != 0
-		c.WriteByteToWRAM(addr, value >> 1)
-		c.updateNZFlags(c.ReadByteFromWRAM(addr))
+		c.WriteByteToWRAM(addr, value)
+		c.updateNZFlags(value)
 	}
 }
 
@@ -482,7 +487,7 @@ func (c *CPU) rol(mode AddressingMode) {
 	if mode == Accumulator {
 		carry := c.Registers.A >> 7 != 0
 		c.Registers.A = c.Registers.A << 1
-		
+
 		if (c.Registers.P.Carry) {
 			c.Registers.A |= 0x01
 		}
@@ -501,8 +506,8 @@ func (c *CPU) rol(mode AddressingMode) {
 		}
 
 		c.Registers.P.Carry = carry
-		c.Registers.P.Zero = c.Registers.A == 0x00
 		c.Registers.P.Negative = value >> 7 != 0
+		c.updateNZFlags(value)
 
 		c.WriteByteToWRAM(addr, value)
 	}
@@ -532,8 +537,8 @@ func (c *CPU) ror(mode AddressingMode) {
 		}
 
 		c.Registers.P.Carry = carry
-		c.Registers.P.Zero = c.Registers.A == 0x00
 		c.Registers.P.Negative = value >> 7 != 0
+		c.updateNZFlags(value)
 
 		c.WriteByteToWRAM(addr, value)
 	}
@@ -551,7 +556,7 @@ func (c *CPU) rti(mode AddressingMode) {
 // MARK: RTS命令の実装
 func (c *CPU) rts(mode AddressingMode) {
 	addr := c.popWord()
-	c.Registers.PC = addr
+	c.Registers.PC = addr + 1
 }
 
 // MARK: SBC命令の実装

@@ -865,6 +865,7 @@ func generateInstructionSet(c *CPU) instructionSet {
 	instructionSet[0x4C] = Instruction{
 		Opecode: 0x4C,
 		Code: JMP,
+		AddressingMode: Absolute,
 		Bytes: 3,
 		Cycles: 3,
 		PageCycles: 0,
@@ -874,6 +875,7 @@ func generateInstructionSet(c *CPU) instructionSet {
 	instructionSet[0x6C] = Instruction{
 		Opecode: 0x6C,
 		Code: JMP,
+		AddressingMode: Indirect,
 		Bytes: 3,
 		Cycles: 5,
 		PageCycles: 0,
@@ -1694,7 +1696,7 @@ func generateInstructionSet(c *CPU) instructionSet {
 	// MARK: TXA命令
 	instructionSet[0x8A] = Instruction{
 		Opecode: 0x8A,
-		Code: TAX,
+		Code: TXA,
 		AddressingMode: Implied,
 		Bytes: 1,
 		Cycles: 2,
