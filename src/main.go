@@ -11,10 +11,8 @@ import (
 
 func main() {
 	fmt.Println("Hello, world!")
-	cpu := cpu.CreateCPU()
-
-	fmt.Println(cpu.Registers.A, cpu.Registers.X, cpu.Registers.P, cpu.Registers.P.Break)
-
+	cpu := cpu.CreateCPU(true)
+	cpu.Execute()
 }
 
 func createWindow() {
