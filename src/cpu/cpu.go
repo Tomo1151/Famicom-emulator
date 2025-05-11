@@ -279,7 +279,8 @@ func (c *CPU) bpl(mode AddressingMode) {
 
 // MARK: BRK命令の実装
 func (c *CPU) brk(mode AddressingMode) {
-	// @TODO 実装
+	c.pushWord(c.Registers.PC)
+	c.pushByte(c.Registers.P.ToByte())
 	c.Registers.P.Break = true
 }
 
@@ -318,6 +319,7 @@ func (c *CPU) cmp(mode AddressingMode) {
 	addr := c.getOperandAddress(mode)
 	value := c.ReadByteFromWRAM(addr)
 
+	c.Registers.P.Carry = c.Registers.A >= value
 	c.updateNZFlags(c.Registers.A - value)
 }
 
@@ -326,6 +328,7 @@ func (c *CPU) cpx(mode AddressingMode) {
 	addr := c.getOperandAddress(mode)
 	value := c.ReadByteFromWRAM(addr)
 
+	c.Registers.P.Carry = c.Registers.X >= value
 	c.updateNZFlags(c.Registers.X - value)
 }
 
@@ -334,6 +337,7 @@ func (c *CPU) cpy(mode AddressingMode) {
 	addr := c.getOperandAddress(mode)
 	value := c.ReadByteFromWRAM(addr)
 
+	c.Registers.P.Carry = c.Registers.Y >= value
 	c.updateNZFlags(c.Registers.Y - value)
 }
 
@@ -538,12 +542,17 @@ func (c *CPU) ror(mode AddressingMode) {
 
 // MARK: RTI命令の実装
 func (c *CPU) rti(mode AddressingMode) {
-	// @TODO 実装
+	status := c.popByte()
+	addr := c.popWord()
+
+	c.Registers.P.SetFromByte(status)
+	c.Registers.PC = addr
 }
 
 // MARK: RTS命令の実装
 func (c *CPU) rts(mode AddressingMode) {
-	// @TODO 実装
+	addr := c.popWord()
+	c.Registers.PC = addr
 }
 
 // MARK: SBC命令の実装
