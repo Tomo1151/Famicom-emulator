@@ -445,7 +445,6 @@ func (c *CPU) lsr(mode AddressingMode) {
 
 // MARK: NOP命令の実装
 func (c *CPU) nop(mode AddressingMode) {
-	// @TODO 実装
 }
 
 // MARK: ORA命令の実装
