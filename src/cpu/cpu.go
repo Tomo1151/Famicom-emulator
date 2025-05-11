@@ -145,31 +145,78 @@ func (c *CPU) updateNZFlags(result uint8) {
 	// Zフラグの更新
 	if result == 0 {
 		c.Registers.P.Zero = true
-		} else {
-			c.Registers.P.Zero = false
-		}
+	} else {
+		c.Registers.P.Zero = false
 	}
+}
 
 
-	// MARK: フラグ(V, C)の更新
-	func (c *CPU) updateVCFlags(prev uint8, result uint8) {
+// MARK: フラグ(V, C)の更新
+func (c *CPU) updateVCFlags(prev uint8, result uint8) {
 	// Vフラグの更新 @TODO 実装
 	// Cフラグの更新 @TODO 実装
+}
+
+// MARK: スタック操作
+func (c *CPU) pushByte(value uint8) {
+	c.Registers.SP--
+	stack_addr := 0x0100 | uint16(c.Registers.SP)
+	c.WriteByteToWRAM(stack_addr, value)
+}
+
+func (c *CPU) pushWord(value uint16) {
+	c.Registers.SP--
+	stack_addr := 0x0100 | uint16(c.Registers.SP)
+	c.WriteByteToWRAM(stack_addr, (uint8(value >> 8)))
+
+	c.Registers.SP--
+	stack_addr = 0x0100 | uint16(c.Registers.SP)
+	c.WriteByteToWRAM(stack_addr, (uint8(value & 0xFF)))
+}
+
+func (c *CPU) popByte() uint8 {
+	stack_addr := 0x0100 | uint16(c.Registers.SP)
+	value := c.ReadByteFromWRAM(stack_addr)
+	c.Registers.SP++
+	return value
+}
+
+func (c *CPU) popWord() uint16 {
+	stack_addr := 0x0100 | uint16(c.Registers.SP)
+	lower := c.ReadByteFromWRAM(stack_addr)
+	c.Registers.SP++
+
+	stack_addr = 0x0100 | uint16(c.Registers.SP)
+	upper := c.ReadByteFromWRAM(stack_addr)
+	c.Registers.SP++
+
+	return uint16(upper << 8) | uint16(lower)
 }
 
 
 // MARK: ADC命令の実装
 func (c *CPU) adc(mode AddressingMode) {
-	if c.log {
-		fmt.Printf("*ADC* mode: $%02X", mode)
+	addr := c.getOperandAddress(mode)
+	value := c.ReadByteFromWRAM(addr)
+	carry := 0
+
+	if c.Registers.P.Carry {
+		carry = 1
 	}
 
-	// @TODO 実装
+	result := c.Registers.A + value + uint8(carry)
+	c.updateNZFlags(c.Registers.A)
+	c.updateVCFlags(c.Registers.A, result) // @FIXME
+	c.Registers.A = result
 }
 
 // MARK: AND命令の実装
 func (c *CPU) and(mode AddressingMode) {
-	// @TODO 実装
+	addr := c.getOperandAddress(mode)
+	value := c.ReadByteFromWRAM(addr)
+	c.Registers.A &= value
+
+	c.updateNZFlags(c.Registers.A)
 }
 
 // MARK: ASL命令の実装
@@ -248,17 +295,26 @@ func (c *CPU) clv(mode AddressingMode) {
 
 // MARK: CMP命令の実装
 func (c *CPU) cmp(mode AddressingMode) {
-	// @TODO 実装
+	addr := c.getOperandAddress(mode)
+	value := c.ReadByteFromWRAM(addr)
+
+	c.updateNZFlags(c.Registers.A - value)
 }
 
 // MARK: CPX命令の実装
 func (c *CPU) cpx(mode AddressingMode) {
-	// @TODO 実装
+	addr := c.getOperandAddress(mode)
+	value := c.ReadByteFromWRAM(addr)
+
+	c.updateNZFlags(c.Registers.X - value)
 }
 
 // MARK: CPY命令の実装
 func (c *CPU) cpy(mode AddressingMode) {
-	// @TODO 実装
+	addr := c.getOperandAddress(mode)
+	value := c.ReadByteFromWRAM(addr)
+
+	c.updateNZFlags(c.Registers.Y - value)
 }
 
 // MARK: DEC命令の実装
@@ -308,12 +364,17 @@ func (c *CPU) iny(mode AddressingMode) {
 
 // MARK: JMP命令の実装
 func (c *CPU) jmp(mode AddressingMode) {
-	// @TODO 実装
+	addr := c.getOperandAddress(mode)
+	value := c.ReadWordFromWRAM(addr)
+	c.Registers.PC = value
 }
 
 // MARK: JSR命令の実装
 func (c *CPU) jsr(mode AddressingMode) {
-	// @TODO 実装
+	addr := c.getOperandAddress(mode)
+	value := c.ReadWordFromWRAM(addr)
+	c.pushWord(c.Registers.PC)
+	c.Registers.PC = value
 }
 
 // MARK: LDA命令の実装
@@ -355,27 +416,32 @@ func (c *CPU) nop(mode AddressingMode) {
 
 // MARK: ORA命令の実装
 func (c *CPU) ora(mode AddressingMode) {
-	// @TODO 実装
+	addr := c.getOperandAddress(mode)
+	value := c.ReadByteFromWRAM(addr)
+
+	c.Registers.A |= value
+	c.updateNZFlags(c.Registers.A)
 }
 
 // MARK: PHA命令の実装
 func (c *CPU) pha(mode AddressingMode) {
-	// @TODO 実装
+	c.pushByte(c.Registers.A)
 }
 
 // MARK: PHP命令の実装
 func (c *CPU) php(mode AddressingMode) {
-	// @TODO 実装
+	c.pushByte(c.Registers.P.ToByte())
 }
 
 // MARK: PLA命令の実装
 func (c *CPU) pla(mode AddressingMode) {
-	// @TODO 実装
+	c.Registers.A = c.popByte()
+	c.updateNZFlags(c.Registers.A)
 }
 
 // MARK: PLP命令の実装
 func (c *CPU) plp(mode AddressingMode) {
-	// @TODO 実装
+	c.Registers.P.SetFromByte(c.popByte())
 }
 
 // MARK: ROL命令の実装
