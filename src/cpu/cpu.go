@@ -151,11 +151,6 @@ func (c *CPU) updateNZFlags(result uint8) {
 }
 
 
-// MARK: フラグ(V, C)の更新
-func (c *CPU) updateVCFlags(prev uint8, result uint8) {
-	// Vフラグの更新 @TODO 実装
-	// Cフラグの更新 @TODO 実装
-}
 
 // MARK: スタック操作
 func (c *CPU) pushByte(value uint8) {
@@ -190,7 +185,7 @@ func (c *CPU) popWord() uint16 {
 	upper := c.ReadByteFromWRAM(stack_addr)
 	c.Registers.SP++
 
-	return uint16(upper << 8) | uint16(lower)
+	return uint16(upper) << 8 | uint16(lower)
 }
 
 
@@ -198,15 +193,22 @@ func (c *CPU) popWord() uint16 {
 func (c *CPU) adc(mode AddressingMode) {
 	addr := c.getOperandAddress(mode)
 	value := c.ReadByteFromWRAM(addr)
-	carry := 0
+	sum := uint16(c.Registers.A) + uint16(value)
 
 	if c.Registers.P.Carry {
-		carry = 1
+		sum++
 	}
 
-	result := c.Registers.A + value + uint8(carry)
-	c.updateNZFlags(c.Registers.A)
-	c.updateVCFlags(c.Registers.A, result) // @FIXME
+	result := uint8(sum)
+
+	// キャリーフラグの設定 (結果が8bitを超えるか)
+	c.Registers.P.Carry = sum > 0xFF
+
+	// 符号付きオーバーフローの検出
+	// 両方の入力の符号が同じで結果の符号が異なる場合にオーバーフロー
+	c.Registers.P.Overflow = ((c.Registers.A ^ value) & 0x80) == 0 && ((c.Registers.A ^ result) & 0x80) != 0
+
+	c.updateNZFlags(result)
 	c.Registers.A = result
 }
 
@@ -221,7 +223,18 @@ func (c *CPU) and(mode AddressingMode) {
 
 // MARK: ASL命令の実装
 func (c *CPU) asl(mode AddressingMode) {
-	// @TODO 実装
+	if mode == Accumulator {
+		c.Registers.P.Carry = (c.Registers.A >> 7) != 0
+		c.Registers.A = c.Registers.A << 1
+		c.updateNZFlags(c.Registers.A)
+	} else {
+		addr := c.getOperandAddress(mode)
+		value := c.ReadByteFromWRAM(addr)
+		c.Registers.P.Carry = (value >> 7) != 0
+		c.WriteByteToWRAM(addr, value << 1)
+		c.Registers.P.Zero = c.Registers.A == 0x00 // @FIXME もしかしたらvalueを見るべきかも
+		c.Registers.P.Negative = (c.ReadByteFromWRAM(addr) >> 7) != 0
+	}
 }
 
 // MARK: BCC命令の実装
@@ -261,6 +274,8 @@ func (c *CPU) bpl(mode AddressingMode) {
 
 // MARK: BRK命令の実装
 func (c *CPU) brk(mode AddressingMode) {
+	// @TODO 実装
+	c.Registers.P.Break = true
 }
 
 // MARK: BVC命令の実装
@@ -466,7 +481,25 @@ func (c *CPU) rts(mode AddressingMode) {
 
 // MARK: SBC命令の実装
 func (c *CPU) sbc(mode AddressingMode) {
-	// @TODO 実装
+	addr := c.getOperandAddress(mode)
+	value := c.ReadByteFromWRAM(addr)
+
+	value = ^value
+
+	sum := uint16(c.Registers.A) + uint16(value)
+
+	if c.Registers.P.Carry {
+		sum++
+	}
+
+	result := uint8(sum)
+
+	// フラグ設定
+	c.Registers.P.Carry = sum > 0xFF
+	c.Registers.P.Overflow = ((c.Registers.A ^ value) & 0x80) == 0 && ((c.Registers.A ^ result) & 0x80) != 0
+
+	c.updateNZFlags(result)
+	c.Registers.A = result
 }
 
 // MARK: SEC命令の実装
