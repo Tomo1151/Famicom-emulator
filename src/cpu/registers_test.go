@@ -166,7 +166,7 @@ func TestStatusRegister_FromByte(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			var got statusRegister
-			got.FromByte(tt.input)
+			got.SetFromByte(tt.input)
 
 			// 各フラグを個別に検証
 			if got.Negative != tt.want.Negative {
@@ -220,7 +220,7 @@ func TestStatusRegister_RoundTrip(t *testing.T) {
 	for i, original := range testCases {
 		byteValue := original.ToByte()
 		var reconverted statusRegister
-		reconverted.FromByte(byteValue)
+		reconverted.SetFromByte(byteValue)
 
 		// 元のステータスと再変換後のステータスが一致するか検証
 		if original.Negative != reconverted.Negative ||
