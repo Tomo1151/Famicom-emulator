@@ -470,12 +470,64 @@ func (c *CPU) plp(mode AddressingMode) {
 
 // MARK: ROL命令の実装
 func (c *CPU) rol(mode AddressingMode) {
-	// @TODO 実装
+	if mode == Accumulator {
+		carry := c.Registers.A >> 7 != 0
+		c.Registers.A = c.Registers.A << 1
+		
+		if (c.Registers.P.Carry) {
+			c.Registers.A |= 0x01
+		}
+
+		c.Registers.P.Carry = carry
+		c.updateNZFlags(c.Registers.A)
+	} else {
+		addr := c.getOperandAddress(mode)
+		value := c.ReadByteFromWRAM(addr)
+
+		carry := value >> 7 != 0
+		value <<= 1
+
+		if c.Registers.P.Carry {
+			value |= 0x01
+		}
+
+		c.Registers.P.Carry = carry
+		c.Registers.P.Zero = c.Registers.A == 0x00
+		c.Registers.P.Negative = value >> 7 != 0
+
+		c.WriteByteToWRAM(addr, value)
+	}
 }
 
 // MARK: ROR命令の実装
 func (c *CPU) ror(mode AddressingMode) {
-	// @TODO 実装
+	if mode == Accumulator {
+		carry := c.Registers.A & 0x01 != 0
+		c.Registers.A = c.Registers.A >> 1
+		
+		if (c.Registers.P.Carry) {
+			c.Registers.A |= 1 << 7
+		}
+
+		c.Registers.P.Carry = carry
+		c.updateNZFlags(c.Registers.A)
+	} else {
+		addr := c.getOperandAddress(mode)
+		value := c.ReadByteFromWRAM(addr)
+
+		carry := value & 0x01 != 0
+		value >>= 1
+
+		if c.Registers.P.Carry {
+			value |= 1 << 7
+		}
+
+		c.Registers.P.Carry = carry
+		c.Registers.P.Zero = c.Registers.A == 0x00
+		c.Registers.P.Negative = value >> 7 != 0
+
+		c.WriteByteToWRAM(addr, value)
+	}
 }
 
 // MARK: RTI命令の実装
