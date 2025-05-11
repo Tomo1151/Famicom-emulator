@@ -68,7 +68,7 @@ func (s *statusRegister) ToByte() uint8 {
 }
 
 // uint8からステータスレジスタオブジェクトへ変換するメソッド
-func (s *statusRegister) FromByte(value uint8) {
+func (s *statusRegister) SetFromByte(value uint8) {
 	s.Negative = (value & (1 << STATUS_REG_NEGATIVE_POS)) != 0
 	s.Overflow = (value & (1 << STATUS_REG_OVERFLOW_POS)) != 0
 	s.Reserved = (value & (1 << STATUS_REG_RESERVED_POS)) != 0
