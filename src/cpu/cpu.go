@@ -148,8 +148,11 @@ func (c *CPU) getOperandAddress(mode AddressingMode) uint16 {
 	case Relative:
 		offset := int8(c.ReadByteFromWRAM(c.Registers.PC))
 		return uint16(offset)
+	case Implied:
+		log.Fatalf("Error: Mode Implied doesn't take any operand")
+		return 0x0000
 	default:
-		log.Fatalf("Unsupported addressing type: %v", mode)
+		log.Fatalf("Error: Unsupported addressing type '%v'", mode)
 		return 0x0000
 	}
 }
