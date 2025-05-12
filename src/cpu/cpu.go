@@ -137,14 +137,10 @@ func (c *CPU) getOperandAddress(mode AddressingMode) uint16 {
 	case IndirectXIndexed:
 		base := c.ReadByteFromWRAM(c.Registers.PC)
 		ptr := base + c.Registers.X
-		lower := c.ReadByteFromWRAM(uint16(ptr))
-		upper := c.ReadByteFromWRAM(uint16(ptr + 1))
-		return uint16(upper) << 8 | uint16(lower)
+		return c.ReadWordFromWRAM(uint16(ptr))
 	case IndirectYIndexed:
 		base := c.ReadByteFromWRAM(c.Registers.PC)
-		lower := c.ReadByteFromWRAM(uint16(base))
-		upper := c.ReadByteFromWRAM(uint16(base + 1) & 0xFF)
-		return (uint16(upper) << 8 | uint16(lower)) + uint16(c.Registers.Y)
+		return c.ReadWordFromWRAM(uint16(base)) + uint16(c.Registers.Y)
 	case Relative:
 		offset := int8(c.ReadByteFromWRAM(c.Registers.PC))
 		return uint16(offset)
