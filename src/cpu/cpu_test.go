@@ -4205,3 +4205,401 @@ func TestDEC(t *testing.T) {
         })
     }
 }
+
+
+// MARK: ジャンプ
+// TestJMP はJMP命令（ジャンプ）をテストします
+func TestJMP(t *testing.T) {
+    tests := []struct {
+        name      string
+        opcode    uint8
+        addrMode  AddressingMode
+        setupCPU  func(*CPU)
+        expectedPC uint16
+    }{
+        {
+            name:     "JMP Absolute",
+            opcode:   0x4C,
+            addrMode: Absolute,
+            setupCPU: func(c *CPU) {
+                c.WriteByteToWRAM(c.Registers.PC, 0x4C) // JMP命令
+                c.WriteByteToWRAM(c.Registers.PC+1, 0x34) // 低バイト
+                c.WriteByteToWRAM(c.Registers.PC+2, 0x12) // 高バイト (0x1234)
+            },
+            expectedPC: 0x1234, // 指定されたアドレスに変更
+        },
+        {
+            name:     "JMP Indirect",
+            opcode:   0x6C,
+            addrMode: Indirect,
+            setupCPU: func(c *CPU) {
+                c.WriteByteToWRAM(c.Registers.PC, 0x6C) // JMP命令
+                c.WriteByteToWRAM(c.Registers.PC+1, 0x80) // 低バイト
+                c.WriteByteToWRAM(c.Registers.PC+2, 0x44) // 高バイト (0x4480)
+                
+                // 間接アドレス先のジャンプ先
+                c.WriteByteToWRAM(0x4480, 0x34) // 低バイト
+                c.WriteByteToWRAM(0x4481, 0x12) // 高バイト (0x1234)
+            },
+            expectedPC: 0x1234, // 間接アドレスの指す位置に変更
+        },
+        {
+            name:     "JMP Indirect - Page Boundary Bug",
+            opcode:   0x6C,
+            addrMode: Indirect,
+            setupCPU: func(c *CPU) {
+                c.WriteByteToWRAM(c.Registers.PC, 0x6C) // JMP命令
+                c.WriteByteToWRAM(c.Registers.PC+1, 0xFF) // 低バイト
+                c.WriteByteToWRAM(c.Registers.PC+2, 0x44) // 高バイト (0x44FF)
+                
+                // 間接アドレス先（ページ境界）
+                c.WriteByteToWRAM(0x44FF, 0x34) // 低バイト
+                // 高バイトは0x4500でなく、同ページ内の0x4400から取得される（バグ）
+                c.WriteByteToWRAM(0x4400, 0x12) // 高バイト (0x1234)
+            },
+            expectedPC: 0x1234, // バグによる特殊なアドレス取得
+        },
+    }
+
+    for _, tt := range tests {
+        t.Run(tt.name, func(t *testing.T) {
+            c := setupCPU()
+            tt.setupCPU(c)
+            
+            // CPU実行サイクルを使用して命令を実行
+            c.Execute()
+
+            // 結果を検証
+            if c.Registers.PC != tt.expectedPC {
+                t.Errorf("PC = %#04x, want %#04x", c.Registers.PC, tt.expectedPC)
+            }
+        })
+    }
+}
+
+// TestJSR はJSR命令（サブルーチンにジャンプ）をテストします
+func TestJSR(t *testing.T) {
+    tests := []struct {
+        name      string
+        opcode    uint8
+        addrMode  AddressingMode
+        setupCPU  func(*CPU)
+        expectedPC uint16
+        expectedSP uint8
+        checkStack func(*testing.T, *CPU)
+    }{
+        {
+            name:     "JSR Absolute",
+            opcode:   0x20,
+            addrMode: Absolute,
+            setupCPU: func(c *CPU) {
+                c.Registers.PC = 0x0200
+                c.Registers.SP = 0xFF // スタックポインタ初期化
+                c.WriteByteToWRAM(0x0200, 0x20) // JSR命令
+                c.WriteByteToWRAM(0x0201, 0x34) // 低バイト
+                c.WriteByteToWRAM(0x0202, 0x12) // 高バイト (0x1234)
+            },
+            expectedPC: 0x1234, // ジャンプ先アドレス
+            expectedSP: 0xFD, // スタックポインタが2バイト分減少
+            checkStack: func(t *testing.T, c *CPU) {
+                // スタックにはPC-1の値（0x0202-1 = 0x0201）が格納されている
+                highByte := c.ReadByteFromWRAM(0x01FF) // SP+2の位置
+                lowByte := c.ReadByteFromWRAM(0x01FE)  // SP+1の位置
+                returnAddr := uint16(highByte)<<8 | uint16(lowByte)
+                if returnAddr != 0x0202 {
+                    t.Errorf("Return address on stack = %#04x, want %#04x", returnAddr, 0x0202)
+                }
+            },
+        },
+    }
+
+    for _, tt := range tests {
+        t.Run(tt.name, func(t *testing.T) {
+            c := setupCPU()
+            tt.setupCPU(c)
+            
+            // CPU実行サイクルを使用して命令を実行
+            c.Execute()
+
+            // 結果を検証
+            if c.Registers.PC != tt.expectedPC {
+                t.Errorf("PC = %#04x, want %#04x", c.Registers.PC, tt.expectedPC)
+            }
+            checkRegister(t, "SP", c.Registers.SP, tt.expectedSP)
+            if tt.checkStack != nil {
+                tt.checkStack(t, c)
+            }
+        })
+    }
+}
+
+// TestRTS はRTS命令（サブルーチンから復帰）をテストします
+func TestRTS(t *testing.T) {
+    tests := []struct {
+        name      string
+        opcode    uint8
+        addrMode  AddressingMode
+        setupCPU  func(*CPU)
+        expectedPC uint16
+        expectedSP uint8
+    }{
+        {
+            name:     "RTS - Return from Subroutine",
+            opcode:   0x60,
+            addrMode: Implied,
+            setupCPU: func(c *CPU) {
+                c.Registers.SP = 0xFD // スタックポインタ設定
+                
+                // スタックに復帰先アドレス-1 (0x1234-1 = 0x1233) を設定
+                c.WriteByteToWRAM(0x01FE, 0x33) // 低バイト
+                c.WriteByteToWRAM(0x01FF, 0x12) // 高バイト
+                
+                c.WriteByteToWRAM(c.Registers.PC, 0x60) // RTS命令
+            },
+            expectedPC: 0x1234, // 復帰先アドレス（スタック値+1）
+            expectedSP: 0xFF, // スタックポインタが2バイト分復元
+        },
+    }
+
+    for _, tt := range tests {
+        t.Run(tt.name, func(t *testing.T) {
+            c := setupCPU()
+            tt.setupCPU(c)
+            
+            // CPU実行サイクルを使用して命令を実行
+            c.Execute()
+
+            // 結果を検証
+            if c.Registers.PC != tt.expectedPC {
+                t.Errorf("PC = %#04x, want %#04x", c.Registers.PC, tt.expectedPC)
+            }
+            checkRegister(t, "SP", c.Registers.SP, tt.expectedSP)
+        })
+    }
+}
+
+// TestRTI はRTI命令（割り込みから復帰）をテストします
+func TestRTI(t *testing.T) {
+    tests := []struct {
+        name           string
+        opcode         uint8
+        addrMode       AddressingMode
+        setupCPU       func(*CPU)
+        expectedPC     uint16
+        expectedSP     uint8
+        expectedCarry  bool
+        expectedZero   bool
+        expectedInt    bool
+        expectedBreak  bool
+        expectedDec    bool
+        expectedOverflow bool
+        expectedNeg    bool
+    }{
+        {
+            name:     "RTI - Return from Interrupt",
+            opcode:   0x40,
+            addrMode: Implied,
+            setupCPU: func(c *CPU) {
+                c.Registers.SP = 0xFC // スタックポインタ設定
+                
+                // スタックに処理状態とアドレスを設定
+                // ステータスレジスタ（Carry=1, Zero=1, 他=0）
+                c.WriteByteToWRAM(0x01FD, 0x03)
+                // 復帰先アドレス (0x1234)
+                c.WriteByteToWRAM(0x01FE, 0x34) // 低バイト
+                c.WriteByteToWRAM(0x01FF, 0x12) // 高バイト
+                
+                c.WriteByteToWRAM(c.Registers.PC, 0x40) // RTI命令
+            },
+            expectedPC: 0x1234, // 復帰先アドレス
+            expectedSP: 0xFF, // スタックポインタが3バイト分復元
+            expectedCarry: true,
+            expectedZero: true,
+            expectedInt: false,
+            expectedBreak: false,
+            expectedDec: false,
+            expectedOverflow: false,
+            expectedNeg: false,
+        },
+        {
+            name:     "RTI - All Flags Set",
+            opcode:   0x40,
+            addrMode: Implied,
+            setupCPU: func(c *CPU) {
+                c.Registers.SP = 0xFC // スタックポインタ設定
+                
+                // スタックに処理状態とアドレスを設定
+                // すべてのフラグセット（但しBreakとReservedは無視される）
+                c.WriteByteToWRAM(0x01FD, 0xFF)
+                // 復帰先アドレス (0x4321)
+                c.WriteByteToWRAM(0x01FE, 0x21) // 低バイト
+                c.WriteByteToWRAM(0x01FF, 0x43) // 高バイト
+                
+                c.WriteByteToWRAM(c.Registers.PC, 0x40) // RTI命令
+            },
+            expectedPC: 0x4321, // 復帰先アドレス
+            expectedSP: 0xFF, // スタックポインタが3バイト分復元
+            expectedCarry: true,
+            expectedZero: true,
+            expectedInt: true,
+            expectedBreak: false, // RTIではBフラグは無視される
+            expectedDec: true,
+            expectedOverflow: true,
+            expectedNeg: true,
+        },
+    }
+
+    for _, tt := range tests {
+        t.Run(tt.name, func(t *testing.T) {
+            c := setupCPU()
+            tt.setupCPU(c)
+            
+            // CPU実行サイクルを使用して命令を実行
+            c.Execute()
+
+            // 結果を検証
+            if c.Registers.PC != tt.expectedPC {
+                t.Errorf("PC = %#04x, want %#04x", c.Registers.PC, tt.expectedPC)
+            }
+            checkRegister(t, "SP", c.Registers.SP, tt.expectedSP)
+            checkFlag(t, "Carry", c.Registers.P.Carry, tt.expectedCarry)
+            checkFlag(t, "Zero", c.Registers.P.Zero, tt.expectedZero)
+            checkFlag(t, "Interrupt", c.Registers.P.Interrupt, tt.expectedInt)
+            checkFlag(t, "Decimal", c.Registers.P.Decimal, tt.expectedDec)
+            checkFlag(t, "Break", c.Registers.P.Break, tt.expectedBreak)
+            checkFlag(t, "Overflow", c.Registers.P.Overflow, tt.expectedOverflow)
+            checkFlag(t, "Negative", c.Registers.P.Negative, tt.expectedNeg)
+        })
+    }
+}
+
+// TestBRK はBRK命令（強制割り込み）をテストします
+func TestBRK(t *testing.T) {
+    tests := []struct {
+        name        string
+        opcode      uint8
+        addrMode    AddressingMode
+        setupCPU    func(*CPU)
+        expectedPC  uint16
+        expectedSP  uint8
+        checkStack  func(*testing.T, *CPU)
+    }{
+        {
+            name:     "BRK - Force Interrupt",
+            opcode:   0x00,
+            addrMode: Implied,
+            setupCPU: func(c *CPU) {
+                c.Registers.PC = 0x0200
+                c.Registers.SP = 0xFF // スタックポインタ初期化
+                
+                // 割り込みベクタを設定
+                c.WriteByteToWRAM(0xFFFE, 0x34) // 低バイト (IRQとBRKは同じベクタを使用)
+                c.WriteByteToWRAM(0xFFFF, 0x12) // 高バイト (0x1234)
+                
+                c.WriteByteToWRAM(0x0200, 0x00) // BRK命令
+            },
+            expectedPC: 0x1234, // 割り込みベクタのアドレスにジャンプ
+            expectedSP: 0xFC, // スタックポインタが3バイト分減少 (PC[2bytes]+P[1byte])
+            checkStack: func(t *testing.T, c *CPU) {
+                // スタックにはPC+2の値（0x0200+2 = 0x0202）とステータスが格納されている
+                statusByte := c.ReadByteFromWRAM(0x01FD)
+                highByte := c.ReadByteFromWRAM(0x01FF)
+                lowByte := c.ReadByteFromWRAM(0x01FE)
+                returnAddr := uint16(highByte)<<8 | uint16(lowByte)
+                
+                if returnAddr != 0x0202 {
+                    t.Errorf("Return address on stack = %#04x, want %#04x", returnAddr, 0x0202)
+                }
+                
+                // BRKでプッシュされるステータスバイトはBフラグが立っているはず
+                if statusByte&0x10 == 0 {
+                    t.Errorf("Break flag not set in pushed status byte: %#02x", statusByte)
+                }
+            },
+        },
+    }
+
+    for _, tt := range tests {
+        t.Run(tt.name, func(t *testing.T) {
+            c := setupCPU()
+            tt.setupCPU(c)
+            
+            // CPU実行サイクルを使用して命令を実行
+            c.Execute()
+
+            // 結果を検証
+            if c.Registers.PC != tt.expectedPC {
+                t.Errorf("PC = %#04x, want %#04x", c.Registers.PC, tt.expectedPC)
+            }
+            checkRegister(t, "SP", c.Registers.SP, tt.expectedSP)
+            checkFlag(t, "Interrupt", c.Registers.P.Interrupt, true) // BRK後は割り込み禁止になる
+            
+            if tt.checkStack != nil {
+                tt.checkStack(t, c)
+            }
+        })
+    }
+}
+
+// TestNOP はNOP命令（何もしない）をテストします
+func TestNOP(t *testing.T) {
+    tests := []struct {
+        name      string
+        opcode    uint8
+        addrMode  AddressingMode
+        setupCPU  func(*CPU)
+        expectedPC uint16
+    }{
+        {
+            name:     "NOP - No Operation",
+            opcode:   0xEA,
+            addrMode: Implied,
+            setupCPU: func(c *CPU) {
+                c.Registers.PC = 0x0200
+                c.WriteByteToWRAM(0x0200, 0xEA) // NOP命令
+            },
+            expectedPC: 0x0201, // PCが1バイト進むだけ
+        },
+    }
+
+    for _, tt := range tests {
+        t.Run(tt.name, func(t *testing.T) {
+            c := setupCPU()
+            tt.setupCPU(c)
+            
+            // 各レジスタの初期値を保存
+            oldA := c.Registers.A
+            oldX := c.Registers.X
+            oldY := c.Registers.Y
+            oldSP := c.Registers.SP
+            oldCarry := c.Registers.P.Carry
+            oldZero := c.Registers.P.Zero
+            oldInterrupt := c.Registers.P.Interrupt
+            oldDecimal := c.Registers.P.Decimal
+            oldBreak := c.Registers.P.Break
+            oldOverflow := c.Registers.P.Overflow
+            oldNegative := c.Registers.P.Negative
+            
+            // CPU実行サイクルを使用して命令を実行
+            c.Execute()
+
+            // PC以外のレジスタが変わっていないことを検証
+            checkRegister(t, "A", c.Registers.A, oldA)
+            checkRegister(t, "X", c.Registers.X, oldX)
+            checkRegister(t, "Y", c.Registers.Y, oldY)
+            checkRegister(t, "SP", c.Registers.SP, oldSP)
+            checkFlag(t, "Carry", c.Registers.P.Carry, oldCarry)
+            checkFlag(t, "Zero", c.Registers.P.Zero, oldZero)
+            checkFlag(t, "Interrupt", c.Registers.P.Interrupt, oldInterrupt)
+            checkFlag(t, "Decimal", c.Registers.P.Decimal, oldDecimal)
+            checkFlag(t, "Break", c.Registers.P.Break, oldBreak)
+            checkFlag(t, "Overflow", c.Registers.P.Overflow, oldOverflow)
+            checkFlag(t, "Negative", c.Registers.P.Negative, oldNegative)
+            
+            // PCだけが進んでいることを検証
+            if c.Registers.PC != tt.expectedPC {
+                t.Errorf("PC = %#04x, want %#04x", c.Registers.PC, tt.expectedPC)
+            }
+        })
+    }
+}
