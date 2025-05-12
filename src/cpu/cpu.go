@@ -232,8 +232,9 @@ func (c *CPU) asl(mode AddressingMode) {
 		c.updateNZFlags(c.Registers.A)
 	} else {
 		addr := c.getOperandAddress(mode)
-		value := c.ReadByteFromWRAM(addr) << 1
+		value := c.ReadByteFromWRAM(addr)
 		c.Registers.P.Carry = (value >> 7) != 0
+		value <<= 1
 		c.WriteByteToWRAM(addr, value)
 		c.updateNZFlags(value)
 	}
@@ -444,8 +445,9 @@ func (c *CPU) lsr(mode AddressingMode) {
 		c.updateNZFlags(c.Registers.A)
 	} else {
 		addr := c.getOperandAddress(mode)
-		value := c.ReadByteFromWRAM(addr) >> 1
+		value := c.ReadByteFromWRAM(addr)
 		c.Registers.P.Carry = (value & 0x01) != 0
+		value >>= 1
 		c.WriteByteToWRAM(addr, value)
 		c.updateNZFlags(value)
 	}
