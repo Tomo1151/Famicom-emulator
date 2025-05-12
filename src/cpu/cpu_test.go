@@ -674,3 +674,383 @@ func TestSTY(t *testing.T) {
     }
 }
 
+// TestTAX はTAX命令（アキュムレータからXレジスタへの転送）をテストします
+func TestTAX(t *testing.T) {
+    tests := []struct {
+        name          string
+        opcode        uint8
+        addrMode      AddressingMode
+        setupCPU      func(*CPU)
+        expectedX     uint8
+        expectedZero  bool
+        expectedNeg   bool
+    }{
+        {
+            name:       "TAX - positive value",
+            opcode:     0xAA,
+            addrMode:   Implied,
+            setupCPU: func(c *CPU) {
+                c.Registers.A = 0x42
+                c.WriteByteToWRAM(c.Registers.PC, 0xAA) // TAX命令
+            },
+            expectedX:    0x42,
+            expectedZero: false,
+            expectedNeg:  false,
+        },
+        {
+            name:       "TAX - zero value",
+            opcode:     0xAA,
+            addrMode:   Implied,
+            setupCPU: func(c *CPU) {
+                c.Registers.A = 0x00
+                c.WriteByteToWRAM(c.Registers.PC, 0xAA) // TAX命令
+            },
+            expectedX:    0x00,
+            expectedZero: true,
+            expectedNeg:  false,
+        },
+        {
+            name:       "TAX - negative value",
+            opcode:     0xAA,
+            addrMode:   Implied,
+            setupCPU: func(c *CPU) {
+                c.Registers.A = 0x80
+                c.WriteByteToWRAM(c.Registers.PC, 0xAA) // TAX命令
+            },
+            expectedX:    0x80,
+            expectedZero: false,
+            expectedNeg:  true,
+        },
+    }
+
+    for _, tt := range tests {
+        t.Run(tt.name, func(t *testing.T) {
+            c := setupCPU()
+            tt.setupCPU(c)
+            
+            // CPU実行サイクルを使用して命令を実行
+            c.Execute()
+
+            // 結果を検証
+            checkRegister(t, "X", c.Registers.X, tt.expectedX)
+            checkFlag(t, "Zero", c.Registers.P.Zero, tt.expectedZero)
+            checkFlag(t, "Negative", c.Registers.P.Negative, tt.expectedNeg)
+        })
+    }
+}
+
+// TestTAY はTAY命令（アキュムレータからYレジスタへの転送）をテストします
+func TestTAY(t *testing.T) {
+    tests := []struct {
+        name          string
+        opcode        uint8
+        addrMode      AddressingMode
+        setupCPU      func(*CPU)
+        expectedY     uint8
+        expectedZero  bool
+        expectedNeg   bool
+    }{
+        {
+            name:       "TAY - positive value",
+            opcode:     0xA8,
+            addrMode:   Implied,
+            setupCPU: func(c *CPU) {
+                c.Registers.A = 0x42
+                c.WriteByteToWRAM(c.Registers.PC, 0xA8) // TAY命令
+            },
+            expectedY:    0x42,
+            expectedZero: false,
+            expectedNeg:  false,
+        },
+        {
+            name:       "TAY - zero value",
+            opcode:     0xA8,
+            addrMode:   Implied,
+            setupCPU: func(c *CPU) {
+                c.Registers.A = 0x00
+                c.WriteByteToWRAM(c.Registers.PC, 0xA8) // TAY命令
+            },
+            expectedY:    0x00,
+            expectedZero: true,
+            expectedNeg:  false,
+        },
+        {
+            name:       "TAY - negative value",
+            opcode:     0xA8,
+            addrMode:   Implied,
+            setupCPU: func(c *CPU) {
+                c.Registers.A = 0x80
+                c.WriteByteToWRAM(c.Registers.PC, 0xA8) // TAY命令
+            },
+            expectedY:    0x80,
+            expectedZero: false,
+            expectedNeg:  true,
+        },
+    }
+
+    for _, tt := range tests {
+        t.Run(tt.name, func(t *testing.T) {
+            c := setupCPU()
+            tt.setupCPU(c)
+            
+            // CPU実行サイクルを使用して命令を実行
+            c.Execute()
+
+            // 結果を検証
+            checkRegister(t, "Y", c.Registers.Y, tt.expectedY)
+            checkFlag(t, "Zero", c.Registers.P.Zero, tt.expectedZero)
+            checkFlag(t, "Negative", c.Registers.P.Negative, tt.expectedNeg)
+        })
+    }
+}
+
+// TestTXA はTXA命令（Xレジスタからアキュムレータへの転送）をテストします
+func TestTXA(t *testing.T) {
+    tests := []struct {
+        name          string
+        opcode        uint8
+        addrMode      AddressingMode
+        setupCPU      func(*CPU)
+        expectedA     uint8
+        expectedZero  bool
+        expectedNeg   bool
+    }{
+        {
+            name:       "TXA - positive value",
+            opcode:     0x8A,
+            addrMode:   Implied,
+            setupCPU: func(c *CPU) {
+                c.Registers.X = 0x42
+                c.WriteByteToWRAM(c.Registers.PC, 0x8A) // TXA命令
+            },
+            expectedA:    0x42,
+            expectedZero: false,
+            expectedNeg:  false,
+        },
+        {
+            name:       "TXA - zero value",
+            opcode:     0x8A,
+            addrMode:   Implied,
+            setupCPU: func(c *CPU) {
+                c.Registers.X = 0x00
+                c.WriteByteToWRAM(c.Registers.PC, 0x8A) // TXA命令
+            },
+            expectedA:    0x00,
+            expectedZero: true,
+            expectedNeg:  false,
+        },
+        {
+            name:       "TXA - negative value",
+            opcode:     0x8A,
+            addrMode:   Implied,
+            setupCPU: func(c *CPU) {
+                c.Registers.X = 0x80
+                c.WriteByteToWRAM(c.Registers.PC, 0x8A) // TXA命令
+            },
+            expectedA:    0x80,
+            expectedZero: false,
+            expectedNeg:  true,
+        },
+    }
+
+    for _, tt := range tests {
+        t.Run(tt.name, func(t *testing.T) {
+            c := setupCPU()
+            tt.setupCPU(c)
+            
+            // CPU実行サイクルを使用して命令を実行
+            c.Execute()
+
+            // 結果を検証
+            checkRegister(t, "A", c.Registers.A, tt.expectedA)
+            checkFlag(t, "Zero", c.Registers.P.Zero, tt.expectedZero)
+            checkFlag(t, "Negative", c.Registers.P.Negative, tt.expectedNeg)
+        })
+    }
+}
+
+// TestTYA はTYA命令（Yレジスタからアキュムレータへの転送）をテストします
+func TestTYA(t *testing.T) {
+    tests := []struct {
+        name          string
+        opcode        uint8
+        addrMode      AddressingMode
+        setupCPU      func(*CPU)
+        expectedA     uint8
+        expectedZero  bool
+        expectedNeg   bool
+    }{
+        {
+            name:       "TYA - positive value",
+            opcode:     0x98,
+            addrMode:   Implied,
+            setupCPU: func(c *CPU) {
+                c.Registers.Y = 0x42
+                c.WriteByteToWRAM(c.Registers.PC, 0x98) // TYA命令
+            },
+            expectedA:    0x42,
+            expectedZero: false,
+            expectedNeg:  false,
+        },
+        {
+            name:       "TYA - zero value",
+            opcode:     0x98,
+            addrMode:   Implied,
+            setupCPU: func(c *CPU) {
+                c.Registers.Y = 0x00
+                c.WriteByteToWRAM(c.Registers.PC, 0x98) // TYA命令
+            },
+            expectedA:    0x00,
+            expectedZero: true,
+            expectedNeg:  false,
+        },
+        {
+            name:       "TYA - negative value",
+            opcode:     0x98,
+            addrMode:   Implied,
+            setupCPU: func(c *CPU) {
+                c.Registers.Y = 0x80
+                c.WriteByteToWRAM(c.Registers.PC, 0x98) // TYA命令
+            },
+            expectedA:    0x80,
+            expectedZero: false,
+            expectedNeg:  true,
+        },
+    }
+
+    for _, tt := range tests {
+        t.Run(tt.name, func(t *testing.T) {
+            c := setupCPU()
+            tt.setupCPU(c)
+            
+            // CPU実行サイクルを使用して命令を実行
+            c.Execute()
+
+            // 結果を検証
+            checkRegister(t, "A", c.Registers.A, tt.expectedA)
+            checkFlag(t, "Zero", c.Registers.P.Zero, tt.expectedZero)
+            checkFlag(t, "Negative", c.Registers.P.Negative, tt.expectedNeg)
+        })
+    }
+}
+
+// TestTXS はTXS命令（XレジスタからSPへの転送）をテストします
+// 注意: TXS命令はフラグに影響を与えません
+func TestTXS(t *testing.T) {
+    tests := []struct {
+        name          string
+        opcode        uint8
+        addrMode      AddressingMode
+        setupCPU      func(*CPU)
+        expectedSP    uint8
+    }{
+        {
+            name:       "TXS - normal value",
+            opcode:     0x9A,
+            addrMode:   Implied,
+            setupCPU: func(c *CPU) {
+                c.Registers.X = 0x42
+                c.WriteByteToWRAM(c.Registers.PC, 0x9A) // TXS命令
+            },
+            expectedSP: 0x42,
+        },
+        {
+            name:       "TXS - high value",
+            opcode:     0x9A,
+            addrMode:   Implied,
+            setupCPU: func(c *CPU) {
+                c.Registers.X = 0xFF
+                c.WriteByteToWRAM(c.Registers.PC, 0x9A) // TXS命令
+            },
+            expectedSP: 0xFF,
+        },
+        {
+            name:       "TXS - low value",
+            opcode:     0x9A,
+            addrMode:   Implied,
+            setupCPU: func(c *CPU) {
+                c.Registers.X = 0x00
+                c.WriteByteToWRAM(c.Registers.PC, 0x9A) // TXS命令
+            },
+            expectedSP: 0x00,
+        },
+    }
+
+    for _, tt := range tests {
+        t.Run(tt.name, func(t *testing.T) {
+            c := setupCPU()
+            tt.setupCPU(c)
+            
+            // CPU実行サイクルを使用して命令を実行
+            c.Execute()
+
+            // 結果を検証（SPレジスタのみ）
+            checkRegister(t, "SP", c.Registers.SP, tt.expectedSP)
+        })
+    }
+}
+
+// TestTSX はTSX命令（SPからXレジスタへの転送）をテストします
+func TestTSX(t *testing.T) {
+    tests := []struct {
+        name          string
+        opcode        uint8
+        addrMode      AddressingMode
+        setupCPU      func(*CPU)
+        expectedX     uint8
+        expectedZero  bool
+        expectedNeg   bool
+    }{
+        {
+            name:       "TSX - positive value",
+            opcode:     0xBA,
+            addrMode:   Implied,
+            setupCPU: func(c *CPU) {
+                c.Registers.SP = 0x42
+                c.WriteByteToWRAM(c.Registers.PC, 0xBA) // TSX命令
+            },
+            expectedX:    0x42,
+            expectedZero: false,
+            expectedNeg:  false,
+        },
+        {
+            name:       "TSX - zero value",
+            opcode:     0xBA,
+            addrMode:   Implied,
+            setupCPU: func(c *CPU) {
+                c.Registers.SP = 0x00
+                c.WriteByteToWRAM(c.Registers.PC, 0xBA) // TSX命令
+            },
+            expectedX:    0x00,
+            expectedZero: true,
+            expectedNeg:  false,
+        },
+        {
+            name:       "TSX - negative value",
+            opcode:     0xBA,
+            addrMode:   Implied,
+            setupCPU: func(c *CPU) {
+                c.Registers.SP = 0x80
+                c.WriteByteToWRAM(c.Registers.PC, 0xBA) // TSX命令
+            },
+            expectedX:    0x80,
+            expectedZero: false,
+            expectedNeg:  true,
+        },
+    }
+
+    for _, tt := range tests {
+        t.Run(tt.name, func(t *testing.T) {
+            c := setupCPU()
+            tt.setupCPU(c)
+            
+            // CPU実行サイクルを使用して命令を実行
+            c.Execute()
+
+            // 結果を検証
+            checkRegister(t, "X", c.Registers.X, tt.expectedX)
+            checkFlag(t, "Zero", c.Registers.P.Zero, tt.expectedZero)
+            checkFlag(t, "Negative", c.Registers.P.Negative, tt.expectedNeg)
+        })
+    }
+}
