@@ -3046,6 +3046,380 @@ func TestROR(t *testing.T) {
 }
 
 
+// MARK: レジスタ比較
+// TestCMP はCMP命令（比較 A レジスタ）をテストします
+func TestCMP(t *testing.T) {
+    tests := []struct {
+        name          string
+        opcode        uint8
+        addrMode      AddressingMode
+        setupCPU      func(*CPU)
+        expectedCarry bool  // 結果: A >= M
+        expectedZero  bool  // 結果: A == M
+        expectedNeg   bool  // 結果: 比較の最上位ビット
+    }{
+        {
+            name:       "CMP Immediate - A > M",
+            opcode:     0xC9,
+            addrMode:   Immediate,
+            setupCPU: func(c *CPU) {
+                c.Registers.A = 0x42
+                c.WriteByteToWRAM(c.Registers.PC, 0xC9) // CMP命令
+                c.WriteByteToWRAM(c.Registers.PC+1, 0x30) // オペランド: 0x30
+            },
+            expectedCarry: true,  // A > M なのでキャリーがセット
+            expectedZero:  false, // A != M なのでゼロはクリア
+            expectedNeg:   false, // 比較結果は正数
+        },
+        {
+            name:       "CMP Immediate - A == M",
+            opcode:     0xC9,
+            addrMode:   Immediate,
+            setupCPU: func(c *CPU) {
+                c.Registers.A = 0x42
+                c.WriteByteToWRAM(c.Registers.PC, 0xC9) // CMP命令
+                c.WriteByteToWRAM(c.Registers.PC+1, 0x42) // オペランド: 0x42
+            },
+            expectedCarry: true,  // A == M なのでキャリーがセット
+            expectedZero:  true,  // A == M なのでゼロがセット
+            expectedNeg:   false, // 比較結果は0
+        },
+        {
+            name:       "CMP Immediate - A < M",
+            opcode:     0xC9,
+            addrMode:   Immediate,
+            setupCPU: func(c *CPU) {
+                c.Registers.A = 0x30
+                c.WriteByteToWRAM(c.Registers.PC, 0xC9) // CMP命令
+                c.WriteByteToWRAM(c.Registers.PC+1, 0x42) // オペランド: 0x42
+            },
+            expectedCarry: false, // A < M なのでキャリーはクリア
+            expectedZero:  false, // A != M なのでゼロはクリア
+            expectedNeg:   true,  // 比較結果は負数
+        },
+        {
+            name:       "CMP Zero Page",
+            opcode:     0xC5,
+            addrMode:   ZeroPage,
+            setupCPU: func(c *CPU) {
+                c.Registers.A = 0x42
+                c.WriteByteToWRAM(c.Registers.PC, 0xC5) // CMP命令
+                c.WriteByteToWRAM(c.Registers.PC+1, 0x20) // オペランド: ZPアドレス0x20
+                c.WriteByteToWRAM(0x20, 0x30) // 0x20に値を設定
+            },
+            expectedCarry: true,  // A > M なのでキャリーがセット
+            expectedZero:  false, // A != M なのでゼロはクリア
+            expectedNeg:   false, // 比較結果は正数
+        },
+        {
+            name:       "CMP Zero Page,X",
+            opcode:     0xD5,
+            addrMode:   ZeroPageXIndexed,
+            setupCPU: func(c *CPU) {
+                c.Registers.A = 0x42
+                c.Registers.X = 0x10
+                c.WriteByteToWRAM(c.Registers.PC, 0xD5) // CMP命令
+                c.WriteByteToWRAM(c.Registers.PC+1, 0x20) // オペランド: ZPアドレス0x20
+                c.WriteByteToWRAM(0x30, 0x42) // 0x30 (0x20+0x10) に値を設定
+            },
+            expectedCarry: true,  // A == M なのでキャリーがセット
+            expectedZero:  true,  // A == M なのでゼロがセット
+            expectedNeg:   false, // 比較結果は0
+        },
+        {
+            name:       "CMP Absolute",
+            opcode:     0xCD,
+            addrMode:   Absolute,
+            setupCPU: func(c *CPU) {
+                c.Registers.A = 0x30
+                c.WriteByteToWRAM(c.Registers.PC, 0xCD) // CMP命令
+                c.WriteByteToWRAM(c.Registers.PC+1, 0x80) // オペランド: 低バイト
+                c.WriteByteToWRAM(c.Registers.PC+2, 0x44) // オペランド: 高バイト (0x4480)
+                c.WriteByteToWRAM(0x4480, 0x42) // 0x4480に値を設定
+            },
+            expectedCarry: false, // A < M なのでキャリーはクリア
+            expectedZero:  false, // A != M なのでゼロはクリア
+            expectedNeg:   true,  // 比較結果は負数
+        },
+        {
+            name:       "CMP Absolute,X",
+            opcode:     0xDD,
+            addrMode:   AbsoluteXIndexed,
+            setupCPU: func(c *CPU) {
+                c.Registers.A = 0x42
+                c.Registers.X = 0x10
+                c.WriteByteToWRAM(c.Registers.PC, 0xDD) // CMP命令
+                c.WriteByteToWRAM(c.Registers.PC+1, 0x80) // オペランド: 低バイト
+                c.WriteByteToWRAM(c.Registers.PC+2, 0x44) // オペランド: 高バイト (0x4480)
+                c.WriteByteToWRAM(0x4490, 0x30) // 0x4490 (0x4480+0x10) に値を設定
+            },
+            expectedCarry: true,  // A > M なのでキャリーがセット
+            expectedZero:  false, // A != M なのでゼロはクリア
+            expectedNeg:   false, // 比較結果は正数
+        },
+        {
+            name:       "CMP Absolute,Y",
+            opcode:     0xD9,
+            addrMode:   AbsoluteYIndexed,
+            setupCPU: func(c *CPU) {
+                c.Registers.A = 0x42
+                c.Registers.Y = 0x10
+                c.WriteByteToWRAM(c.Registers.PC, 0xD9) // CMP命令
+                c.WriteByteToWRAM(c.Registers.PC+1, 0x80) // オペランド: 低バイト
+                c.WriteByteToWRAM(c.Registers.PC+2, 0x44) // オペランド: 高バイト (0x4480)
+                c.WriteByteToWRAM(0x4490, 0x30) // 0x4490 (0x4480+0x10) に値を設定
+            },
+            expectedCarry: true,  // A > M なのでキャリーがセット
+            expectedZero:  false, // A != M なのでゼロはクリア
+            expectedNeg:   false, // 比較結果は正数
+        },
+        {
+            name:       "CMP Indirect,X",
+            opcode:     0xC1,
+            addrMode:   IndirectXIndexed,
+            setupCPU: func(c *CPU) {
+                c.Registers.A = 0x42
+                c.Registers.X = 0x04
+                c.WriteByteToWRAM(c.Registers.PC, 0xC1) // CMP命令
+                c.WriteByteToWRAM(c.Registers.PC+1, 0x20) // オペランド: ZPアドレス0x20
+                c.WriteByteToWRAM(0x24, 0x74) // 0x24 (0x20+0x04) に低バイト
+                c.WriteByteToWRAM(0x25, 0x20) // 0x25 に高バイト (→ 0x2074)
+                c.WriteByteToWRAM(0x2074, 0x42) // 0x2074に値を設定
+            },
+            expectedCarry: true,  // A == M なのでキャリーがセット
+            expectedZero:  true,  // A == M なのでゼロがセット
+            expectedNeg:   false, // 比較結果は0
+        },
+        {
+            name:       "CMP Indirect,Y",
+            opcode:     0xD1,
+            addrMode:   IndirectYIndexed,
+            setupCPU: func(c *CPU) {
+                c.Registers.A = 0x42
+                c.Registers.Y = 0x10
+                c.WriteByteToWRAM(c.Registers.PC, 0xD1) // CMP命令
+                c.WriteByteToWRAM(c.Registers.PC+1, 0x20) // オペランド: ZPアドレス0x20
+                c.WriteByteToWRAM(0x20, 0x74) // 0x20に低バイト
+                c.WriteByteToWRAM(0x21, 0x20) // 0x21に高バイト (→ 0x2074)
+                c.WriteByteToWRAM(0x2084, 0x30) // 0x2084 (0x2074+0x10) に値を設定
+            },
+            expectedCarry: true,  // A > M なのでキャリーがセット
+            expectedZero:  false, // A != M なのでゼロはクリア
+            expectedNeg:   false, // 比較結果は正数
+        },
+    }
+
+    for _, tt := range tests {
+        t.Run(tt.name, func(t *testing.T) {
+            c := setupCPU()
+            tt.setupCPU(c)
+            
+            // CPU実行サイクルを使用して命令を実行
+            c.Execute()
+
+            // 結果を検証
+            checkFlag(t, "Carry", c.Registers.P.Carry, tt.expectedCarry)
+            checkFlag(t, "Zero", c.Registers.P.Zero, tt.expectedZero)
+            checkFlag(t, "Negative", c.Registers.P.Negative, tt.expectedNeg)
+        })
+    }
+}
+
+// TestCPX はCPX命令（比較 X レジスタ）をテストします
+func TestCPX(t *testing.T) {
+    tests := []struct {
+        name          string
+        opcode        uint8
+        addrMode      AddressingMode
+        setupCPU      func(*CPU)
+        expectedCarry bool  // 結果: X >= M
+        expectedZero  bool  // 結果: X == M
+        expectedNeg   bool  // 結果: 比較の最上位ビット
+    }{
+        {
+            name:       "CPX Immediate - X > M",
+            opcode:     0xE0,
+            addrMode:   Immediate,
+            setupCPU: func(c *CPU) {
+                c.Registers.X = 0x42
+                c.WriteByteToWRAM(c.Registers.PC, 0xE0) // CPX命令
+                c.WriteByteToWRAM(c.Registers.PC+1, 0x30) // オペランド: 0x30
+            },
+            expectedCarry: true,  // X > M なのでキャリーがセット
+            expectedZero:  false, // X != M なのでゼロはクリア
+            expectedNeg:   false, // 比較結果は正数
+        },
+        {
+            name:       "CPX Immediate - X == M",
+            opcode:     0xE0,
+            addrMode:   Immediate,
+            setupCPU: func(c *CPU) {
+                c.Registers.X = 0x42
+                c.WriteByteToWRAM(c.Registers.PC, 0xE0) // CPX命令
+                c.WriteByteToWRAM(c.Registers.PC+1, 0x42) // オペランド: 0x42
+            },
+            expectedCarry: true,  // X == M なのでキャリーがセット
+            expectedZero:  true,  // X == M なのでゼロがセット
+            expectedNeg:   false, // 比較結果は0
+        },
+        {
+            name:       "CPX Immediate - X < M",
+            opcode:     0xE0,
+            addrMode:   Immediate,
+            setupCPU: func(c *CPU) {
+                c.Registers.X = 0x30
+                c.WriteByteToWRAM(c.Registers.PC, 0xE0) // CPX命令
+                c.WriteByteToWRAM(c.Registers.PC+1, 0x42) // オペランド: 0x42
+            },
+            expectedCarry: false, // X < M なのでキャリーはクリア
+            expectedZero:  false, // X != M なのでゼロはクリア
+            expectedNeg:   true,  // 比較結果は負数
+        },
+        {
+            name:       "CPX Zero Page",
+            opcode:     0xE4,
+            addrMode:   ZeroPage,
+            setupCPU: func(c *CPU) {
+                c.Registers.X = 0x42
+                c.WriteByteToWRAM(c.Registers.PC, 0xE4) // CPX命令
+                c.WriteByteToWRAM(c.Registers.PC+1, 0x20) // オペランド: ZPアドレス0x20
+                c.WriteByteToWRAM(0x20, 0x30) // 0x20に値を設定
+            },
+            expectedCarry: true,  // X > M なのでキャリーがセット
+            expectedZero:  false, // X != M なのでゼロはクリア
+            expectedNeg:   false, // 比較結果は正数
+        },
+        {
+            name:       "CPX Absolute",
+            opcode:     0xEC,
+            addrMode:   Absolute,
+            setupCPU: func(c *CPU) {
+                c.Registers.X = 0x30
+                c.WriteByteToWRAM(c.Registers.PC, 0xEC) // CPX命令
+                c.WriteByteToWRAM(c.Registers.PC+1, 0x80) // オペランド: 低バイト
+                c.WriteByteToWRAM(c.Registers.PC+2, 0x44) // オペランド: 高バイト (0x4480)
+                c.WriteByteToWRAM(0x4480, 0x30) // 0x4480に値を設定
+            },
+            expectedCarry: true,  // X == M なのでキャリーがセット
+            expectedZero:  true,  // X == M なのでゼロがセット
+            expectedNeg:   false, // 比較結果は0
+        },
+    }
+
+    for _, tt := range tests {
+        t.Run(tt.name, func(t *testing.T) {
+            c := setupCPU()
+            tt.setupCPU(c)
+            
+            // CPU実行サイクルを使用して命令を実行
+            c.Execute()
+
+            // 結果を検証
+            checkFlag(t, "Carry", c.Registers.P.Carry, tt.expectedCarry)
+            checkFlag(t, "Zero", c.Registers.P.Zero, tt.expectedZero)
+            checkFlag(t, "Negative", c.Registers.P.Negative, tt.expectedNeg)
+        })
+    }
+}
+
+// TestCPY はCPY命令（比較 Y レジスタ）をテストします
+func TestCPY(t *testing.T) {
+    tests := []struct {
+        name          string
+        opcode        uint8
+        addrMode      AddressingMode
+        setupCPU      func(*CPU)
+        expectedCarry bool  // 結果: Y >= M
+        expectedZero  bool  // 結果: Y == M
+        expectedNeg   bool  // 結果: 比較の最上位ビット
+    }{
+        {
+            name:       "CPY Immediate - Y > M",
+            opcode:     0xC0,
+            addrMode:   Immediate,
+            setupCPU: func(c *CPU) {
+                c.Registers.Y = 0x42
+                c.WriteByteToWRAM(c.Registers.PC, 0xC0) // CPY命令
+                c.WriteByteToWRAM(c.Registers.PC+1, 0x30) // オペランド: 0x30
+            },
+            expectedCarry: true,  // Y > M なのでキャリーがセット
+            expectedZero:  false, // Y != M なのでゼロはクリア
+            expectedNeg:   false, // 比較結果は正数
+        },
+        {
+            name:       "CPY Immediate - Y == M",
+            opcode:     0xC0,
+            addrMode:   Immediate,
+            setupCPU: func(c *CPU) {
+                c.Registers.Y = 0x42
+                c.WriteByteToWRAM(c.Registers.PC, 0xC0) // CPY命令
+                c.WriteByteToWRAM(c.Registers.PC+1, 0x42) // オペランド: 0x42
+            },
+            expectedCarry: true,  // Y == M なのでキャリーがセット
+            expectedZero:  true,  // Y == M なのでゼロがセット
+            expectedNeg:   false, // 比較結果は0
+        },
+        {
+            name:       "CPY Immediate - Y < M",
+            opcode:     0xC0,
+            addrMode:   Immediate,
+            setupCPU: func(c *CPU) {
+                c.Registers.Y = 0x30
+                c.WriteByteToWRAM(c.Registers.PC, 0xC0) // CPY命令
+                c.WriteByteToWRAM(c.Registers.PC+1, 0x42) // オペランド: 0x42
+            },
+            expectedCarry: false, // Y < M なのでキャリーはクリア
+            expectedZero:  false, // Y != M なのでゼロはクリア
+            expectedNeg:   true,  // 比較結果は負数
+        },
+        {
+            name:       "CPY Zero Page",
+            opcode:     0xC4,
+            addrMode:   ZeroPage,
+            setupCPU: func(c *CPU) {
+                c.Registers.Y = 0x42
+                c.WriteByteToWRAM(c.Registers.PC, 0xC4) // CPY命令
+                c.WriteByteToWRAM(c.Registers.PC+1, 0x20) // オペランド: ZPアドレス0x20
+                c.WriteByteToWRAM(0x20, 0x30) // 0x20に値を設定
+            },
+            expectedCarry: true,  // Y > M なのでキャリーがセット
+            expectedZero:  false, // Y != M なのでゼロはクリア
+            expectedNeg:   false, // 比較結果は正数
+        },
+        {
+            name:       "CPY Absolute",
+            opcode:     0xCC,
+            addrMode:   Absolute,
+            setupCPU: func(c *CPU) {
+                c.Registers.Y = 0x30
+                c.WriteByteToWRAM(c.Registers.PC, 0xCC) // CPY命令
+                c.WriteByteToWRAM(c.Registers.PC+1, 0x80) // オペランド: 低バイト
+                c.WriteByteToWRAM(c.Registers.PC+2, 0x44) // オペランド: 高バイト (0x4480)
+                c.WriteByteToWRAM(0x4480, 0x30) // 0x4480に値を設定
+            },
+            expectedCarry: true,  // Y == M なのでキャリーがセット
+            expectedZero:  true,  // Y == M なのでゼロがセット
+            expectedNeg:   false, // 比較結果は0
+        },
+    }
+
+    for _, tt := range tests {
+        t.Run(tt.name, func(t *testing.T) {
+            c := setupCPU()
+            tt.setupCPU(c)
+            
+            // CPU実行サイクルを使用して命令を実行
+            c.Execute()
+
+            // 結果を検証
+            checkFlag(t, "Carry", c.Registers.P.Carry, tt.expectedCarry)
+            checkFlag(t, "Zero", c.Registers.P.Zero, tt.expectedZero)
+            checkFlag(t, "Negative", c.Registers.P.Negative, tt.expectedNeg)
+        })
+    }
+}
+
+
 // MARK: スタック操作
 // TestPHA はPHA命令（Push Accumulator）をテストします
 func TestPHA(t *testing.T) {
