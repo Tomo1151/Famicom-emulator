@@ -376,8 +376,9 @@ func (c *CPU) eor(mode AddressingMode) {
 // MARK: INC命令の実装
 func (c *CPU) inc(mode AddressingMode) {
 	addr := c.getOperandAddress(mode)
-	value := c.ReadByteFromWRAM(addr)
-	c.WriteByteToWRAM(addr, value + 1)
+	value := c.ReadByteFromWRAM(addr) + 1
+	c.WriteByteToWRAM(addr, value)
+	c.updateNZFlags(value)
 }
 
 // MARK: INX命令の実装
