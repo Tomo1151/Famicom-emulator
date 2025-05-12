@@ -26,6 +26,321 @@ func checkFlag(t *testing.T, name string, got, want bool) {
     }
 }
 
+// TestSEC はSEC命令（キャリーフラグをセット）をテストします
+func TestSEC(t *testing.T) {
+    tests := []struct {
+        name          string
+        opcode        uint8
+        addrMode      AddressingMode
+        setupCPU      func(*CPU)
+        expectedCarry bool
+    }{
+        {
+            name:       "SEC - carry false to true",
+            opcode:     0x38,
+            addrMode:   Implied,
+            setupCPU: func(c *CPU) {
+                c.Registers.P.Carry = false
+                c.WriteByteToWRAM(c.Registers.PC, 0x38) // SEC命令
+            },
+            expectedCarry: true,
+        },
+        {
+            name:       "SEC - carry already true",
+            opcode:     0x38,
+            addrMode:   Implied,
+            setupCPU: func(c *CPU) {
+                c.Registers.P.Carry = true
+                c.WriteByteToWRAM(c.Registers.PC, 0x38) // SEC命令
+            },
+            expectedCarry: true,
+        },
+    }
+
+    for _, tt := range tests {
+        t.Run(tt.name, func(t *testing.T) {
+            c := setupCPU()
+            tt.setupCPU(c)
+            
+            // CPU実行サイクルを使用して命令を実行
+            c.Execute()
+
+            // 結果を検証
+            checkFlag(t, "Carry", c.Registers.P.Carry, tt.expectedCarry)
+        })
+    }
+}
+
+// TestCLC はCLC命令（キャリーフラグをクリア）をテストします
+func TestCLC(t *testing.T) {
+    tests := []struct {
+        name          string
+        opcode        uint8
+        addrMode      AddressingMode
+        setupCPU      func(*CPU)
+        expectedCarry bool
+    }{
+        {
+            name:       "CLC - carry true to false",
+            opcode:     0x18,
+            addrMode:   Implied,
+            setupCPU: func(c *CPU) {
+                c.Registers.P.Carry = true
+                c.WriteByteToWRAM(c.Registers.PC, 0x18) // CLC命令
+            },
+            expectedCarry: false,
+        },
+        {
+            name:       "CLC - carry already false",
+            opcode:     0x18,
+            addrMode:   Implied,
+            setupCPU: func(c *CPU) {
+                c.Registers.P.Carry = false
+                c.WriteByteToWRAM(c.Registers.PC, 0x18) // CLC命令
+            },
+            expectedCarry: false,
+        },
+    }
+
+    for _, tt := range tests {
+        t.Run(tt.name, func(t *testing.T) {
+            c := setupCPU()
+            tt.setupCPU(c)
+            
+            // CPU実行サイクルを使用して命令を実行
+            c.Execute()
+
+            // 結果を検証
+            checkFlag(t, "Carry", c.Registers.P.Carry, tt.expectedCarry)
+        })
+    }
+}
+
+// TestCLV はCLV命令（オーバーフローフラグをクリア）をテストします
+func TestCLV(t *testing.T) {
+    tests := []struct {
+        name            string
+        opcode          uint8
+        addrMode        AddressingMode
+        setupCPU        func(*CPU)
+        expectedOverflow bool
+    }{
+        {
+            name:       "CLV - overflow true to false",
+            opcode:     0xB8,
+            addrMode:   Implied,
+            setupCPU: func(c *CPU) {
+                c.Registers.P.Overflow = true
+                c.WriteByteToWRAM(c.Registers.PC, 0xB8) // CLV命令
+            },
+            expectedOverflow: false,
+        },
+        {
+            name:       "CLV - overflow already false",
+            opcode:     0xB8,
+            addrMode:   Implied,
+            setupCPU: func(c *CPU) {
+                c.Registers.P.Overflow = false
+                c.WriteByteToWRAM(c.Registers.PC, 0xB8) // CLV命令
+            },
+            expectedOverflow: false,
+        },
+    }
+
+    for _, tt := range tests {
+        t.Run(tt.name, func(t *testing.T) {
+            c := setupCPU()
+            tt.setupCPU(c)
+            
+            // CPU実行サイクルを使用して命令を実行
+            c.Execute()
+
+            // 結果を検証
+            checkFlag(t, "Overflow", c.Registers.P.Overflow, tt.expectedOverflow)
+        })
+    }
+}
+
+// TestSEI はSEI命令（割り込み禁止フラグをセット）をテストします
+func TestSEI(t *testing.T) {
+    tests := []struct {
+        name              string
+        opcode            uint8
+        addrMode          AddressingMode
+        setupCPU          func(*CPU)
+        expectedInterrupt bool
+    }{
+        {
+            name:       "SEI - interrupt false to true",
+            opcode:     0x78,
+            addrMode:   Implied,
+            setupCPU: func(c *CPU) {
+                c.Registers.P.Interrupt = false
+                c.WriteByteToWRAM(c.Registers.PC, 0x78) // SEI命令
+            },
+            expectedInterrupt: true,
+        },
+        {
+            name:       "SEI - interrupt already true",
+            opcode:     0x78,
+            addrMode:   Implied,
+            setupCPU: func(c *CPU) {
+                c.Registers.P.Interrupt = true
+                c.WriteByteToWRAM(c.Registers.PC, 0x78) // SEI命令
+            },
+            expectedInterrupt: true,
+        },
+    }
+
+    for _, tt := range tests {
+        t.Run(tt.name, func(t *testing.T) {
+            c := setupCPU()
+            tt.setupCPU(c)
+            
+            // CPU実行サイクルを使用して命令を実行
+            c.Execute()
+
+            // 結果を検証
+            checkFlag(t, "Interrupt", c.Registers.P.Interrupt, tt.expectedInterrupt)
+        })
+    }
+}
+
+// TestCLI はCLI命令（割り込み禁止フラグをクリア）をテストします
+func TestCLI(t *testing.T) {
+    tests := []struct {
+        name              string
+        opcode            uint8
+        addrMode          AddressingMode
+        setupCPU          func(*CPU)
+        expectedInterrupt bool
+    }{
+        {
+            name:       "CLI - interrupt true to false",
+            opcode:     0x58,
+            addrMode:   Implied,
+            setupCPU: func(c *CPU) {
+                c.Registers.P.Interrupt = true
+                c.WriteByteToWRAM(c.Registers.PC, 0x58) // CLI命令
+            },
+            expectedInterrupt: false,
+        },
+        {
+            name:       "CLI - interrupt already false",
+            opcode:     0x58,
+            addrMode:   Implied,
+            setupCPU: func(c *CPU) {
+                c.Registers.P.Interrupt = false
+                c.WriteByteToWRAM(c.Registers.PC, 0x58) // CLI命令
+            },
+            expectedInterrupt: false,
+        },
+    }
+
+    for _, tt := range tests {
+        t.Run(tt.name, func(t *testing.T) {
+            c := setupCPU()
+            tt.setupCPU(c)
+            
+            // CPU実行サイクルを使用して命令を実行
+            c.Execute()
+
+            // 結果を検証
+            checkFlag(t, "Interrupt", c.Registers.P.Interrupt, tt.expectedInterrupt)
+        })
+    }
+}
+
+// TestSED はSED命令（デシマルモードフラグをセット）をテストします
+func TestSED(t *testing.T) {
+    tests := []struct {
+        name            string
+        opcode          uint8
+        addrMode        AddressingMode
+        setupCPU        func(*CPU)
+        expectedDecimal bool
+    }{
+        {
+            name:       "SED - decimal false to true",
+            opcode:     0xF8,
+            addrMode:   Implied,
+            setupCPU: func(c *CPU) {
+                c.Registers.P.Decimal = false
+                c.WriteByteToWRAM(c.Registers.PC, 0xF8) // SED命令
+            },
+            expectedDecimal: true,
+        },
+        {
+            name:       "SED - decimal already true",
+            opcode:     0xF8,
+            addrMode:   Implied,
+            setupCPU: func(c *CPU) {
+                c.Registers.P.Decimal = true
+                c.WriteByteToWRAM(c.Registers.PC, 0xF8) // SED命令
+            },
+            expectedDecimal: true,
+        },
+    }
+
+    for _, tt := range tests {
+        t.Run(tt.name, func(t *testing.T) {
+            c := setupCPU()
+            tt.setupCPU(c)
+            
+            // CPU実行サイクルを使用して命令を実行
+            c.Execute()
+
+            // 結果を検証
+            checkFlag(t, "Decimal", c.Registers.P.Decimal, tt.expectedDecimal)
+        })
+    }
+}
+
+// TestCLD はCLD命令（デシマルモードフラグをクリア）をテストします
+func TestCLD(t *testing.T) {
+    tests := []struct {
+        name            string
+        opcode          uint8
+        addrMode        AddressingMode
+        setupCPU        func(*CPU)
+        expectedDecimal bool
+    }{
+        {
+            name:       "CLD - decimal true to false",
+            opcode:     0xD8,
+            addrMode:   Implied,
+            setupCPU: func(c *CPU) {
+                c.Registers.P.Decimal = true
+                c.WriteByteToWRAM(c.Registers.PC, 0xD8) // CLD命令
+            },
+            expectedDecimal: false,
+        },
+        {
+            name:       "CLD - decimal already false",
+            opcode:     0xD8,
+            addrMode:   Implied,
+            setupCPU: func(c *CPU) {
+                c.Registers.P.Decimal = false
+                c.WriteByteToWRAM(c.Registers.PC, 0xD8) // CLD命令
+            },
+            expectedDecimal: false,
+        },
+    }
+
+    for _, tt := range tests {
+        t.Run(tt.name, func(t *testing.T) {
+            c := setupCPU()
+            tt.setupCPU(c)
+            
+            // CPU実行サイクルを使用して命令を実行
+            c.Execute()
+
+            // 結果を検証
+            checkFlag(t, "Decimal", c.Registers.P.Decimal, tt.expectedDecimal)
+        })
+    }
+}
+
 // LDA命令のテスト (Load Accumulator)
 func TestLDA(t *testing.T) {
     tests := []struct {
