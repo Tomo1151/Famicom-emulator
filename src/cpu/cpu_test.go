@@ -26,6 +26,8 @@ func checkFlag(t *testing.T, name string, got, want bool) {
     }
 }
 
+
+// MARK: フラグ操作
 // TestSEC はSEC命令（キャリーフラグをセット）をテストします
 func TestSEC(t *testing.T) {
     tests := []struct {
@@ -341,6 +343,8 @@ func TestCLD(t *testing.T) {
     }
 }
 
+
+// MARK: レジスタ操作
 // LDA命令のテスト (Load Accumulator)
 func TestLDA(t *testing.T) {
     tests := []struct {
@@ -1366,6 +1370,496 @@ func TestTSX(t *testing.T) {
             checkRegister(t, "X", c.Registers.X, tt.expectedX)
             checkFlag(t, "Zero", c.Registers.P.Zero, tt.expectedZero)
             checkFlag(t, "Negative", c.Registers.P.Negative, tt.expectedNeg)
+        })
+    }
+}
+
+
+// MARK: 加算/減算
+// TestADC はADC命令（キャリー付き加算）をテストします
+func TestADC(t *testing.T) {
+    tests := []struct {
+        name             string
+        opcode           uint8
+        addrMode         AddressingMode
+        setupCPU         func(*CPU)
+        expectedA        uint8
+        expectedZero     bool
+        expectedNeg      bool
+        expectedCarry    bool
+        expectedOverflow bool
+    }{
+        {
+            name:       "ADC Immediate - basic addition",
+            opcode:     0x69,
+            addrMode:   Immediate,
+            setupCPU: func(c *CPU) {
+                c.Registers.A = 0x10
+                c.Registers.P.Carry = false
+                c.WriteByteToWRAM(c.Registers.PC, 0x69) // ADC命令
+                c.WriteByteToWRAM(c.Registers.PC+1, 0x15) // オペランド: 0x15
+            },
+            expectedA:        0x25, // 0x10 + 0x15 = 0x25
+            expectedZero:     false,
+            expectedNeg:      false,
+            expectedCarry:    false,
+            expectedOverflow: false,
+        },
+        {
+            name:       "ADC Immediate - addition with initial carry set",
+            opcode:     0x69,
+            addrMode:   Immediate,
+            setupCPU: func(c *CPU) {
+                c.Registers.A = 0x10
+                c.Registers.P.Carry = true
+                c.WriteByteToWRAM(c.Registers.PC, 0x69) // ADC命令
+                c.WriteByteToWRAM(c.Registers.PC+1, 0x15) // オペランド: 0x15
+            },
+            expectedA:        0x26, // 0x10 + 0x15 + 1 (Carry) = 0x26
+            expectedZero:     false,
+            expectedNeg:      false,
+            expectedCarry:    false,
+            expectedOverflow: false,
+        },
+        {
+            name:       "ADC Immediate - carry out",
+            opcode:     0x69,
+            addrMode:   Immediate,
+            setupCPU: func(c *CPU) {
+                c.Registers.A = 0xFF
+                c.Registers.P.Carry = false
+                c.WriteByteToWRAM(c.Registers.PC, 0x69) // ADC命令
+                c.WriteByteToWRAM(c.Registers.PC+1, 0x01) // オペランド: 0x01
+            },
+            expectedA:        0x00, // 0xFF + 0x01 = 0x100 (下位8bit = 0x00)
+            expectedZero:     true,
+            expectedNeg:      false,
+            expectedCarry:    true, // キャリー発生
+            expectedOverflow: false,
+        },
+        {
+            name:       "ADC Immediate - overflow case (positive+positive=negative)",
+            opcode:     0x69,
+            addrMode:   Immediate,
+            setupCPU: func(c *CPU) {
+                c.Registers.A = 0x7F // 01111111 (127)
+                c.Registers.P.Carry = false
+                c.WriteByteToWRAM(c.Registers.PC, 0x69) // ADC命令
+                c.WriteByteToWRAM(c.Registers.PC+1, 0x01) // オペランド: 0x01
+            },
+            expectedA:        0x80, // 0x7F + 0x01 = 0x80 (-128 as signed)
+            expectedZero:     false,
+            expectedNeg:      true, // 負数（最上位ビットが1）
+            expectedCarry:    false,
+            expectedOverflow: true, // 符号付きオーバーフロー発生
+        },
+        {
+            name:       "ADC Immediate - overflow case (negative+negative=positive)",
+            opcode:     0x69,
+            addrMode:   Immediate,
+            setupCPU: func(c *CPU) {
+                c.Registers.A = 0x80 // 10000000 (-128)
+                c.Registers.P.Carry = false
+                c.WriteByteToWRAM(c.Registers.PC, 0x69) // ADC命令
+                c.WriteByteToWRAM(c.Registers.PC+1, 0x80) // オペランド: 0x80 (-128)
+            },
+            expectedA:        0x00, // 0x80 + 0x80 = 0x100 (下位8bit = 0x00)
+            expectedZero:     true,
+            expectedNeg:      false,
+            expectedCarry:    true, // キャリー発生
+            expectedOverflow: true, // 符号付きオーバーフロー発生
+        },
+        {
+            name:       "ADC Zero Page",
+            opcode:     0x65,
+            addrMode:   ZeroPage,
+            setupCPU: func(c *CPU) {
+                c.Registers.A = 0x42
+                c.Registers.P.Carry = false
+                c.WriteByteToWRAM(c.Registers.PC, 0x65) // ADC命令
+                c.WriteByteToWRAM(c.Registers.PC+1, 0x20) // オペランド: ZPアドレス0x20
+                c.WriteByteToWRAM(0x20, 0x13) // 0x20に値を設定
+            },
+            expectedA:        0x55, // 0x42 + 0x13 = 0x55
+            expectedZero:     false,
+            expectedNeg:      false,
+            expectedCarry:    false,
+            expectedOverflow: false,
+        },
+        {
+            name:       "ADC Zero Page,X",
+            opcode:     0x75,
+            addrMode:   ZeroPageXIndexed,
+            setupCPU: func(c *CPU) {
+                c.Registers.A = 0x42
+                c.Registers.X = 0x10
+                c.Registers.P.Carry = false
+                c.WriteByteToWRAM(c.Registers.PC, 0x75) // ADC命令
+                c.WriteByteToWRAM(c.Registers.PC+1, 0x20) // オペランド: ZPアドレス0x20
+                c.WriteByteToWRAM(0x30, 0x13) // 0x30 (0x20+0x10) に値を設定
+            },
+            expectedA:        0x55, // 0x42 + 0x13 = 0x55
+            expectedZero:     false,
+            expectedNeg:      false,
+            expectedCarry:    false,
+            expectedOverflow: false,
+        },
+        {
+            name:       "ADC Absolute",
+            opcode:     0x6D,
+            addrMode:   Absolute,
+            setupCPU: func(c *CPU) {
+                c.Registers.A = 0x42
+                c.Registers.P.Carry = false
+                c.WriteByteToWRAM(c.Registers.PC, 0x6D) // ADC命令
+                c.WriteByteToWRAM(c.Registers.PC+1, 0x80) // オペランド: 低バイト
+                c.WriteByteToWRAM(c.Registers.PC+2, 0x44) // オペランド: 高バイト (0x4480)
+                c.WriteByteToWRAM(0x4480, 0x13) // 0x4480に値を設定
+            },
+            expectedA:        0x55, // 0x42 + 0x13 = 0x55
+            expectedZero:     false,
+            expectedNeg:      false,
+            expectedCarry:    false,
+            expectedOverflow: false,
+        },
+        {
+            name:       "ADC Absolute,X",
+            opcode:     0x7D,
+            addrMode:   AbsoluteXIndexed,
+            setupCPU: func(c *CPU) {
+                c.Registers.A = 0x42
+                c.Registers.X = 0x10
+                c.Registers.P.Carry = false
+                c.WriteByteToWRAM(c.Registers.PC, 0x7D) // ADC命令
+                c.WriteByteToWRAM(c.Registers.PC+1, 0x80) // オペランド: 低バイト
+                c.WriteByteToWRAM(c.Registers.PC+2, 0x44) // オペランド: 高バイト (0x4480)
+                c.WriteByteToWRAM(0x4490, 0x13) // 0x4490 (0x4480+0x10) に値を設定
+            },
+            expectedA:        0x55, // 0x42 + 0x13 = 0x55
+            expectedZero:     false,
+            expectedNeg:      false,
+            expectedCarry:    false,
+            expectedOverflow: false,
+        },
+        {
+            name:       "ADC Absolute,Y",
+            opcode:     0x79,
+            addrMode:   AbsoluteYIndexed,
+            setupCPU: func(c *CPU) {
+                c.Registers.A = 0x42
+                c.Registers.Y = 0x10
+                c.Registers.P.Carry = false
+                c.WriteByteToWRAM(c.Registers.PC, 0x79) // ADC命令
+                c.WriteByteToWRAM(c.Registers.PC+1, 0x80) // オペランド: 低バイト
+                c.WriteByteToWRAM(c.Registers.PC+2, 0x44) // オペランド: 高バイト (0x4480)
+                c.WriteByteToWRAM(0x4490, 0x13) // 0x4490 (0x4480+0x10) に値を設定
+            },
+            expectedA:        0x55, // 0x42 + 0x13 = 0x55
+            expectedZero:     false,
+            expectedNeg:      false,
+            expectedCarry:    false,
+            expectedOverflow: false,
+        },
+        {
+            name:       "ADC Indirect,X",
+            opcode:     0x61,
+            addrMode:   IndirectXIndexed,
+            setupCPU: func(c *CPU) {
+                c.Registers.A = 0x42
+                c.Registers.X = 0x04
+                c.Registers.P.Carry = false
+                c.WriteByteToWRAM(c.Registers.PC, 0x61) // ADC命令
+                c.WriteByteToWRAM(c.Registers.PC+1, 0x20) // オペランド: ZPアドレス0x20
+                c.WriteByteToWRAM(0x24, 0x74) // 0x24 (0x20+0x04) に低バイト
+                c.WriteByteToWRAM(0x25, 0x20) // 0x25 に高バイト (→ 0x2074)
+                c.WriteByteToWRAM(0x2074, 0x13) // 0x2074に値を設定
+            },
+            expectedA:        0x55, // 0x42 + 0x13 = 0x55
+            expectedZero:     false,
+            expectedNeg:      false,
+            expectedCarry:    false,
+            expectedOverflow: false,
+        },
+        {
+            name:       "ADC Indirect,Y",
+            opcode:     0x71,
+            addrMode:   IndirectYIndexed,
+            setupCPU: func(c *CPU) {
+                c.Registers.A = 0x42
+                c.Registers.Y = 0x10
+                c.Registers.P.Carry = false
+                c.WriteByteToWRAM(c.Registers.PC, 0x71) // ADC命令
+                c.WriteByteToWRAM(c.Registers.PC+1, 0x20) // オペランド: ZPアドレス0x20
+                c.WriteByteToWRAM(0x20, 0x74) // 0x20に低バイト
+                c.WriteByteToWRAM(0x21, 0x20) // 0x21に高バイト (→ 0x2074)
+                c.WriteByteToWRAM(0x2084, 0x13) // 0x2084 (0x2074+0x10) に値を設定
+            },
+            expectedA:        0x55, // 0x42 + 0x13 = 0x55
+            expectedZero:     false,
+            expectedNeg:      false,
+            expectedCarry:    false,
+            expectedOverflow: false,
+        },
+    }
+
+    for _, tt := range tests {
+        t.Run(tt.name, func(t *testing.T) {
+            c := setupCPU()
+            tt.setupCPU(c)
+            
+            // CPU実行サイクルを使用して命令を実行
+            c.Execute()
+
+            // 結果を検証
+            checkRegister(t, "A", c.Registers.A, tt.expectedA)
+            checkFlag(t, "Zero", c.Registers.P.Zero, tt.expectedZero)
+            checkFlag(t, "Negative", c.Registers.P.Negative, tt.expectedNeg)
+            checkFlag(t, "Carry", c.Registers.P.Carry, tt.expectedCarry)
+            checkFlag(t, "Overflow", c.Registers.P.Overflow, tt.expectedOverflow)
+        })
+    }
+}
+
+// TestSBC はSBC命令（キャリー付き減算）をテストします
+func TestSBC(t *testing.T) {
+    tests := []struct {
+        name             string
+        opcode           uint8
+        addrMode         AddressingMode
+        setupCPU         func(*CPU)
+        expectedA        uint8
+        expectedZero     bool
+        expectedNeg      bool
+        expectedCarry    bool
+        expectedOverflow bool
+    }{
+        {
+            name:       "SBC Immediate - basic subtraction with carry set",
+            opcode:     0xE9,
+            addrMode:   Immediate,
+            setupCPU: func(c *CPU) {
+                c.Registers.A = 0x50
+                c.Registers.P.Carry = true // ボローなし（1 = 借りなし、0 = 借りあり）
+                c.WriteByteToWRAM(c.Registers.PC, 0xE9) // SBC命令
+                c.WriteByteToWRAM(c.Registers.PC+1, 0x30) // オペランド: 0x30
+            },
+            expectedA:        0x20, // 0x50 - 0x30 = 0x20
+            expectedZero:     false,
+            expectedNeg:      false,
+            expectedCarry:    true, // ボローなし
+            expectedOverflow: false,
+        },
+        {
+            name:       "SBC Immediate - subtraction with borrow (carry clear)",
+            opcode:     0xE9,
+            addrMode:   Immediate,
+            setupCPU: func(c *CPU) {
+                c.Registers.A = 0x50
+                c.Registers.P.Carry = false // ボローあり（0 = 借りあり）
+                c.WriteByteToWRAM(c.Registers.PC, 0xE9) // SBC命令
+                c.WriteByteToWRAM(c.Registers.PC+1, 0x30) // オペランド: 0x30
+            },
+            expectedA:        0x1F, // 0x50 - 0x30 - 1 (ボロー) = 0x1F
+            expectedZero:     false,
+            expectedNeg:      false,
+            expectedCarry:    true, // ボローなし
+            expectedOverflow: false,
+        },
+        {
+            name:       "SBC Immediate - borrow out (carry clear result)",
+            opcode:     0xE9,
+            addrMode:   Immediate,
+            setupCPU: func(c *CPU) {
+                c.Registers.A = 0x30
+                c.Registers.P.Carry = true // ボローなし
+                c.WriteByteToWRAM(c.Registers.PC, 0xE9) // SBC命令
+                c.WriteByteToWRAM(c.Registers.PC+1, 0x40) // オペランド: 0x40
+            },
+            expectedA:        0xF0, // 0x30 - 0x40 = 0xF0 (下位8bit)
+            expectedZero:     false,
+            expectedNeg:      true, // 負数（最上位ビットが1）
+            expectedCarry:    false, // ボローあり
+            expectedOverflow: false,
+        },
+        {
+            name:       "SBC Immediate - overflow case (positive-negative=negative)",
+            opcode:     0xE9,
+            addrMode:   Immediate,
+            setupCPU: func(c *CPU) {
+                c.Registers.A = 0x50 // 01010000 (正数)
+                c.Registers.P.Carry = true // ボローなし
+                c.WriteByteToWRAM(c.Registers.PC, 0xE9) // SBC命令
+                c.WriteByteToWRAM(c.Registers.PC+1, 0xB0) // オペランド: 0xB0 (負数)
+            },
+            expectedA:        0xA0, // 0x50 - 0xB0 = 0xA0 (下位8bit)
+            expectedZero:     false,
+            expectedNeg:      true, // 負数
+            expectedCarry:    false, // ボローあり
+            expectedOverflow: true, // 符号付きオーバーフロー発生 (正 - 負 = 負)
+        },
+        {
+            name:       "SBC Immediate - overflow case (negative-positive=positive)",
+            opcode:     0xE9,
+            addrMode:   Immediate,
+            setupCPU: func(c *CPU) {
+                c.Registers.A = 0x90 // 10010000 (負数)
+                c.Registers.P.Carry = true // ボローなし
+                c.WriteByteToWRAM(c.Registers.PC, 0xE9) // SBC命令
+                c.WriteByteToWRAM(c.Registers.PC+1, 0x10) // オペランド: 0x10 (正数)
+            },
+            expectedA:        0x80, // 0x90 - 0x10 = 0x80 (下位8bit)
+            expectedZero:     false,
+            expectedNeg:      true, // 負数
+            expectedCarry:    true, // ボローなし
+            expectedOverflow: true, // 符号付きオーバーフロー発生 (負 - 正 = 正だが結果が負になってしまう)
+        },
+        {
+            name:       "SBC Zero Page",
+            opcode:     0xE5,
+            addrMode:   ZeroPage,
+            setupCPU: func(c *CPU) {
+                c.Registers.A = 0x50
+                c.Registers.P.Carry = true // ボローなし
+                c.WriteByteToWRAM(c.Registers.PC, 0xE5) // SBC命令
+                c.WriteByteToWRAM(c.Registers.PC+1, 0x20) // オペランド: ZPアドレス0x20
+                c.WriteByteToWRAM(0x20, 0x30) // 0x20に値を設定
+            },
+            expectedA:        0x20, // 0x50 - 0x30 = 0x20
+            expectedZero:     false,
+            expectedNeg:      false,
+            expectedCarry:    true, // ボローなし
+            expectedOverflow: false,
+        },
+        {
+            name:       "SBC Zero Page,X",
+            opcode:     0xF5,
+            addrMode:   ZeroPageXIndexed,
+            setupCPU: func(c *CPU) {
+                c.Registers.A = 0x50
+                c.Registers.X = 0x10
+                c.Registers.P.Carry = true // ボローなし
+                c.WriteByteToWRAM(c.Registers.PC, 0xF5) // SBC命令
+                c.WriteByteToWRAM(c.Registers.PC+1, 0x20) // オペランド: ZPアドレス0x20
+                c.WriteByteToWRAM(0x30, 0x30) // 0x30 (0x20+0x10) に値を設定
+            },
+            expectedA:        0x20, // 0x50 - 0x30 = 0x20
+            expectedZero:     false,
+            expectedNeg:      false,
+            expectedCarry:    true, // ボローなし
+            expectedOverflow: false,
+        },
+        {
+            name:       "SBC Absolute",
+            opcode:     0xED,
+            addrMode:   Absolute,
+            setupCPU: func(c *CPU) {
+                c.Registers.A = 0x50
+                c.Registers.P.Carry = true // ボローなし
+                c.WriteByteToWRAM(c.Registers.PC, 0xED) // SBC命令
+                c.WriteByteToWRAM(c.Registers.PC+1, 0x80) // オペランド: 低バイト
+                c.WriteByteToWRAM(c.Registers.PC+2, 0x44) // オペランド: 高バイト (0x4480)
+                c.WriteByteToWRAM(0x4480, 0x30) // 0x4480に値を設定
+            },
+            expectedA:        0x20, // 0x50 - 0x30 = 0x20
+            expectedZero:     false,
+            expectedNeg:      false,
+            expectedCarry:    true, // ボローなし
+            expectedOverflow: false,
+        },
+        {
+            name:       "SBC Absolute,X",
+            opcode:     0xFD,
+            addrMode:   AbsoluteXIndexed,
+            setupCPU: func(c *CPU) {
+                c.Registers.A = 0x50
+                c.Registers.X = 0x10
+                c.Registers.P.Carry = true // ボローなし
+                c.WriteByteToWRAM(c.Registers.PC, 0xFD) // SBC命令
+                c.WriteByteToWRAM(c.Registers.PC+1, 0x80) // オペランド: 低バイト
+                c.WriteByteToWRAM(c.Registers.PC+2, 0x44) // オペランド: 高バイト (0x4480)
+                c.WriteByteToWRAM(0x4490, 0x30) // 0x4490 (0x4480+0x10) に値を設定
+            },
+            expectedA:        0x20, // 0x50 - 0x30 = 0x20
+            expectedZero:     false,
+            expectedNeg:      false,
+            expectedCarry:    true, // ボローなし
+            expectedOverflow: false,
+        },
+        {
+            name:       "SBC Absolute,Y",
+            opcode:     0xF9,
+            addrMode:   AbsoluteYIndexed,
+            setupCPU: func(c *CPU) {
+                c.Registers.A = 0x50
+                c.Registers.Y = 0x10
+                c.Registers.P.Carry = true // ボローなし
+                c.WriteByteToWRAM(c.Registers.PC, 0xF9) // SBC命令
+                c.WriteByteToWRAM(c.Registers.PC+1, 0x80) // オペランド: 低バイト
+                c.WriteByteToWRAM(c.Registers.PC+2, 0x44) // オペランド: 高バイト (0x4480)
+                c.WriteByteToWRAM(0x4490, 0x30) // 0x4490 (0x4480+0x10) に値を設定
+            },
+            expectedA:        0x20, // 0x50 - 0x30 = 0x20
+            expectedZero:     false,
+            expectedNeg:      false,
+            expectedCarry:    true, // ボローなし
+            expectedOverflow: false,
+        },
+        {
+            name:       "SBC Indirect,X",
+            opcode:     0xE1,
+            addrMode:   IndirectXIndexed,
+            setupCPU: func(c *CPU) {
+                c.Registers.A = 0x50
+                c.Registers.X = 0x04
+                c.Registers.P.Carry = true // ボローなし
+                c.WriteByteToWRAM(c.Registers.PC, 0xE1) // SBC命令
+                c.WriteByteToWRAM(c.Registers.PC+1, 0x20) // オペランド: ZPアドレス0x20
+                c.WriteByteToWRAM(0x24, 0x74) // 0x24 (0x20+0x04) に低バイト
+                c.WriteByteToWRAM(0x25, 0x20) // 0x25 に高バイト (→ 0x2074)
+                c.WriteByteToWRAM(0x2074, 0x30) // 0x2074に値を設定
+            },
+            expectedA:        0x20, // 0x50 - 0x30 = 0x20
+            expectedZero:     false,
+            expectedNeg:      false,
+            expectedCarry:    true, // ボローなし
+            expectedOverflow: false,
+        },
+        {
+            name:       "SBC Indirect,Y",
+            opcode:     0xF1,
+            addrMode:   IndirectYIndexed,
+            setupCPU: func(c *CPU) {
+                c.Registers.A = 0x50
+                c.Registers.Y = 0x10
+                c.Registers.P.Carry = true // ボローなし
+                c.WriteByteToWRAM(c.Registers.PC, 0xF1) // SBC命令
+                c.WriteByteToWRAM(c.Registers.PC+1, 0x20) // オペランド: ZPアドレス0x20
+                c.WriteByteToWRAM(0x20, 0x74) // 0x20に低バイト
+                c.WriteByteToWRAM(0x21, 0x20) // 0x21に高バイト (→ 0x2074)
+                c.WriteByteToWRAM(0x2084, 0x30) // 0x2084 (0x2074+0x10) に値を設定
+            },
+            expectedA:        0x20, // 0x50 - 0x30 = 0x20
+            expectedZero:     false,
+            expectedNeg:      false,
+            expectedCarry:    true, // ボローなし
+            expectedOverflow: false,
+        },
+    }
+
+    for _, tt := range tests {
+        t.Run(tt.name, func(t *testing.T) {
+            c := setupCPU()
+            tt.setupCPU(c)
+            
+            // CPU実行サイクルを使用して命令を実行
+            c.Execute()
+
+            // 結果を検証
+            checkRegister(t, "A", c.Registers.A, tt.expectedA)
+            checkFlag(t, "Zero", c.Registers.P.Zero, tt.expectedZero)
+            checkFlag(t, "Negative", c.Registers.P.Negative, tt.expectedNeg)
+            checkFlag(t, "Carry", c.Registers.P.Carry, tt.expectedCarry)
+            checkFlag(t, "Overflow", c.Registers.P.Overflow, tt.expectedOverflow)
         })
     }
 }
