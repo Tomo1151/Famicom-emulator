@@ -412,20 +412,14 @@ func (c *CPU) iny(mode AddressingMode) {
 
 // MARK: JMP命令の実装
 func (c *CPU) jmp(mode AddressingMode) {
-	if mode == Indirect {
-		addr := c.getOperandAddress(mode)
-		c.Registers.PC = c.ReadWordFromWRAM(addr)
-	} else {
-		c.Registers.PC = c.getOperandAddress(mode)
-	}
+	c.Registers.PC = c.getOperandAddress(mode)
 }
 
 // MARK: JSR命令の実装
 func (c *CPU) jsr(mode AddressingMode) {
-	addr := c.getOperandAddress(mode)
-	value := c.ReadWordFromWRAM(addr)
 	c.pushWord(c.Registers.PC + 1)
-	c.Registers.PC = value
+	addr := c.getOperandAddress(mode)
+	c.Registers.PC = addr
 }
 
 // MARK: LDA命令の実装
