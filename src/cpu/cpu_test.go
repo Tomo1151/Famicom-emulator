@@ -3323,3 +3323,511 @@ func TestPLP(t *testing.T) {
         })
     }
 }
+
+
+// MARK: インクリメント / デクリメント
+// TestINX はINX命令（インクリメントX）をテストします
+func TestINX(t *testing.T) {
+    tests := []struct {
+        name          string
+        opcode        uint8
+        addrMode      AddressingMode
+        setupCPU      func(*CPU)
+        expectedX     uint8
+        expectedZero  bool
+        expectedNeg   bool
+    }{
+        {
+            name:       "INX - Normal increment",
+            opcode:     0xE8,
+            addrMode:   Implied,
+            setupCPU: func(c *CPU) {
+                c.Registers.X = 0x42
+                c.WriteByteToWRAM(c.Registers.PC, 0xE8) // INX命令
+            },
+            expectedX:    0x43,
+            expectedZero: false,
+            expectedNeg:  false,
+        },
+        {
+            name:       "INX - Overflow from 0xFF to 0x00",
+            opcode:     0xE8,
+            addrMode:   Implied,
+            setupCPU: func(c *CPU) {
+                c.Registers.X = 0xFF
+                c.WriteByteToWRAM(c.Registers.PC, 0xE8) // INX命令
+            },
+            expectedX:    0x00,
+            expectedZero: true,
+            expectedNeg:  false,
+        },
+        {
+            name:       "INX - Negative result",
+            opcode:     0xE8,
+            addrMode:   Implied,
+            setupCPU: func(c *CPU) {
+                c.Registers.X = 0x7F
+                c.WriteByteToWRAM(c.Registers.PC, 0xE8) // INX命令
+            },
+            expectedX:    0x80,
+            expectedZero: false,
+            expectedNeg:  true,
+        },
+    }
+
+    for _, tt := range tests {
+        t.Run(tt.name, func(t *testing.T) {
+            c := setupCPU()
+            tt.setupCPU(c)
+            
+            // CPU実行サイクルを使用して命令を実行
+            c.Execute()
+
+            // 結果を検証
+            checkRegister(t, "X", c.Registers.X, tt.expectedX)
+            checkFlag(t, "Zero", c.Registers.P.Zero, tt.expectedZero)
+            checkFlag(t, "Negative", c.Registers.P.Negative, tt.expectedNeg)
+        })
+    }
+}
+
+// TestINY はINY命令（インクリメントY）をテストします
+func TestINY(t *testing.T) {
+    tests := []struct {
+        name          string
+        opcode        uint8
+        addrMode      AddressingMode
+        setupCPU      func(*CPU)
+        expectedY     uint8
+        expectedZero  bool
+        expectedNeg   bool
+    }{
+        {
+            name:       "INY - Normal increment",
+            opcode:     0xC8,
+            addrMode:   Implied,
+            setupCPU: func(c *CPU) {
+                c.Registers.Y = 0x42
+                c.WriteByteToWRAM(c.Registers.PC, 0xC8) // INY命令
+            },
+            expectedY:    0x43,
+            expectedZero: false,
+            expectedNeg:  false,
+        },
+        {
+            name:       "INY - Overflow from 0xFF to 0x00",
+            opcode:     0xC8,
+            addrMode:   Implied,
+            setupCPU: func(c *CPU) {
+                c.Registers.Y = 0xFF
+                c.WriteByteToWRAM(c.Registers.PC, 0xC8) // INY命令
+            },
+            expectedY:    0x00,
+            expectedZero: true,
+            expectedNeg:  false,
+        },
+        {
+            name:       "INY - Negative result",
+            opcode:     0xC8,
+            addrMode:   Implied,
+            setupCPU: func(c *CPU) {
+                c.Registers.Y = 0x7F
+                c.WriteByteToWRAM(c.Registers.PC, 0xC8) // INY命令
+            },
+            expectedY:    0x80,
+            expectedZero: false,
+            expectedNeg:  true,
+        },
+    }
+
+    for _, tt := range tests {
+        t.Run(tt.name, func(t *testing.T) {
+            c := setupCPU()
+            tt.setupCPU(c)
+            
+            // CPU実行サイクルを使用して命令を実行
+            c.Execute()
+
+            // 結果を検証
+            checkRegister(t, "Y", c.Registers.Y, tt.expectedY)
+            checkFlag(t, "Zero", c.Registers.P.Zero, tt.expectedZero)
+            checkFlag(t, "Negative", c.Registers.P.Negative, tt.expectedNeg)
+        })
+    }
+}
+
+// TestDEX はDEX命令（デクリメントX）をテストします
+func TestDEX(t *testing.T) {
+    tests := []struct {
+        name          string
+        opcode        uint8
+        addrMode      AddressingMode
+        setupCPU      func(*CPU)
+        expectedX     uint8
+        expectedZero  bool
+        expectedNeg   bool
+    }{
+        {
+            name:       "DEX - Normal decrement",
+            opcode:     0xCA,
+            addrMode:   Implied,
+            setupCPU: func(c *CPU) {
+                c.Registers.X = 0x42
+                c.WriteByteToWRAM(c.Registers.PC, 0xCA) // DEX命令
+            },
+            expectedX:    0x41,
+            expectedZero: false,
+            expectedNeg:  false,
+        },
+        {
+            name:       "DEX - Underflow from 0x00 to 0xFF",
+            opcode:     0xCA,
+            addrMode:   Implied,
+            setupCPU: func(c *CPU) {
+                c.Registers.X = 0x00
+                c.WriteByteToWRAM(c.Registers.PC, 0xCA) // DEX命令
+            },
+            expectedX:    0xFF,
+            expectedZero: false,
+            expectedNeg:  true,
+        },
+        {
+            name:       "DEX - Decrement to zero",
+            opcode:     0xCA,
+            addrMode:   Implied,
+            setupCPU: func(c *CPU) {
+                c.Registers.X = 0x01
+                c.WriteByteToWRAM(c.Registers.PC, 0xCA) // DEX命令
+            },
+            expectedX:    0x00,
+            expectedZero: true,
+            expectedNeg:  false,
+        },
+    }
+
+    for _, tt := range tests {
+        t.Run(tt.name, func(t *testing.T) {
+            c := setupCPU()
+            tt.setupCPU(c)
+            
+            // CPU実行サイクルを使用して命令を実行
+            c.Execute()
+
+            // 結果を検証
+            checkRegister(t, "X", c.Registers.X, tt.expectedX)
+            checkFlag(t, "Zero", c.Registers.P.Zero, tt.expectedZero)
+            checkFlag(t, "Negative", c.Registers.P.Negative, tt.expectedNeg)
+        })
+    }
+}
+
+// TestDEY はDEY命令（デクリメントY）をテストします
+func TestDEY(t *testing.T) {
+    tests := []struct {
+        name          string
+        opcode        uint8
+        addrMode      AddressingMode
+        setupCPU      func(*CPU)
+        expectedY     uint8
+        expectedZero  bool
+        expectedNeg   bool
+    }{
+        {
+            name:       "DEY - Normal decrement",
+            opcode:     0x88,
+            addrMode:   Implied,
+            setupCPU: func(c *CPU) {
+                c.Registers.Y = 0x42
+                c.WriteByteToWRAM(c.Registers.PC, 0x88) // DEY命令
+            },
+            expectedY:    0x41,
+            expectedZero: false,
+            expectedNeg:  false,
+        },
+        {
+            name:       "DEY - Underflow from 0x00 to 0xFF",
+            opcode:     0x88,
+            addrMode:   Implied,
+            setupCPU: func(c *CPU) {
+                c.Registers.Y = 0x00
+                c.WriteByteToWRAM(c.Registers.PC, 0x88) // DEY命令
+            },
+            expectedY:    0xFF,
+            expectedZero: false,
+            expectedNeg:  true,
+        },
+        {
+            name:       "DEY - Decrement to zero",
+            opcode:     0x88,
+            addrMode:   Implied,
+            setupCPU: func(c *CPU) {
+                c.Registers.Y = 0x01
+                c.WriteByteToWRAM(c.Registers.PC, 0x88) // DEY命令
+            },
+            expectedY:    0x00,
+            expectedZero: true,
+            expectedNeg:  false,
+        },
+    }
+
+    for _, tt := range tests {
+        t.Run(tt.name, func(t *testing.T) {
+            c := setupCPU()
+            tt.setupCPU(c)
+            
+            // CPU実行サイクルを使用して命令を実行
+            c.Execute()
+
+            // 結果を検証
+            checkRegister(t, "Y", c.Registers.Y, tt.expectedY)
+            checkFlag(t, "Zero", c.Registers.P.Zero, tt.expectedZero)
+            checkFlag(t, "Negative", c.Registers.P.Negative, tt.expectedNeg)
+        })
+    }
+}
+
+// TestINC はINC命令（インクリメントメモリ）をテストします
+func TestINC(t *testing.T) {
+    tests := []struct {
+        name          string
+        opcode        uint8
+        addrMode      AddressingMode
+        setupCPU      func(*CPU)
+        checkResult   func(*testing.T, *CPU)
+        expectedZero  bool
+        expectedNeg   bool
+    }{
+        {
+            name:       "INC Zero Page - Normal increment",
+            opcode:     0xE6,
+            addrMode:   ZeroPage,
+            setupCPU: func(c *CPU) {
+                c.WriteByteToWRAM(c.Registers.PC, 0xE6) // INC命令
+                c.WriteByteToWRAM(c.Registers.PC+1, 0x20) // ZPアドレス0x20
+                c.WriteByteToWRAM(0x20, 0x42) // 0x20に初期値設定
+            },
+            checkResult: func(t *testing.T, c *CPU) {
+                value := c.ReadByteFromWRAM(0x20)
+                if value != 0x43 {
+                    t.Errorf("Memory at $20 = %#02x, want %#02x", value, 0x43)
+                }
+            },
+            expectedZero: false,
+            expectedNeg:  false,
+        },
+        {
+            name:       "INC Zero Page - Overflow from 0xFF to 0x00",
+            opcode:     0xE6,
+            addrMode:   ZeroPage,
+            setupCPU: func(c *CPU) {
+                c.WriteByteToWRAM(c.Registers.PC, 0xE6) // INC命令
+                c.WriteByteToWRAM(c.Registers.PC+1, 0x20) // ZPアドレス0x20
+                c.WriteByteToWRAM(0x20, 0xFF) // 0x20に初期値設定
+            },
+            checkResult: func(t *testing.T, c *CPU) {
+                value := c.ReadByteFromWRAM(0x20)
+                if value != 0x00 {
+                    t.Errorf("Memory at $20 = %#02x, want %#02x", value, 0x00)
+                }
+            },
+            expectedZero: true,
+            expectedNeg:  false,
+        },
+        {
+            name:       "INC Zero Page,X - Negative result",
+            opcode:     0xF6,
+            addrMode:   ZeroPageXIndexed,
+            setupCPU: func(c *CPU) {
+                c.Registers.X = 0x10
+                c.WriteByteToWRAM(c.Registers.PC, 0xF6) // INC命令
+                c.WriteByteToWRAM(c.Registers.PC+1, 0x20) // ZPアドレス0x20
+                c.WriteByteToWRAM(0x30, 0x7F) // 0x30 (0x20+0x10) に初期値設定
+            },
+            checkResult: func(t *testing.T, c *CPU) {
+                value := c.ReadByteFromWRAM(0x30)
+                if value != 0x80 {
+                    t.Errorf("Memory at $30 = %#02x, want %#02x", value, 0x80)
+                }
+            },
+            expectedZero: false,
+            expectedNeg:  true,
+        },
+        {
+            name:       "INC Absolute",
+            opcode:     0xEE,
+            addrMode:   Absolute,
+            setupCPU: func(c *CPU) {
+                c.WriteByteToWRAM(c.Registers.PC, 0xEE) // INC命令
+                c.WriteByteToWRAM(c.Registers.PC+1, 0x80) // 低バイト
+                c.WriteByteToWRAM(c.Registers.PC+2, 0x44) // 高バイト (0x4480)
+                c.WriteByteToWRAM(0x4480, 0x42) // 0x4480に初期値設定
+            },
+            checkResult: func(t *testing.T, c *CPU) {
+                value := c.ReadByteFromWRAM(0x4480)
+                if value != 0x43 {
+                    t.Errorf("Memory at $4480 = %#02x, want %#02x", value, 0x43)
+                }
+            },
+            expectedZero: false,
+            expectedNeg:  false,
+        },
+        {
+            name:       "INC Absolute,X",
+            opcode:     0xFE,
+            addrMode:   AbsoluteXIndexed,
+            setupCPU: func(c *CPU) {
+                c.Registers.X = 0x10
+                c.WriteByteToWRAM(c.Registers.PC, 0xFE) // INC命令
+                c.WriteByteToWRAM(c.Registers.PC+1, 0x80) // 低バイト
+                c.WriteByteToWRAM(c.Registers.PC+2, 0x44) // 高バイト (0x4480)
+                c.WriteByteToWRAM(0x4490, 0x42) // 0x4490 (0x4480+0x10) に初期値設定
+            },
+            checkResult: func(t *testing.T, c *CPU) {
+                value := c.ReadByteFromWRAM(0x4490)
+                if value != 0x43 {
+                    t.Errorf("Memory at $4490 = %#02x, want %#02x", value, 0x43)
+                }
+            },
+            expectedZero: false,
+            expectedNeg:  false,
+        },
+    }
+
+    for _, tt := range tests {
+        t.Run(tt.name, func(t *testing.T) {
+            c := setupCPU()
+            tt.setupCPU(c)
+            
+            // CPU実行サイクルを使用して命令を実行
+            c.Execute()
+
+            // 結果を検証
+            tt.checkResult(t, c)
+            checkFlag(t, "Zero", c.Registers.P.Zero, tt.expectedZero)
+            checkFlag(t, "Negative", c.Registers.P.Negative, tt.expectedNeg)
+        })
+    }
+}
+
+// TestDEC はDEC命令（デクリメントメモリ）をテストします
+func TestDEC(t *testing.T) {
+    tests := []struct {
+        name          string
+        opcode        uint8
+        addrMode      AddressingMode
+        setupCPU      func(*CPU)
+        checkResult   func(*testing.T, *CPU)
+        expectedZero  bool
+        expectedNeg   bool
+    }{
+        {
+            name:       "DEC Zero Page - Normal decrement",
+            opcode:     0xC6,
+            addrMode:   ZeroPage,
+            setupCPU: func(c *CPU) {
+                c.WriteByteToWRAM(c.Registers.PC, 0xC6) // DEC命令
+                c.WriteByteToWRAM(c.Registers.PC+1, 0x20) // ZPアドレス0x20
+                c.WriteByteToWRAM(0x20, 0x42) // 0x20に初期値設定
+            },
+            checkResult: func(t *testing.T, c *CPU) {
+                value := c.ReadByteFromWRAM(0x20)
+                if value != 0x41 {
+                    t.Errorf("Memory at $20 = %#02x, want %#02x", value, 0x41)
+                }
+            },
+            expectedZero: false,
+            expectedNeg:  false,
+        },
+        {
+            name:       "DEC Zero Page - Underflow from 0x00 to 0xFF",
+            opcode:     0xC6,
+            addrMode:   ZeroPage,
+            setupCPU: func(c *CPU) {
+                c.WriteByteToWRAM(c.Registers.PC, 0xC6) // DEC命令
+                c.WriteByteToWRAM(c.Registers.PC+1, 0x20) // ZPアドレス0x20
+                c.WriteByteToWRAM(0x20, 0x00) // 0x20に初期値設定
+            },
+            checkResult: func(t *testing.T, c *CPU) {
+                value := c.ReadByteFromWRAM(0x20)
+                if value != 0xFF {
+                    t.Errorf("Memory at $20 = %#02x, want %#02x", value, 0xFF)
+                }
+            },
+            expectedZero: false,
+            expectedNeg:  true,
+        },
+        {
+            name:       "DEC Zero Page,X - Decrement to zero",
+            opcode:     0xD6,
+            addrMode:   ZeroPageXIndexed,
+            setupCPU: func(c *CPU) {
+                c.Registers.X = 0x10
+                c.WriteByteToWRAM(c.Registers.PC, 0xD6) // DEC命令
+                c.WriteByteToWRAM(c.Registers.PC+1, 0x20) // ZPアドレス0x20
+                c.WriteByteToWRAM(0x30, 0x01) // 0x30 (0x20+0x10) に初期値設定
+            },
+            checkResult: func(t *testing.T, c *CPU) {
+                value := c.ReadByteFromWRAM(0x30)
+                if value != 0x00 {
+                    t.Errorf("Memory at $30 = %#02x, want %#02x", value, 0x00)
+                }
+            },
+            expectedZero: true,
+            expectedNeg:  false,
+        },
+        {
+            name:       "DEC Absolute",
+            opcode:     0xCE,
+            addrMode:   Absolute,
+            setupCPU: func(c *CPU) {
+                c.WriteByteToWRAM(c.Registers.PC, 0xCE) // DEC命令
+                c.WriteByteToWRAM(c.Registers.PC+1, 0x80) // 低バイト
+                c.WriteByteToWRAM(c.Registers.PC+2, 0x44) // 高バイト (0x4480)
+                c.WriteByteToWRAM(0x4480, 0x42) // 0x4480に初期値設定
+            },
+            checkResult: func(t *testing.T, c *CPU) {
+                value := c.ReadByteFromWRAM(0x4480)
+                if value != 0x41 {
+                    t.Errorf("Memory at $4480 = %#02x, want %#02x", value, 0x41)
+                }
+            },
+            expectedZero: false,
+            expectedNeg:  false,
+        },
+        {
+            name:       "DEC Absolute,X",
+            opcode:     0xDE,
+            addrMode:   AbsoluteXIndexed,
+            setupCPU: func(c *CPU) {
+                c.Registers.X = 0x10
+                c.WriteByteToWRAM(c.Registers.PC, 0xDE) // DEC命令
+                c.WriteByteToWRAM(c.Registers.PC+1, 0x80) // 低バイト
+                c.WriteByteToWRAM(c.Registers.PC+2, 0x44) // 高バイト (0x4480)
+                c.WriteByteToWRAM(0x4490, 0x42) // 0x4490 (0x4480+0x10) に初期値設定
+            },
+            checkResult: func(t *testing.T, c *CPU) {
+                value := c.ReadByteFromWRAM(0x4490)
+                if value != 0x41 {
+                    t.Errorf("Memory at $4490 = %#02x, want %#02x", value, 0x41)
+                }
+            },
+            expectedZero: false,
+            expectedNeg:  false,
+        },
+    }
+
+    for _, tt := range tests {
+        t.Run(tt.name, func(t *testing.T) {
+            c := setupCPU()
+            tt.setupCPU(c)
+            
+            // CPU実行サイクルを使用して命令を実行
+            c.Execute()
+
+            // 結果を検証
+            tt.checkResult(t, c)
+            checkFlag(t, "Zero", c.Registers.P.Zero, tt.expectedZero)
+            checkFlag(t, "Negative", c.Registers.P.Negative, tt.expectedNeg)
+        })
+    }
+}
