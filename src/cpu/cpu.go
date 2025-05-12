@@ -5,12 +5,16 @@ import (
 	"log"
 )
 
+const (
+	CPU_WRAM_SIZE = 0xFFFF
+)
+
 // MARK: CPUの定義
 type CPU struct {
 	Registers registers // レジスタ
 	InstructionSet instructionSet // 命令セット
 
-	wram [0xFFFF]uint8 // WRAM
+	wram [CPU_WRAM_SIZE+1]uint8 // WRAM
 
 	log bool // デバッグ出力フラグ
 }
@@ -62,8 +66,10 @@ func (c *CPU) Execute() {
 	c.Registers.PC++
 	instruction.Handler(instruction.AddressingMode)
 
-	// オペランド分プログラムカウンタを進める (オペコードの分 -1)
-	c.Registers.PC += uint16(instruction.Bytes-1)
+	if instruction.Code != JMP && instruction.Code != JSR && instruction.Code != RTS && instruction.Code != RTI {
+		// オペランド分プログラムカウンタを進める (オペコードの分 -1)
+		c.Registers.PC += uint16(instruction.Bytes-1)
+	}
 
 	if c.log {
 		fmt.Printf("PC: $%04X\n\n", c.Registers.PC)
@@ -118,6 +124,16 @@ func (c *CPU) getOperandAddress(mode AddressingMode) uint16 {
 	case AbsoluteYIndexed:
 		origin := c.ReadWordFromWRAM(c.Registers.PC)
 		return origin + uint16(c.Registers.Y)
+	case Indirect:
+		ptr := c.ReadWordFromWRAM(c.Registers.PC)
+		// ページ境界をまたぐ際のバグを再現
+		if (ptr & 0xFF) == 0xFF {
+			lower := c.ReadByteFromWRAM(ptr)
+			upper := c.ReadByteFromWRAM(ptr & 0xFF00)
+			return uint16(upper) << 8 | uint16(lower)
+		} else {
+			return c.ReadWordFromWRAM(ptr)
+		}
 	case IndirectXIndexed:
 		base := c.ReadByteFromWRAM(c.Registers.PC)
 		ptr := base + c.Registers.X
@@ -283,9 +299,10 @@ func (c *CPU) bpl(mode AddressingMode) {
 
 // MARK: BRK命令の実装
 func (c *CPU) brk(mode AddressingMode) {
-	c.pushWord(c.Registers.PC)
-	c.pushByte(c.Registers.P.ToByte())
+	c.pushWord(c.Registers.PC + 1)
 	c.Registers.P.Break = true
+	c.pushByte(c.Registers.P.ToByte())
+	c.Registers.PC = c.ReadWordFromWRAM(0xFFFE)
 }
 
 // MARK: BVC命令の実装
@@ -407,7 +424,7 @@ func (c *CPU) jmp(mode AddressingMode) {
 func (c *CPU) jsr(mode AddressingMode) {
 	addr := c.getOperandAddress(mode)
 	value := c.ReadWordFromWRAM(addr)
-	c.pushWord(c.Registers.PC)
+	c.pushWord(c.Registers.PC + 1)
 	c.Registers.PC = value
 }
 
@@ -557,6 +574,7 @@ func (c *CPU) rti(mode AddressingMode) {
 
 	c.Registers.P.SetFromByte(status)
 	c.Registers.PC = addr
+	c.Registers.P.Break = false
 }
 
 // MARK: RTS命令の実装
