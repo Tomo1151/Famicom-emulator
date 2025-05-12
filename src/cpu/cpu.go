@@ -148,6 +148,9 @@ func (c *CPU) getOperandAddress(mode AddressingMode) uint16 {
 	case Relative:
 		offset := int8(c.ReadByteFromWRAM(c.Registers.PC))
 		return uint16(offset)
+	case Accumulator:
+		log.Fatalf("Error: Mode Accumulator doesn't take any operand")
+		return 0x0000
 	case Implied:
 		log.Fatalf("Error: Mode Implied doesn't take any operand")
 		return 0x0000
