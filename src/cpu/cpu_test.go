@@ -3044,3 +3044,282 @@ func TestROR(t *testing.T) {
         })
     }
 }
+
+
+// MARK: スタック操作
+// TestPHA はPHA命令（Push Accumulator）をテストします
+func TestPHA(t *testing.T) {
+    tests := []struct {
+        name        string
+        opcode      uint8
+        addrMode    AddressingMode
+        setupCPU    func(*CPU)
+        expectedSP  uint8
+        stackValue  uint8
+    }{
+        {
+            name:     "PHA - Push Accumulator to Stack",
+            opcode:   0x48,
+            addrMode: Implied,
+            setupCPU: func(c *CPU) {
+                c.Registers.A = 0x42  // テスト用の値
+                c.Registers.SP = 0xFF // スタックポインタを初期化
+                c.WriteByteToWRAM(c.Registers.PC, 0x48) // PHA命令
+            },
+            expectedSP: 0xFE,  // スタックポインタが1つ減少
+            stackValue: 0x42,  // スタックに格納される値
+        },
+        {
+            name:     "PHA - Push negative value",
+            opcode:   0x48,
+            addrMode: Implied,
+            setupCPU: func(c *CPU) {
+                c.Registers.A = 0x80  // 負の値
+                c.Registers.SP = 0xFF // スタックポインタを初期化
+                c.WriteByteToWRAM(c.Registers.PC, 0x48) // PHA命令
+            },
+            expectedSP: 0xFE,  // スタックポインタが1つ減少
+            stackValue: 0x80,  // スタックに格納される値
+        },
+    }
+
+    for _, tt := range tests {
+        t.Run(tt.name, func(t *testing.T) {
+            c := setupCPU()
+            tt.setupCPU(c)
+            
+            // CPU実行サイクルを使用して命令を実行
+            c.Execute()
+
+            // 結果を検証
+            checkRegister(t, "SP", c.Registers.SP, tt.expectedSP)
+            
+            // スタックの内容を検証（最後にプッシュした値）
+            stackAddr := 0x0100 | uint16(c.Registers.SP+1)
+            stackValue := c.ReadByteFromWRAM(stackAddr)
+            if stackValue != tt.stackValue {
+                t.Errorf("Stack value at $%04X = %#02x, want %#02x", stackAddr, stackValue, tt.stackValue)
+            }
+        })
+    }
+}
+
+// TestPHP はPHP命令（Push Processor Status）をテストします
+func TestPHP(t *testing.T) {
+    tests := []struct {
+        name        string
+        opcode      uint8
+        addrMode    AddressingMode
+        setupCPU    func(*CPU)
+        expectedSP  uint8
+    }{
+        {
+            name:     "PHP - Push Processor Status to Stack",
+            opcode:   0x08,
+            addrMode: Implied,
+            setupCPU: func(c *CPU) {
+                // 特定のフラグセットを設定
+                c.Registers.P.Carry = true
+                c.Registers.P.Zero = true
+                c.Registers.P.Negative = false
+                c.Registers.P.Overflow = false
+                c.Registers.P.Decimal = false
+                c.Registers.P.Interrupt = false
+                c.Registers.SP = 0xFF // スタックポインタを初期化
+                c.WriteByteToWRAM(c.Registers.PC, 0x08) // PHP命令
+            },
+            expectedSP: 0xFE,  // スタックポインタが1つ減少
+        },
+        {
+            name:     "PHP - All flags set",
+            opcode:   0x08,
+            addrMode: Implied,
+            setupCPU: func(c *CPU) {
+                // すべてのフラグをセット
+                c.Registers.P.Carry = true
+                c.Registers.P.Zero = true
+                c.Registers.P.Interrupt = true
+                c.Registers.P.Decimal = true
+                c.Registers.P.Break = true
+                c.Registers.P.Overflow = true
+                c.Registers.P.Negative = true
+                c.Registers.SP = 0xFF // スタックポインタを初期化
+                c.WriteByteToWRAM(c.Registers.PC, 0x08) // PHP命令
+            },
+            expectedSP: 0xFE,  // スタックポインタが1つ減少
+        },
+    }
+
+    for _, tt := range tests {
+        t.Run(tt.name, func(t *testing.T) {
+            c := setupCPU()
+            tt.setupCPU(c)
+            
+            // スタックにプッシュされる予定のステータスバイトを記録
+            expectedStatus := c.Registers.P.ToByte()
+            
+            // CPU実行サイクルを使用して命令を実行
+            c.Execute()
+
+            // 結果を検証
+            checkRegister(t, "SP", c.Registers.SP, tt.expectedSP)
+            
+            // スタックの内容を検証（最後にプッシュしたステータス）
+            stackAddr := 0x0100 | uint16(c.Registers.SP+1)
+            stackValue := c.ReadByteFromWRAM(stackAddr)
+            if stackValue != expectedStatus {
+                t.Errorf("Stack status at $%04X = %#02x, want %#02x", stackAddr, stackValue, expectedStatus)
+            }
+        })
+    }
+}
+
+// TestPLA はPLA命令（Pull Accumulator）をテストします
+func TestPLA(t *testing.T) {
+    tests := []struct {
+        name          string
+        opcode        uint8
+        addrMode      AddressingMode
+        setupCPU      func(*CPU)
+        expectedA     uint8
+        expectedSP    uint8
+        expectedZero  bool
+        expectedNeg   bool
+    }{
+        {
+            name:     "PLA - Pull Accumulator from Stack (positive value)",
+            opcode:   0x68,
+            addrMode: Implied,
+            setupCPU: func(c *CPU) {
+                c.Registers.SP = 0xFE // スタックポインタを設定
+                c.WriteByteToWRAM(0x01FF, 0x42) // スタックの次の位置に値を配置
+                c.WriteByteToWRAM(c.Registers.PC, 0x68) // PLA命令
+            },
+            expectedA: 0x42,   // 取得した値
+            expectedSP: 0xFF,  // スタックポインタが1つ増加
+            expectedZero: false,
+            expectedNeg: false,
+        },
+        {
+            name:     "PLA - Pull Accumulator from Stack (zero value)",
+            opcode:   0x68,
+            addrMode: Implied,
+            setupCPU: func(c *CPU) {
+                c.Registers.SP = 0xFE // スタックポインタを設定
+                c.WriteByteToWRAM(0x01FF, 0x00) // スタックの次の位置にゼロを配置
+                c.WriteByteToWRAM(c.Registers.PC, 0x68) // PLA命令
+            },
+            expectedA: 0x00,   // 取得した値
+            expectedSP: 0xFF,  // スタックポインタが1つ増加
+            expectedZero: true,
+            expectedNeg: false,
+        },
+        {
+            name:     "PLA - Pull Accumulator from Stack (negative value)",
+            opcode:   0x68,
+            addrMode: Implied,
+            setupCPU: func(c *CPU) {
+                c.Registers.SP = 0xFE // スタックポインタを設定
+                c.WriteByteToWRAM(0x01FF, 0x80) // スタックの次の位置に負の値を配置
+                c.WriteByteToWRAM(c.Registers.PC, 0x68) // PLA命令
+            },
+            expectedA: 0x80,   // 取得した値
+            expectedSP: 0xFF,  // スタックポインタが1つ増加
+            expectedZero: false,
+            expectedNeg: true,
+        },
+    }
+
+    for _, tt := range tests {
+        t.Run(tt.name, func(t *testing.T) {
+            c := setupCPU()
+            tt.setupCPU(c)
+            
+            // CPU実行サイクルを使用して命令を実行
+            c.Execute()
+
+            // 結果を検証
+            checkRegister(t, "A", c.Registers.A, tt.expectedA)
+            checkRegister(t, "SP", c.Registers.SP, tt.expectedSP)
+            checkFlag(t, "Zero", c.Registers.P.Zero, tt.expectedZero)
+            checkFlag(t, "Negative", c.Registers.P.Negative, tt.expectedNeg)
+        })
+    }
+}
+
+// TestPLP はPLP命令（Pull Processor Status）をテストします
+func TestPLP(t *testing.T) {
+    tests := []struct {
+        name            string
+        opcode          uint8
+        addrMode        AddressingMode
+        setupCPU        func(*CPU)
+        expectedSP      uint8
+        expectedCarry   bool
+        expectedZero    bool
+        expectedInt     bool
+        expectedDecimal bool
+        expectedBreak   bool
+        expectedOverflow bool
+        expectedNeg     bool
+    }{
+        {
+            name:     "PLP - Pull Processor Status from Stack (mixed flags)",
+            opcode:   0x28,
+            addrMode: Implied,
+            setupCPU: func(c *CPU) {
+                c.Registers.SP = 0xFE // スタックポインタを設定
+                // ステータスレジスタのバイト表現: Carry=1, Zero=1, 他=0 (0x03)
+                c.WriteByteToWRAM(0x01FF, 0x03)
+                c.WriteByteToWRAM(c.Registers.PC, 0x28) // PLP命令
+            },
+            expectedSP: 0xFF,       // スタックポインタが1つ増加
+            expectedCarry: true,
+            expectedZero: true,
+            expectedInt: false,
+            expectedDecimal: false,
+            expectedBreak: false,
+            expectedOverflow: false,
+            expectedNeg: false,
+        },
+        {
+            name:     "PLP - Pull Processor Status from Stack (all flags)",
+            opcode:   0x28,
+            addrMode: Implied,
+            setupCPU: func(c *CPU) {
+                c.Registers.SP = 0xFE // スタックポインタを設定
+                // すべてのフラグがセット (0xFF)
+                c.WriteByteToWRAM(0x01FF, 0xFF)
+                c.WriteByteToWRAM(c.Registers.PC, 0x28) // PLP命令
+            },
+            expectedSP: 0xFF,       // スタックポインタが1つ増加
+            expectedCarry: true,
+            expectedZero: true,
+            expectedInt: true,
+            expectedDecimal: true,
+            expectedBreak: true,
+            expectedOverflow: true,
+            expectedNeg: true,
+        },
+    }
+
+    for _, tt := range tests {
+        t.Run(tt.name, func(t *testing.T) {
+            c := setupCPU()
+            tt.setupCPU(c)
+            
+            // CPU実行サイクルを使用して命令を実行
+            c.Execute()
+
+            // 結果を検証
+            checkRegister(t, "SP", c.Registers.SP, tt.expectedSP)
+            checkFlag(t, "Carry", c.Registers.P.Carry, tt.expectedCarry)
+            checkFlag(t, "Zero", c.Registers.P.Zero, tt.expectedZero)
+            checkFlag(t, "Interrupt", c.Registers.P.Interrupt, tt.expectedInt)
+            checkFlag(t, "Decimal", c.Registers.P.Decimal, tt.expectedDecimal)
+            checkFlag(t, "Break", c.Registers.P.Break, tt.expectedBreak)
+            checkFlag(t, "Overflow", c.Registers.P.Overflow, tt.expectedOverflow)
+            checkFlag(t, "Negative", c.Registers.P.Negative, tt.expectedNeg)
+        })
+    }
+}
