@@ -149,10 +149,10 @@ func (c *CPU) getOperandAddress(mode AddressingMode) uint16 {
 		offset := int8(c.ReadByteFromWRAM(c.Registers.PC))
 		return uint16(offset)
 	case Accumulator:
-		log.Fatalf("Error: Mode Accumulator doesn't take any operand")
+		log.Fatalf("Error: Mode Accumulator doesn't take any operands")
 		return 0x0000
 	case Implied:
-		log.Fatalf("Error: Mode Implied doesn't take any operand")
+		log.Fatalf("Error: Mode Implied doesn't take any operands")
 		return 0x0000
 	default:
 		log.Fatalf("Error: Unsupported addressing type '%v'", mode)
