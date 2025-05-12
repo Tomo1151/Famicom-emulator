@@ -26,6 +26,89 @@ func checkFlag(t *testing.T, name string, got, want bool) {
     }
 }
 
+// TestAllCPUInstructions は全ての命令のテストをまとめて実行する統合テストです
+func TestAllCPUInstructions(t *testing.T) {
+    // フラグ操作命令テスト
+    t.Run("Flag operations", func(t *testing.T) {
+        TestSEC(t)
+        TestCLC(t)
+        TestCLV(t)
+        TestSEI(t)
+        TestCLI(t)
+        TestSED(t)
+        TestCLD(t)
+    })
+
+    // レジスタ操作命令テスト
+    t.Run("Register operations", func(t *testing.T) {
+        TestLDA(t)
+        TestLDX(t)
+        TestLDY(t)
+        TestSTA(t)
+        TestSTX(t)
+        TestSTY(t)
+        TestTAX(t)
+        TestTAY(t)
+        TestTXA(t)
+        TestTYA(t)
+        TestTXS(t)
+        TestTSX(t)
+    })
+
+    // 加算・減算命令テスト
+    t.Run("Addition and subtraction", func(t *testing.T) {
+        TestADC(t)
+        TestSBC(t)
+    })
+
+    // ビット演算命令テスト
+    t.Run("Bit operations", func(t *testing.T) {
+        TestAND(t)
+        TestORA(t)
+        TestEOR(t)
+        TestBIT(t)
+        TestLSR(t)
+        TestASL(t)
+        TestROL(t)
+        TestROR(t)
+    })
+
+    // レジスタ比較命令テスト
+    t.Run("Register comparisons", func(t *testing.T) {
+        TestCMP(t)
+        TestCPX(t)
+        TestCPY(t)
+    })
+
+    // スタック操作命令テスト
+    t.Run("Stack operations", func(t *testing.T) {
+        TestPHA(t)
+        TestPHP(t)
+        TestPLA(t)
+        TestPLP(t)
+    })
+
+    // インクリメント・デクリメント命令テスト
+    t.Run("Increment and decrement", func(t *testing.T) {
+        TestINX(t)
+        TestINY(t)
+        TestDEX(t)
+        TestDEY(t)
+        TestINC(t)
+        TestDEC(t)
+    })
+
+    // ジャンプ命令テスト
+    t.Run("Jump and control flow", func(t *testing.T) {
+        TestJMP(t)
+        TestJSR(t)
+        TestRTS(t)
+        TestRTI(t)
+        TestBRK(t)
+        TestNOP(t)
+    })
+}
+
 
 // MARK: フラグ操作
 // TestSEC はSEC命令（キャリーフラグをセット）をテストします
