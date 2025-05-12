@@ -1711,7 +1711,7 @@ func TestSBC(t *testing.T) {
             expectedZero:     false,
             expectedNeg:      true, // 負数
             expectedCarry:    true, // ボローなし
-            expectedOverflow: true, // 符号付きオーバーフロー発生 (負 - 正 = 正だが結果が負になってしまう)
+            expectedOverflow: false, // 符号付きオーバーフローは発生しない (負 - 正)
         },
         {
             name:       "SBC Zero Page",
