@@ -1863,3 +1863,1184 @@ func TestSBC(t *testing.T) {
         })
     }
 }
+
+
+// MARK: ビット演算
+// TestAND はAND命令（論理積）をテストします
+func TestAND(t *testing.T) {
+    tests := []struct {
+        name          string
+        opcode        uint8
+        addrMode      AddressingMode
+        setupCPU      func(*CPU)
+        expectedA     uint8
+        expectedZero  bool
+        expectedNeg   bool
+    }{
+        {
+            name:       "AND Immediate - basic AND operation",
+            opcode:     0x29,
+            addrMode:   Immediate,
+            setupCPU: func(c *CPU) {
+                c.Registers.A = 0xF0 // 11110000
+                c.WriteByteToWRAM(c.Registers.PC, 0x29) // AND命令
+                c.WriteByteToWRAM(c.Registers.PC+1, 0x0F) // オペランド: 0x0F (00001111)
+            },
+            expectedA:    0x00, // 0xF0 & 0x0F = 0x00
+            expectedZero: true,
+            expectedNeg:  false,
+        },
+        {
+            name:       "AND Immediate - result with bits set",
+            opcode:     0x29,
+            addrMode:   Immediate,
+            setupCPU: func(c *CPU) {
+                c.Registers.A = 0xFF // 11111111
+                c.WriteByteToWRAM(c.Registers.PC, 0x29) // AND命令
+                c.WriteByteToWRAM(c.Registers.PC+1, 0xAA) // オペランド: 0xAA (10101010)
+            },
+            expectedA:    0xAA, // 0xFF & 0xAA = 0xAA
+            expectedZero: false,
+            expectedNeg:  true, // 負数（最上位ビットが1）
+        },
+        {
+            name:       "AND Zero Page",
+            opcode:     0x25,
+            addrMode:   ZeroPage,
+            setupCPU: func(c *CPU) {
+                c.Registers.A = 0xF0 // 11110000
+                c.WriteByteToWRAM(c.Registers.PC, 0x25) // AND命令
+                c.WriteByteToWRAM(c.Registers.PC+1, 0x20) // オペランド: ZPアドレス0x20
+                c.WriteByteToWRAM(0x20, 0x0F) // 0x20に値を設定 (00001111)
+            },
+            expectedA:    0x00, // 0xF0 & 0x0F = 0x00
+            expectedZero: true,
+            expectedNeg:  false,
+        },
+        {
+            name:       "AND Zero Page,X",
+            opcode:     0x35,
+            addrMode:   ZeroPageXIndexed,
+            setupCPU: func(c *CPU) {
+                c.Registers.A = 0xF0 // 11110000
+                c.Registers.X = 0x10
+                c.WriteByteToWRAM(c.Registers.PC, 0x35) // AND命令
+                c.WriteByteToWRAM(c.Registers.PC+1, 0x20) // オペランド: ZPアドレス0x20
+                c.WriteByteToWRAM(0x30, 0x0F) // 0x30 (0x20+0x10) に値を設定 (00001111)
+            },
+            expectedA:    0x00, // 0xF0 & 0x0F = 0x00
+            expectedZero: true,
+            expectedNeg:  false,
+        },
+        {
+            name:       "AND Absolute",
+            opcode:     0x2D,
+            addrMode:   Absolute,
+            setupCPU: func(c *CPU) {
+                c.Registers.A = 0xF0 // 11110000
+                c.WriteByteToWRAM(c.Registers.PC, 0x2D) // AND命令
+                c.WriteByteToWRAM(c.Registers.PC+1, 0x80) // オペランド: 低バイト
+                c.WriteByteToWRAM(c.Registers.PC+2, 0x44) // オペランド: 高バイト (0x4480)
+                c.WriteByteToWRAM(0x4480, 0x0F) // 0x4480に値を設定 (00001111)
+            },
+            expectedA:    0x00, // 0xF0 & 0x0F = 0x00
+            expectedZero: true,
+            expectedNeg:  false,
+        },
+        {
+            name:       "AND Absolute,X",
+            opcode:     0x3D,
+            addrMode:   AbsoluteXIndexed,
+            setupCPU: func(c *CPU) {
+                c.Registers.A = 0xF0 // 11110000
+                c.Registers.X = 0x10
+                c.WriteByteToWRAM(c.Registers.PC, 0x3D) // AND命令
+                c.WriteByteToWRAM(c.Registers.PC+1, 0x80) // オペランド: 低バイト
+                c.WriteByteToWRAM(c.Registers.PC+2, 0x44) // オペランド: 高バイト (0x4480)
+                c.WriteByteToWRAM(0x4490, 0x0F) // 0x4490 (0x4480+0x10) に値を設定 (00001111)
+            },
+            expectedA:    0x00, // 0xF0 & 0x0F = 0x00
+            expectedZero: true,
+            expectedNeg:  false,
+        },
+        {
+            name:       "AND Absolute,Y",
+            opcode:     0x39,
+            addrMode:   AbsoluteYIndexed,
+            setupCPU: func(c *CPU) {
+                c.Registers.A = 0xF0 // 11110000
+                c.Registers.Y = 0x10
+                c.WriteByteToWRAM(c.Registers.PC, 0x39) // AND命令
+                c.WriteByteToWRAM(c.Registers.PC+1, 0x80) // オペランド: 低バイト
+                c.WriteByteToWRAM(c.Registers.PC+2, 0x44) // オペランド: 高バイト (0x4480)
+                c.WriteByteToWRAM(0x4490, 0x0F) // 0x4490 (0x4480+0x10) に値を設定 (00001111)
+            },
+            expectedA:    0x00, // 0xF0 & 0x0F = 0x00
+            expectedZero: true,
+            expectedNeg:  false,
+        },
+        {
+            name:       "AND Indirect,X",
+            opcode:     0x21,
+            addrMode:   IndirectXIndexed,
+            setupCPU: func(c *CPU) {
+                c.Registers.A = 0xF0 // 11110000
+                c.Registers.X = 0x04
+                c.WriteByteToWRAM(c.Registers.PC, 0x21) // AND命令
+                c.WriteByteToWRAM(c.Registers.PC+1, 0x20) // オペランド: ZPアドレス0x20
+                c.WriteByteToWRAM(0x24, 0x74) // 0x24 (0x20+0x04) に低バイト
+                c.WriteByteToWRAM(0x25, 0x20) // 0x25 に高バイト (→ 0x2074)
+                c.WriteByteToWRAM(0x2074, 0x0F) // 0x2074に値を設定 (00001111)
+            },
+            expectedA:    0x00, // 0xF0 & 0x0F = 0x00
+            expectedZero: true,
+            expectedNeg:  false,
+        },
+        {
+            name:       "AND Indirect,Y",
+            opcode:     0x31,
+            addrMode:   IndirectYIndexed,
+            setupCPU: func(c *CPU) {
+                c.Registers.A = 0xF0 // 11110000
+                c.Registers.Y = 0x10
+                c.WriteByteToWRAM(c.Registers.PC, 0x31) // AND命令
+                c.WriteByteToWRAM(c.Registers.PC+1, 0x20) // オペランド: ZPアドレス0x20
+                c.WriteByteToWRAM(0x20, 0x74) // 0x20に低バイト
+                c.WriteByteToWRAM(0x21, 0x20) // 0x21に高バイト (→ 0x2074)
+                c.WriteByteToWRAM(0x2084, 0x0F) // 0x2084 (0x2074+0x10) に値を設定 (00001111)
+            },
+            expectedA:    0x00, // 0xF0 & 0x0F = 0x00
+            expectedZero: true,
+            expectedNeg:  false,
+        },
+    }
+
+    for _, tt := range tests {
+        t.Run(tt.name, func(t *testing.T) {
+            c := setupCPU()
+            tt.setupCPU(c)
+            
+            // CPU実行サイクルを使用して命令を実行
+            c.Execute()
+
+            // 結果を検証
+            checkRegister(t, "A", c.Registers.A, tt.expectedA)
+            checkFlag(t, "Zero", c.Registers.P.Zero, tt.expectedZero)
+            checkFlag(t, "Negative", c.Registers.P.Negative, tt.expectedNeg)
+        })
+    }
+}
+
+// TestORA はORA命令（論理和）をテストします
+func TestORA(t *testing.T) {
+    tests := []struct {
+        name          string
+        opcode        uint8
+        addrMode      AddressingMode
+        setupCPU      func(*CPU)
+        expectedA     uint8
+        expectedZero  bool
+        expectedNeg   bool
+    }{
+        {
+            name:       "ORA Immediate - basic OR operation",
+            opcode:     0x09,
+            addrMode:   Immediate,
+            setupCPU: func(c *CPU) {
+                c.Registers.A = 0xF0 // 11110000
+                c.WriteByteToWRAM(c.Registers.PC, 0x09) // ORA命令
+                c.WriteByteToWRAM(c.Registers.PC+1, 0x0F) // オペランド: 0x0F (00001111)
+            },
+            expectedA:    0xFF, // 0xF0 | 0x0F = 0xFF
+            expectedZero: false,
+            expectedNeg:  true, // 負数（最上位ビットが1）
+        },
+        {
+            name:       "ORA Immediate - zero result",
+            opcode:     0x09,
+            addrMode:   Immediate,
+            setupCPU: func(c *CPU) {
+                c.Registers.A = 0x00 // 00000000
+                c.WriteByteToWRAM(c.Registers.PC, 0x09) // ORA命令
+                c.WriteByteToWRAM(c.Registers.PC+1, 0x00) // オペランド: 0x00 (00000000)
+            },
+            expectedA:    0x00, // 0x00 | 0x00 = 0x00
+            expectedZero: true,
+            expectedNeg:  false,
+        },
+        {
+            name:       "ORA Zero Page",
+            opcode:     0x05,
+            addrMode:   ZeroPage,
+            setupCPU: func(c *CPU) {
+                c.Registers.A = 0xF0 // 11110000
+                c.WriteByteToWRAM(c.Registers.PC, 0x05) // ORA命令
+                c.WriteByteToWRAM(c.Registers.PC+1, 0x20) // オペランド: ZPアドレス0x20
+                c.WriteByteToWRAM(0x20, 0x0F) // 0x20に値を設定 (00001111)
+            },
+            expectedA:    0xFF, // 0xF0 | 0x0F = 0xFF
+            expectedZero: false,
+            expectedNeg:  true, // 負数（最上位ビットが1）
+        },
+        {
+            name:       "ORA Zero Page,X",
+            opcode:     0x15,
+            addrMode:   ZeroPageXIndexed,
+            setupCPU: func(c *CPU) {
+                c.Registers.A = 0xF0 // 11110000
+                c.Registers.X = 0x10
+                c.WriteByteToWRAM(c.Registers.PC, 0x15) // ORA命令
+                c.WriteByteToWRAM(c.Registers.PC+1, 0x20) // オペランド: ZPアドレス0x20
+                c.WriteByteToWRAM(0x30, 0x0F) // 0x30 (0x20+0x10) に値を設定 (00001111)
+            },
+            expectedA:    0xFF, // 0xF0 | 0x0F = 0xFF
+            expectedZero: false,
+            expectedNeg:  true, // 負数（最上位ビットが1）
+        },
+        {
+            name:       "ORA Absolute",
+            opcode:     0x0D,
+            addrMode:   Absolute,
+            setupCPU: func(c *CPU) {
+                c.Registers.A = 0xF0 // 11110000
+                c.WriteByteToWRAM(c.Registers.PC, 0x0D) // ORA命令
+                c.WriteByteToWRAM(c.Registers.PC+1, 0x80) // オペランド: 低バイト
+                c.WriteByteToWRAM(c.Registers.PC+2, 0x44) // オペランド: 高バイト (0x4480)
+                c.WriteByteToWRAM(0x4480, 0x0F) // 0x4480に値を設定 (00001111)
+            },
+            expectedA:    0xFF, // 0xF0 | 0x0F = 0xFF
+            expectedZero: false,
+            expectedNeg:  true, // 負数（最上位ビットが1）
+        },
+        {
+            name:       "ORA Absolute,X",
+            opcode:     0x1D,
+            addrMode:   AbsoluteXIndexed,
+            setupCPU: func(c *CPU) {
+                c.Registers.A = 0xF0 // 11110000
+                c.Registers.X = 0x10
+                c.WriteByteToWRAM(c.Registers.PC, 0x1D) // ORA命令
+                c.WriteByteToWRAM(c.Registers.PC+1, 0x80) // オペランド: 低バイト
+                c.WriteByteToWRAM(c.Registers.PC+2, 0x44) // オペランド: 高バイト (0x4480)
+                c.WriteByteToWRAM(0x4490, 0x0F) // 0x4490 (0x4480+0x10) に値を設定 (00001111)
+            },
+            expectedA:    0xFF, // 0xF0 | 0x0F = 0xFF
+            expectedZero: false,
+            expectedNeg:  true, // 負数（最上位ビットが1）
+        },
+        {
+            name:       "ORA Absolute,Y",
+            opcode:     0x19,
+            addrMode:   AbsoluteYIndexed,
+            setupCPU: func(c *CPU) {
+                c.Registers.A = 0xF0 // 11110000
+                c.Registers.Y = 0x10
+                c.WriteByteToWRAM(c.Registers.PC, 0x19) // ORA命令
+                c.WriteByteToWRAM(c.Registers.PC+1, 0x80) // オペランド: 低バイト
+                c.WriteByteToWRAM(c.Registers.PC+2, 0x44) // オペランド: 高バイト (0x4480)
+                c.WriteByteToWRAM(0x4490, 0x0F) // 0x4490 (0x4480+0x10) に値を設定 (00001111)
+            },
+            expectedA:    0xFF, // 0xF0 | 0x0F = 0xFF
+            expectedZero: false,
+            expectedNeg:  true, // 負数（最上位ビットが1）
+        },
+        {
+            name:       "ORA Indirect,X",
+            opcode:     0x01,
+            addrMode:   IndirectXIndexed,
+            setupCPU: func(c *CPU) {
+                c.Registers.A = 0xF0 // 11110000
+                c.Registers.X = 0x04
+                c.WriteByteToWRAM(c.Registers.PC, 0x01) // ORA命令
+                c.WriteByteToWRAM(c.Registers.PC+1, 0x20) // オペランド: ZPアドレス0x20
+                c.WriteByteToWRAM(0x24, 0x74) // 0x24 (0x20+0x04) に低バイト
+                c.WriteByteToWRAM(0x25, 0x20) // 0x25 に高バイト (→ 0x2074)
+                c.WriteByteToWRAM(0x2074, 0x0F) // 0x2074に値を設定 (00001111)
+            },
+            expectedA:    0xFF, // 0xF0 | 0x0F = 0xFF
+            expectedZero: false,
+            expectedNeg:  true, // 負数（最上位ビットが1）
+        },
+        {
+            name:       "ORA Indirect,Y",
+            opcode:     0x11,
+            addrMode:   IndirectYIndexed,
+            setupCPU: func(c *CPU) {
+                c.Registers.A = 0xF0 // 11110000
+                c.Registers.Y = 0x10
+                c.WriteByteToWRAM(c.Registers.PC, 0x11) // ORA命令
+                c.WriteByteToWRAM(c.Registers.PC+1, 0x20) // オペランド: ZPアドレス0x20
+                c.WriteByteToWRAM(0x20, 0x74) // 0x20に低バイト
+                c.WriteByteToWRAM(0x21, 0x20) // 0x21に高バイト (→ 0x2074)
+                c.WriteByteToWRAM(0x2084, 0x0F) // 0x2084 (0x2074+0x10) に値を設定 (00001111)
+            },
+            expectedA:    0xFF, // 0xF0 | 0x0F = 0xFF
+            expectedZero: false,
+            expectedNeg:  true, // 負数（最上位ビットが1）
+        },
+    }
+
+    for _, tt := range tests {
+        t.Run(tt.name, func(t *testing.T) {
+            c := setupCPU()
+            tt.setupCPU(c)
+            
+            // CPU実行サイクルを使用して命令を実行
+            c.Execute()
+
+            // 結果を検証
+            checkRegister(t, "A", c.Registers.A, tt.expectedA)
+            checkFlag(t, "Zero", c.Registers.P.Zero, tt.expectedZero)
+            checkFlag(t, "Negative", c.Registers.P.Negative, tt.expectedNeg)
+        })
+    }
+}
+
+// TestEOR はEOR命令（排他的論理和）をテストします
+func TestEOR(t *testing.T) {
+    tests := []struct {
+        name          string
+        opcode        uint8
+        addrMode      AddressingMode
+        setupCPU      func(*CPU)
+        expectedA     uint8
+        expectedZero  bool
+        expectedNeg   bool
+    }{
+        {
+            name:       "EOR Immediate - basic XOR operation",
+            opcode:     0x49,
+            addrMode:   Immediate,
+            setupCPU: func(c *CPU) {
+                c.Registers.A = 0xF0 // 11110000
+                c.WriteByteToWRAM(c.Registers.PC, 0x49) // EOR命令
+                c.WriteByteToWRAM(c.Registers.PC+1, 0xFF) // オペランド: 0xFF (11111111)
+            },
+            expectedA:    0x0F, // 0xF0 ^ 0xFF = 0x0F
+            expectedZero: false,
+            expectedNeg:  false,
+        },
+        {
+            name:       "EOR Immediate - zero result",
+            opcode:     0x49,
+            addrMode:   Immediate,
+            setupCPU: func(c *CPU) {
+                c.Registers.A = 0xFF // 11111111
+                c.WriteByteToWRAM(c.Registers.PC, 0x49) // EOR命令
+                c.WriteByteToWRAM(c.Registers.PC+1, 0xFF) // オペランド: 0xFF (11111111)
+            },
+            expectedA:    0x00, // 0xFF ^ 0xFF = 0x00
+            expectedZero: true,
+            expectedNeg:  false,
+        },
+        {
+            name:       "EOR Immediate - negative result",
+            opcode:     0x49,
+            addrMode:   Immediate,
+            setupCPU: func(c *CPU) {
+                c.Registers.A = 0x0F // 00001111
+                c.WriteByteToWRAM(c.Registers.PC, 0x49) // EOR命令
+                c.WriteByteToWRAM(c.Registers.PC+1, 0xFF) // オペランド: 0xFF (11111111)
+            },
+            expectedA:    0xF0, // 0x0F ^ 0xFF = 0xF0
+            expectedZero: false,
+            expectedNeg:  true, // 負数（最上位ビットが1）
+        },
+        {
+            name:       "EOR Zero Page",
+            opcode:     0x45,
+            addrMode:   ZeroPage,
+            setupCPU: func(c *CPU) {
+                c.Registers.A = 0xF0 // 11110000
+                c.WriteByteToWRAM(c.Registers.PC, 0x45) // EOR命令
+                c.WriteByteToWRAM(c.Registers.PC+1, 0x20) // オペランド: ZPアドレス0x20
+                c.WriteByteToWRAM(0x20, 0xFF) // 0x20に値を設定 (11111111)
+            },
+            expectedA:    0x0F, // 0xF0 ^ 0xFF = 0x0F
+            expectedZero: false,
+            expectedNeg:  false,
+        },
+        {
+            name:       "EOR Zero Page,X",
+            opcode:     0x55,
+            addrMode:   ZeroPageXIndexed,
+            setupCPU: func(c *CPU) {
+                c.Registers.A = 0xF0 // 11110000
+                c.Registers.X = 0x10
+                c.WriteByteToWRAM(c.Registers.PC, 0x55) // EOR命令
+                c.WriteByteToWRAM(c.Registers.PC+1, 0x20) // オペランド: ZPアドレス0x20
+                c.WriteByteToWRAM(0x30, 0xFF) // 0x30 (0x20+0x10) に値を設定 (11111111)
+            },
+            expectedA:    0x0F, // 0xF0 ^ 0xFF = 0x0F
+            expectedZero: false,
+            expectedNeg:  false,
+        },
+        {
+            name:       "EOR Absolute",
+            opcode:     0x4D,
+            addrMode:   Absolute,
+            setupCPU: func(c *CPU) {
+                c.Registers.A = 0xF0 // 11110000
+                c.WriteByteToWRAM(c.Registers.PC, 0x4D) // EOR命令
+                c.WriteByteToWRAM(c.Registers.PC+1, 0x80) // オペランド: 低バイト
+                c.WriteByteToWRAM(c.Registers.PC+2, 0x44) // オペランド: 高バイト (0x4480)
+                c.WriteByteToWRAM(0x4480, 0xFF) // 0x4480に値を設定 (11111111)
+            },
+            expectedA:    0x0F, // 0xF0 ^ 0xFF = 0x0F
+            expectedZero: false,
+            expectedNeg:  false,
+        },
+        {
+            name:       "EOR Absolute,X",
+            opcode:     0x5D,
+            addrMode:   AbsoluteXIndexed,
+            setupCPU: func(c *CPU) {
+                c.Registers.A = 0xF0 // 11110000
+                c.Registers.X = 0x10
+                c.WriteByteToWRAM(c.Registers.PC, 0x5D) // EOR命令
+                c.WriteByteToWRAM(c.Registers.PC+1, 0x80) // オペランド: 低バイト
+                c.WriteByteToWRAM(c.Registers.PC+2, 0x44) // オペランド: 高バイト (0x4480)
+                c.WriteByteToWRAM(0x4490, 0xFF) // 0x4490 (0x4480+0x10) に値を設定 (11111111)
+            },
+            expectedA:    0x0F, // 0xF0 ^ 0xFF = 0x0F
+            expectedZero: false,
+            expectedNeg:  false,
+        },
+        {
+            name:       "EOR Absolute,Y",
+            opcode:     0x59,
+            addrMode:   AbsoluteYIndexed,
+            setupCPU: func(c *CPU) {
+                c.Registers.A = 0xF0 // 11110000
+                c.Registers.Y = 0x10
+                c.WriteByteToWRAM(c.Registers.PC, 0x59) // EOR命令
+                c.WriteByteToWRAM(c.Registers.PC+1, 0x80) // オペランド: 低バイト
+                c.WriteByteToWRAM(c.Registers.PC+2, 0x44) // オペランド: 高バイト (0x4480)
+                c.WriteByteToWRAM(0x4490, 0xFF) // 0x4490 (0x4480+0x10) に値を設定 (11111111)
+            },
+            expectedA:    0x0F, // 0xF0 ^ 0xFF = 0x0F
+            expectedZero: false,
+            expectedNeg:  false,
+        },
+        {
+            name:       "EOR Indirect,X",
+            opcode:     0x41,
+            addrMode:   IndirectXIndexed,
+            setupCPU: func(c *CPU) {
+                c.Registers.A = 0xF0 // 11110000
+                c.Registers.X = 0x04
+                c.WriteByteToWRAM(c.Registers.PC, 0x41) // EOR命令
+                c.WriteByteToWRAM(c.Registers.PC+1, 0x20) // オペランド: ZPアドレス0x20
+                c.WriteByteToWRAM(0x24, 0x74) // 0x24 (0x20+0x04) に低バイト
+                c.WriteByteToWRAM(0x25, 0x20) // 0x25 に高バイト (→ 0x2074)
+                c.WriteByteToWRAM(0x2074, 0xFF) // 0x2074に値を設定 (11111111)
+            },
+            expectedA:    0x0F, // 0xF0 ^ 0xFF = 0x0F
+            expectedZero: false,
+            expectedNeg:  false,
+        },
+        {
+            name:       "EOR Indirect,Y",
+            opcode:     0x51,
+            addrMode:   IndirectYIndexed,
+            setupCPU: func(c *CPU) {
+                c.Registers.A = 0xF0 // 11110000
+                c.Registers.Y = 0x10
+                c.WriteByteToWRAM(c.Registers.PC, 0x51) // EOR命令
+                c.WriteByteToWRAM(c.Registers.PC+1, 0x20) // オペランド: ZPアドレス0x20
+                c.WriteByteToWRAM(0x20, 0x74) // 0x20に低バイト
+                c.WriteByteToWRAM(0x21, 0x20) // 0x21に高バイト (→ 0x2074)
+                c.WriteByteToWRAM(0x2084, 0xFF) // 0x2084 (0x2074+0x10) に値を設定 (11111111)
+            },
+            expectedA:    0x0F, // 0xF0 ^ 0xFF = 0x0F
+            expectedZero: false,
+            expectedNeg:  false,
+        },
+    }
+
+    for _, tt := range tests {
+        t.Run(tt.name, func(t *testing.T) {
+            c := setupCPU()
+            tt.setupCPU(c)
+            
+            // CPU実行サイクルを使用して命令を実行
+            c.Execute()
+
+            // 結果を検証
+            checkRegister(t, "A", c.Registers.A, tt.expectedA)
+            checkFlag(t, "Zero", c.Registers.P.Zero, tt.expectedZero)
+            checkFlag(t, "Negative", c.Registers.P.Negative, tt.expectedNeg)
+        })
+    }
+}
+
+
+// MARK: ビット操作
+// TestBIT はBIT命令（ビットテスト）をテストします
+func TestBIT(t *testing.T) {
+    tests := []struct {
+        name             string
+        opcode           uint8
+        addrMode         AddressingMode
+        setupCPU         func(*CPU)
+        expectedA        uint8      // Aレジスタは変更されない
+        expectedZero     bool
+        expectedNeg      bool
+        expectedOverflow bool
+    }{
+        {
+            name:       "BIT Zero Page - Zero flag set (A & M == 0)",
+            opcode:     0x24,
+            addrMode:   ZeroPage,
+            setupCPU: func(c *CPU) {
+                c.Registers.A = 0x0F // 00001111
+                c.WriteByteToWRAM(c.Registers.PC, 0x24) // BIT命令
+                c.WriteByteToWRAM(c.Registers.PC+1, 0x20) // オペランド: ZPアドレス0x20
+                c.WriteByteToWRAM(0x20, 0xF0) // 0x20に値を設定 (11110000)
+            },
+            expectedA:        0x0F, // 変更なし
+            expectedZero:     true,  // A & M = 0
+            expectedNeg:      true,  // M のビット7が1
+            expectedOverflow: true,  // M のビット6が1
+        },
+        {
+            name:       "BIT Zero Page - Zero flag clear (A & M != 0)",
+            opcode:     0x24,
+            addrMode:   ZeroPage,
+            setupCPU: func(c *CPU) {
+                c.Registers.A = 0xFF // 11111111
+                c.WriteByteToWRAM(c.Registers.PC, 0x24) // BIT命令
+                c.WriteByteToWRAM(c.Registers.PC+1, 0x20) // オペランド: ZPアドレス0x20
+                c.WriteByteToWRAM(0x20, 0x0C) // 0x20に値を設定 (00001100)
+            },
+            expectedA:        0xFF, // 変更なし
+            expectedZero:     false, // A & M != 0
+            expectedNeg:      false, // M のビット7が0
+            expectedOverflow: false, // M のビット6が0
+        },
+        {
+            name:       "BIT Absolute",
+            opcode:     0x2C,
+            addrMode:   Absolute,
+            setupCPU: func(c *CPU) {
+                c.Registers.A = 0x0F // 00001111
+                c.WriteByteToWRAM(c.Registers.PC, 0x2C) // BIT命令
+                c.WriteByteToWRAM(c.Registers.PC+1, 0x80) // オペランド: 低バイト
+                c.WriteByteToWRAM(c.Registers.PC+2, 0x44) // オペランド: 高バイト (0x4480)
+                c.WriteByteToWRAM(0x4480, 0x40) // 0x4480に値を設定 (01000000)
+            },
+            expectedA:        0x0F, // 変更なし
+            expectedZero:     true,  // A & M = 0
+            expectedNeg:      false, // M のビット7が0
+            expectedOverflow: true,  // M のビット6が1
+        },
+    }
+
+    for _, tt := range tests {
+        t.Run(tt.name, func(t *testing.T) {
+            c := setupCPU()
+            tt.setupCPU(c)
+            
+            // CPU実行サイクルを使用して命令を実行
+            c.Execute()
+
+            // 結果を検証
+            checkRegister(t, "A", c.Registers.A, tt.expectedA) // Aレジスタは変更されないことを確認
+            checkFlag(t, "Zero", c.Registers.P.Zero, tt.expectedZero)
+            checkFlag(t, "Negative", c.Registers.P.Negative, tt.expectedNeg)
+            checkFlag(t, "Overflow", c.Registers.P.Overflow, tt.expectedOverflow)
+        })
+    }
+}
+
+// TestLSR はLSR命令（論理右シフト）をテストします
+func TestLSR(t *testing.T) {
+    tests := []struct {
+        name          string
+        opcode        uint8
+        addrMode      AddressingMode
+        setupCPU      func(*CPU)
+        checkResult   func(*testing.T, *CPU)
+        expectedCarry bool
+        expectedZero  bool
+        expectedNeg   bool
+    }{
+        {
+            name:       "LSR Accumulator - typical case",
+            opcode:     0x4A,
+            addrMode:   Accumulator,
+            setupCPU: func(c *CPU) {
+                c.Registers.A = 0x82 // 10000010
+                c.WriteByteToWRAM(c.Registers.PC, 0x4A) // LSR命令
+            },
+            checkResult: func(t *testing.T, c *CPU) {
+                checkRegister(t, "A", c.Registers.A, 0x41) // 01000001
+            },
+            expectedCarry: false,
+            expectedZero:  false,
+            expectedNeg:   false,
+        },
+        {
+            name:       "LSR Accumulator - carry out",
+            opcode:     0x4A,
+            addrMode:   Accumulator,
+            setupCPU: func(c *CPU) {
+                c.Registers.A = 0x01 // 00000001
+                c.WriteByteToWRAM(c.Registers.PC, 0x4A) // LSR命令
+            },
+            checkResult: func(t *testing.T, c *CPU) {
+                checkRegister(t, "A", c.Registers.A, 0x00) // 00000000
+            },
+            expectedCarry: true,
+            expectedZero:  true,
+            expectedNeg:   false,
+        },
+        {
+            name:       "LSR Zero Page",
+            opcode:     0x46,
+            addrMode:   ZeroPage,
+            setupCPU: func(c *CPU) {
+                c.WriteByteToWRAM(c.Registers.PC, 0x46) // LSR命令
+                c.WriteByteToWRAM(c.Registers.PC+1, 0x20) // オペランド: ZPアドレス0x20
+                c.WriteByteToWRAM(0x20, 0x82) // 0x20に値を設定 (10000010)
+            },
+            checkResult: func(t *testing.T, c *CPU) {
+                if c.ReadByteFromWRAM(0x20) != 0x41 { // 01000001
+                    t.Errorf("Memory at $20 = %#02x, want %#02x", c.ReadByteFromWRAM(0x20), 0x41)
+                }
+            },
+            expectedCarry: false,
+            expectedZero:  false,
+            expectedNeg:   false,
+        },
+        {
+            name:       "LSR Zero Page,X",
+            opcode:     0x56,
+            addrMode:   ZeroPageXIndexed,
+            setupCPU: func(c *CPU) {
+                c.Registers.X = 0x10
+                c.WriteByteToWRAM(c.Registers.PC, 0x56) // LSR命令
+                c.WriteByteToWRAM(c.Registers.PC+1, 0x20) // オペランド: ZPアドレス0x20
+                c.WriteByteToWRAM(0x30, 0x82) // 0x30 (0x20+0x10) に値を設定 (10000010)
+            },
+            checkResult: func(t *testing.T, c *CPU) {
+                if c.ReadByteFromWRAM(0x30) != 0x41 { // 01000001
+                    t.Errorf("Memory at $30 = %#02x, want %#02x", c.ReadByteFromWRAM(0x30), 0x41)
+                }
+            },
+            expectedCarry: false,
+            expectedZero:  false,
+            expectedNeg:   false,
+        },
+        {
+            name:       "LSR Absolute",
+            opcode:     0x4E,
+            addrMode:   Absolute,
+            setupCPU: func(c *CPU) {
+                c.WriteByteToWRAM(c.Registers.PC, 0x4E) // LSR命令
+                c.WriteByteToWRAM(c.Registers.PC+1, 0x80) // オペランド: 低バイト
+                c.WriteByteToWRAM(c.Registers.PC+2, 0x44) // オペランド: 高バイト (0x4480)
+                c.WriteByteToWRAM(0x4480, 0x82) // 0x4480に値を設定 (10000010)
+            },
+            checkResult: func(t *testing.T, c *CPU) {
+                if c.ReadByteFromWRAM(0x4480) != 0x41 { // 01000001
+                    t.Errorf("Memory at $4480 = %#02x, want %#02x", c.ReadByteFromWRAM(0x4480), 0x41)
+                }
+            },
+            expectedCarry: false,
+            expectedZero:  false,
+            expectedNeg:   false,
+        },
+        {
+            name:       "LSR Absolute,X",
+            opcode:     0x5E,
+            addrMode:   AbsoluteXIndexed,
+            setupCPU: func(c *CPU) {
+                c.Registers.X = 0x10
+                c.WriteByteToWRAM(c.Registers.PC, 0x5E) // LSR命令
+                c.WriteByteToWRAM(c.Registers.PC+1, 0x80) // オペランド: 低バイト
+                c.WriteByteToWRAM(c.Registers.PC+2, 0x44) // オペランド: 高バイト (0x4480)
+                c.WriteByteToWRAM(0x4490, 0x82) // 0x4490 (0x4480+0x10) に値を設定 (10000010)
+            },
+            checkResult: func(t *testing.T, c *CPU) {
+                if c.ReadByteFromWRAM(0x4490) != 0x41 { // 01000001
+                    t.Errorf("Memory at $4490 = %#02x, want %#02x", c.ReadByteFromWRAM(0x4490), 0x41)
+                }
+            },
+            expectedCarry: false,
+            expectedZero:  false,
+            expectedNeg:   false,
+        },
+    }
+
+    for _, tt := range tests {
+        t.Run(tt.name, func(t *testing.T) {
+            c := setupCPU()
+            tt.setupCPU(c)
+            
+            // CPU実行サイクルを使用して命令を実行
+            c.Execute()
+
+            // 結果を検証
+            tt.checkResult(t, c)
+            checkFlag(t, "Carry", c.Registers.P.Carry, tt.expectedCarry)
+            checkFlag(t, "Zero", c.Registers.P.Zero, tt.expectedZero)
+            checkFlag(t, "Negative", c.Registers.P.Negative, tt.expectedNeg)
+        })
+    }
+}
+
+// TestASL はASL命令（算術左シフト）をテストします
+func TestASL(t *testing.T) {
+    tests := []struct {
+        name          string
+        opcode        uint8
+        addrMode      AddressingMode
+        setupCPU      func(*CPU)
+        checkResult   func(*testing.T, *CPU)
+        expectedCarry bool
+        expectedZero  bool
+        expectedNeg   bool
+    }{
+        {
+            name:       "ASL Accumulator - typical case",
+            opcode:     0x0A,
+            addrMode:   Accumulator,
+            setupCPU: func(c *CPU) {
+                c.Registers.A = 0x41 // 01000001
+                c.WriteByteToWRAM(c.Registers.PC, 0x0A) // ASL命令
+            },
+            checkResult: func(t *testing.T, c *CPU) {
+                checkRegister(t, "A", c.Registers.A, 0x82) // 10000010
+            },
+            expectedCarry: false,
+            expectedZero:  false,
+            expectedNeg:   true,  // 最上位ビットが1
+        },
+        {
+            name:       "ASL Accumulator - carry out",
+            opcode:     0x0A,
+            addrMode:   Accumulator,
+            setupCPU: func(c *CPU) {
+                c.Registers.A = 0x80 // 10000000
+                c.WriteByteToWRAM(c.Registers.PC, 0x0A) // ASL命令
+            },
+            checkResult: func(t *testing.T, c *CPU) {
+                checkRegister(t, "A", c.Registers.A, 0x00) // 00000000
+            },
+            expectedCarry: true,
+            expectedZero:  true,
+            expectedNeg:   false,
+        },
+        {
+            name:       "ASL Zero Page",
+            opcode:     0x06,
+            addrMode:   ZeroPage,
+            setupCPU: func(c *CPU) {
+                c.WriteByteToWRAM(c.Registers.PC, 0x06) // ASL命令
+                c.WriteByteToWRAM(c.Registers.PC+1, 0x20) // オペランド: ZPアドレス0x20
+                c.WriteByteToWRAM(0x20, 0x41) // 0x20に値を設定 (01000001)
+            },
+            checkResult: func(t *testing.T, c *CPU) {
+                if c.ReadByteFromWRAM(0x20) != 0x82 { // 10000010
+                    t.Errorf("Memory at $20 = %#02x, want %#02x", c.ReadByteFromWRAM(0x20), 0x82)
+                }
+            },
+            expectedCarry: false,
+            expectedZero:  false,
+            expectedNeg:   true,  // 最上位ビットが1
+        },
+        {
+            name:       "ASL Zero Page,X",
+            opcode:     0x16,
+            addrMode:   ZeroPageXIndexed,
+            setupCPU: func(c *CPU) {
+                c.Registers.X = 0x10
+                c.WriteByteToWRAM(c.Registers.PC, 0x16) // ASL命令
+                c.WriteByteToWRAM(c.Registers.PC+1, 0x20) // オペランド: ZPアドレス0x20
+                c.WriteByteToWRAM(0x30, 0x41) // 0x30 (0x20+0x10) に値を設定 (01000001)
+            },
+            checkResult: func(t *testing.T, c *CPU) {
+                if c.ReadByteFromWRAM(0x30) != 0x82 { // 10000010
+                    t.Errorf("Memory at $30 = %#02x, want %#02x", c.ReadByteFromWRAM(0x30), 0x82)
+                }
+            },
+            expectedCarry: false,
+            expectedZero:  false,
+            expectedNeg:   true,  // 最上位ビットが1
+        },
+        {
+            name:       "ASL Absolute",
+            opcode:     0x0E,
+            addrMode:   Absolute,
+            setupCPU: func(c *CPU) {
+                c.WriteByteToWRAM(c.Registers.PC, 0x0E) // ASL命令
+                c.WriteByteToWRAM(c.Registers.PC+1, 0x80) // オペランド: 低バイト
+                c.WriteByteToWRAM(c.Registers.PC+2, 0x44) // オペランド: 高バイト (0x4480)
+                c.WriteByteToWRAM(0x4480, 0x41) // 0x4480に値を設定 (01000001)
+            },
+            checkResult: func(t *testing.T, c *CPU) {
+                if c.ReadByteFromWRAM(0x4480) != 0x82 { // 10000010
+                    t.Errorf("Memory at $4480 = %#02x, want %#02x", c.ReadByteFromWRAM(0x4480), 0x82)
+                }
+            },
+            expectedCarry: false,
+            expectedZero:  false,
+            expectedNeg:   true,  // 最上位ビットが1
+        },
+        {
+            name:       "ASL Absolute,X",
+            opcode:     0x1E,
+            addrMode:   AbsoluteXIndexed,
+            setupCPU: func(c *CPU) {
+                c.Registers.X = 0x10
+                c.WriteByteToWRAM(c.Registers.PC, 0x1E) // ASL命令
+                c.WriteByteToWRAM(c.Registers.PC+1, 0x80) // オペランド: 低バイト
+                c.WriteByteToWRAM(c.Registers.PC+2, 0x44) // オペランド: 高バイト (0x4480)
+                c.WriteByteToWRAM(0x4490, 0x41) // 0x4490 (0x4480+0x10) に値を設定 (01000001)
+            },
+            checkResult: func(t *testing.T, c *CPU) {
+                if c.ReadByteFromWRAM(0x4490) != 0x82 { // 10000010
+                    t.Errorf("Memory at $4490 = %#02x, want %#02x", c.ReadByteFromWRAM(0x4490), 0x82)
+                }
+            },
+            expectedCarry: false,
+            expectedZero:  false,
+            expectedNeg:   true,  // 最上位ビットが1
+        },
+    }
+
+    for _, tt := range tests {
+        t.Run(tt.name, func(t *testing.T) {
+            c := setupCPU()
+            tt.setupCPU(c)
+            
+            // CPU実行サイクルを使用して命令を実行
+            c.Execute()
+
+            // 結果を検証
+            tt.checkResult(t, c)
+            checkFlag(t, "Carry", c.Registers.P.Carry, tt.expectedCarry)
+            checkFlag(t, "Zero", c.Registers.P.Zero, tt.expectedZero)
+            checkFlag(t, "Negative", c.Registers.P.Negative, tt.expectedNeg)
+        })
+    }
+}
+
+// TestROL はROL命令（左回転）をテストします
+func TestROL(t *testing.T) {
+    tests := []struct {
+        name          string
+        opcode        uint8
+        addrMode      AddressingMode
+        setupCPU      func(*CPU)
+        checkResult   func(*testing.T, *CPU)
+        expectedCarry bool
+        expectedZero  bool
+        expectedNeg   bool
+    }{
+        {
+            name:       "ROL Accumulator - with carry in=0",
+            opcode:     0x2A,
+            addrMode:   Accumulator,
+            setupCPU: func(c *CPU) {
+                c.Registers.A = 0x41 // 01000001
+                c.Registers.P.Carry = false // キャリーなし
+                c.WriteByteToWRAM(c.Registers.PC, 0x2A) // ROL命令
+            },
+            checkResult: func(t *testing.T, c *CPU) {
+                checkRegister(t, "A", c.Registers.A, 0x82) // 10000010
+            },
+            expectedCarry: false,
+            expectedZero:  false,
+            expectedNeg:   true,  // 最上位ビットが1
+        },
+        {
+            name:       "ROL Accumulator - with carry in=1",
+            opcode:     0x2A,
+            addrMode:   Accumulator,
+            setupCPU: func(c *CPU) {
+                c.Registers.A = 0x41 // 01000001
+                c.Registers.P.Carry = true // キャリーあり
+                c.WriteByteToWRAM(c.Registers.PC, 0x2A) // ROL命令
+            },
+            checkResult: func(t *testing.T, c *CPU) {
+                checkRegister(t, "A", c.Registers.A, 0x83) // 10000011
+            },
+            expectedCarry: false,
+            expectedZero:  false,
+            expectedNeg:   true,  // 最上位ビットが1
+        },
+        {
+            name:       "ROL Accumulator - carry out",
+            opcode:     0x2A,
+            addrMode:   Accumulator,
+            setupCPU: func(c *CPU) {
+                c.Registers.A = 0x80 // 10000000
+                c.Registers.P.Carry = false // キャリーなし
+                c.WriteByteToWRAM(c.Registers.PC, 0x2A) // ROL命令
+            },
+            checkResult: func(t *testing.T, c *CPU) {
+                checkRegister(t, "A", c.Registers.A, 0x00) // 00000000
+            },
+            expectedCarry: true,
+            expectedZero:  true,
+            expectedNeg:   false,
+        },
+        {
+            name:       "ROL Zero Page",
+            opcode:     0x26,
+            addrMode:   ZeroPage,
+            setupCPU: func(c *CPU) {
+                c.Registers.P.Carry = true // キャリーあり
+                c.WriteByteToWRAM(c.Registers.PC, 0x26) // ROL命令
+                c.WriteByteToWRAM(c.Registers.PC+1, 0x20) // オペランド: ZPアドレス0x20
+                c.WriteByteToWRAM(0x20, 0x41) // 0x20に値を設定 (01000001)
+            },
+            checkResult: func(t *testing.T, c *CPU) {
+                if c.ReadByteFromWRAM(0x20) != 0x83 { // 10000011
+                    t.Errorf("Memory at $20 = %#02x, want %#02x", c.ReadByteFromWRAM(0x20), 0x83)
+                }
+            },
+            expectedCarry: false,
+            expectedZero:  false,
+            expectedNeg:   true,  // 最上位ビットが1
+        },
+        {
+            name:       "ROL Zero Page,X",
+            opcode:     0x36,
+            addrMode:   ZeroPageXIndexed,
+            setupCPU: func(c *CPU) {
+                c.Registers.X = 0x10
+                c.Registers.P.Carry = true // キャリーあり
+                c.WriteByteToWRAM(c.Registers.PC, 0x36) // ROL命令
+                c.WriteByteToWRAM(c.Registers.PC+1, 0x20) // オペランド: ZPアドレス0x20
+                c.WriteByteToWRAM(0x30, 0x41) // 0x30 (0x20+0x10) に値を設定 (01000001)
+            },
+            checkResult: func(t *testing.T, c *CPU) {
+                if c.ReadByteFromWRAM(0x30) != 0x83 { // 10000011
+                    t.Errorf("Memory at $30 = %#02x, want %#02x", c.ReadByteFromWRAM(0x30), 0x83)
+                }
+            },
+            expectedCarry: false,
+            expectedZero:  false,
+            expectedNeg:   true,  // 最上位ビットが1
+        },
+        {
+            name:       "ROL Absolute",
+            opcode:     0x2E,
+            addrMode:   Absolute,
+            setupCPU: func(c *CPU) {
+                c.Registers.P.Carry = true // キャリーあり
+                c.WriteByteToWRAM(c.Registers.PC, 0x2E) // ROL命令
+                c.WriteByteToWRAM(c.Registers.PC+1, 0x80) // オペランド: 低バイト
+                c.WriteByteToWRAM(c.Registers.PC+2, 0x44) // オペランド: 高バイト (0x4480)
+                c.WriteByteToWRAM(0x4480, 0x41) // 0x4480に値を設定 (01000001)
+            },
+            checkResult: func(t *testing.T, c *CPU) {
+                if c.ReadByteFromWRAM(0x4480) != 0x83 { // 10000011
+                    t.Errorf("Memory at $4480 = %#02x, want %#02x", c.ReadByteFromWRAM(0x4480), 0x83)
+                }
+            },
+            expectedCarry: false,
+            expectedZero:  false,
+            expectedNeg:   true,  // 最上位ビットが1
+        },
+        {
+            name:       "ROL Absolute,X",
+            opcode:     0x3E,
+            addrMode:   AbsoluteXIndexed,
+            setupCPU: func(c *CPU) {
+                c.Registers.X = 0x10
+                c.Registers.P.Carry = true // キャリーあり
+                c.WriteByteToWRAM(c.Registers.PC, 0x3E) // ROL命令
+                c.WriteByteToWRAM(c.Registers.PC+1, 0x80) // オペランド: 低バイト
+                c.WriteByteToWRAM(c.Registers.PC+2, 0x44) // オペランド: 高バイト (0x4480)
+                c.WriteByteToWRAM(0x4490, 0x41) // 0x4490 (0x4480+0x10) に値を設定 (01000001)
+            },
+            checkResult: func(t *testing.T, c *CPU) {
+                if c.ReadByteFromWRAM(0x4490) != 0x83 { // 10000011
+                    t.Errorf("Memory at $4490 = %#02x, want %#02x", c.ReadByteFromWRAM(0x4490), 0x83)
+                }
+            },
+            expectedCarry: false,
+            expectedZero:  false,
+            expectedNeg:   true,  // 最上位ビットが1
+        },
+    }
+
+    for _, tt := range tests {
+        t.Run(tt.name, func(t *testing.T) {
+            c := setupCPU()
+            tt.setupCPU(c)
+            
+            // CPU実行サイクルを使用して命令を実行
+            c.Execute()
+
+            // 結果を検証
+            tt.checkResult(t, c)
+            checkFlag(t, "Carry", c.Registers.P.Carry, tt.expectedCarry)
+            checkFlag(t, "Zero", c.Registers.P.Zero, tt.expectedZero)
+            checkFlag(t, "Negative", c.Registers.P.Negative, tt.expectedNeg)
+        })
+    }
+}
+
+// TestROR はROR命令（右回転）をテストします
+func TestROR(t *testing.T) {
+    tests := []struct {
+        name          string
+        opcode        uint8
+        addrMode      AddressingMode
+        setupCPU      func(*CPU)
+        checkResult   func(*testing.T, *CPU)
+        expectedCarry bool
+        expectedZero  bool
+        expectedNeg   bool
+    }{
+        {
+            name:       "ROR Accumulator - with carry in=0",
+            opcode:     0x6A,
+            addrMode:   Accumulator,
+            setupCPU: func(c *CPU) {
+                c.Registers.A = 0x41 // 01000001
+                c.Registers.P.Carry = false // キャリーなし
+                c.WriteByteToWRAM(c.Registers.PC, 0x6A) // ROR命令
+            },
+            checkResult: func(t *testing.T, c *CPU) {
+                checkRegister(t, "A", c.Registers.A, 0x20) // 00100000
+            },
+            expectedCarry: true,  // ビット0が1だったため
+            expectedZero:  false,
+            expectedNeg:   false,
+        },
+        {
+            name:       "ROR Accumulator - with carry in=1",
+            opcode:     0x6A,
+            addrMode:   Accumulator,
+            setupCPU: func(c *CPU) {
+                c.Registers.A = 0x41 // 01000001
+                c.Registers.P.Carry = true // キャリーあり
+                c.WriteByteToWRAM(c.Registers.PC, 0x6A) // ROR命令
+            },
+            checkResult: func(t *testing.T, c *CPU) {
+                checkRegister(t, "A", c.Registers.A, 0xA0) // 10100000
+            },
+            expectedCarry: true,  // ビット0が1だったため
+            expectedZero:  false,
+            expectedNeg:   true,  // 最上位ビットが1
+        },
+        {
+            name:       "ROR Accumulator - carry out=0",
+            opcode:     0x6A,
+            addrMode:   Accumulator,
+            setupCPU: func(c *CPU) {
+                c.Registers.A = 0x40 // 01000000
+                c.Registers.P.Carry = false // キャリーなし
+                c.WriteByteToWRAM(c.Registers.PC, 0x6A) // ROR命令
+            },
+            checkResult: func(t *testing.T, c *CPU) {
+                checkRegister(t, "A", c.Registers.A, 0x20) // 00100000
+            },
+            expectedCarry: false,
+            expectedZero:  false,
+            expectedNeg:   false,
+        },
+        {
+            name:       "ROR Zero Page",
+            opcode:     0x66,
+            addrMode:   ZeroPage,
+            setupCPU: func(c *CPU) {
+                c.Registers.P.Carry = true // キャリーあり
+                c.WriteByteToWRAM(c.Registers.PC, 0x66) // ROR命令
+                c.WriteByteToWRAM(c.Registers.PC+1, 0x20) // オペランド: ZPアドレス0x20
+                c.WriteByteToWRAM(0x20, 0x41) // 0x20に値を設定 (01000001)
+            },
+            checkResult: func(t *testing.T, c *CPU) {
+                if c.ReadByteFromWRAM(0x20) != 0xA0 { // 10100000
+                    t.Errorf("Memory at $20 = %#02x, want %#02x", c.ReadByteFromWRAM(0x20), 0xA0)
+                }
+            },
+            expectedCarry: true,  // ビット0が1だったため
+            expectedZero:  false,
+            expectedNeg:   true,  // 最上位ビットが1
+        },
+        {
+            name:       "ROR Zero Page,X",
+            opcode:     0x76,
+            addrMode:   ZeroPageXIndexed,
+            setupCPU: func(c *CPU) {
+                c.Registers.X = 0x10
+                c.Registers.P.Carry = true // キャリーあり
+                c.WriteByteToWRAM(c.Registers.PC, 0x76) // ROR命令
+                c.WriteByteToWRAM(c.Registers.PC+1, 0x20) // オペランド: ZPアドレス0x20
+                c.WriteByteToWRAM(0x30, 0x41) // 0x30 (0x20+0x10) に値を設定 (01000001)
+            },
+            checkResult: func(t *testing.T, c *CPU) {
+                if c.ReadByteFromWRAM(0x30) != 0xA0 { // 10100000
+                    t.Errorf("Memory at $30 = %#02x, want %#02x", c.ReadByteFromWRAM(0x30), 0xA0)
+                }
+            },
+            expectedCarry: true,  // ビット0が1だったため
+            expectedZero:  false,
+            expectedNeg:   true,  // 最上位ビットが1
+        },
+        {
+            name:       "ROR Absolute",
+            opcode:     0x6E,
+            addrMode:   Absolute,
+            setupCPU: func(c *CPU) {
+                c.Registers.P.Carry = true // キャリーあり
+                c.WriteByteToWRAM(c.Registers.PC, 0x6E) // ROR命令
+                c.WriteByteToWRAM(c.Registers.PC+1, 0x80) // オペランド: 低バイト
+                c.WriteByteToWRAM(c.Registers.PC+2, 0x44) // オペランド: 高バイト (0x4480)
+                c.WriteByteToWRAM(0x4480, 0x41) // 0x4480に値を設定 (01000001)
+            },
+            checkResult: func(t *testing.T, c *CPU) {
+                if c.ReadByteFromWRAM(0x4480) != 0xA0 { // 10100000
+                    t.Errorf("Memory at $4480 = %#02x, want %#02x", c.ReadByteFromWRAM(0x4480), 0xA0)
+                }
+            },
+            expectedCarry: true,  // ビット0が1だったため
+            expectedZero:  false,
+            expectedNeg:   true,  // 最上位ビットが1
+        },
+        {
+            name:       "ROR Absolute,X",
+            opcode:     0x7E,
+            addrMode:   AbsoluteXIndexed,
+            setupCPU: func(c *CPU) {
+                c.Registers.X = 0x10
+                c.Registers.P.Carry = true // キャリーあり
+                c.WriteByteToWRAM(c.Registers.PC, 0x7E) // ROR命令
+                c.WriteByteToWRAM(c.Registers.PC+1, 0x80) // オペランド: 低バイト
+                c.WriteByteToWRAM(c.Registers.PC+2, 0x44) // オペランド: 高バイト (0x4480)
+                c.WriteByteToWRAM(0x4490, 0x41) // 0x4490 (0x4480+0x10) に値を設定 (01000001)
+            },
+            checkResult: func(t *testing.T, c *CPU) {
+                if c.ReadByteFromWRAM(0x4490) != 0xA0 { // 10100000
+                    t.Errorf("Memory at $4490 = %#02x, want %#02x", c.ReadByteFromWRAM(0x4490), 0xA0)
+                }
+            },
+            expectedCarry: true,  // ビット0が1だったため
+            expectedZero:  false,
+            expectedNeg:   true,  // 最上位ビットが1
+        },
+    }
+
+    for _, tt := range tests {
+        t.Run(tt.name, func(t *testing.T) {
+            c := setupCPU()
+            tt.setupCPU(c)
+            
+            // CPU実行サイクルを使用して命令を実行
+            c.Execute()
+
+            // 結果を検証
+            tt.checkResult(t, c)
+            checkFlag(t, "Carry", c.Registers.P.Carry, tt.expectedCarry)
+            checkFlag(t, "Zero", c.Registers.P.Zero, tt.expectedZero)
+            checkFlag(t, "Negative", c.Registers.P.Negative, tt.expectedNeg)
+        })
+    }
+}
