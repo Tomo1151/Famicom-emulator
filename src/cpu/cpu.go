@@ -567,9 +567,7 @@ func (c *CPU) sbc(mode AddressingMode) {
 	addr := c.getOperandAddress(mode)
 	value := c.ReadByteFromWRAM(addr)
 
-	value = ^value
-
-	sum := uint16(c.Registers.A) + uint16(value)
+	sum := uint16(c.Registers.A) + uint16(^value)
 
 	if c.Registers.P.Carry {
 		sum++
@@ -579,7 +577,7 @@ func (c *CPU) sbc(mode AddressingMode) {
 
 	// フラグ設定
 	c.Registers.P.Carry = sum > 0xFF
-	c.Registers.P.Overflow = ((c.Registers.A ^ value) & 0x80) == 0 && ((c.Registers.A ^ result) & 0x80) != 0
+	c.Registers.P.Overflow = ((c.Registers.A ^ value) & 0x80) != 0 && ((c.Registers.A ^ result) & 0x80) != 0
 
 	c.updateNZFlags(result)
 	c.Registers.A = result
