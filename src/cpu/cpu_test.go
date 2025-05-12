@@ -160,7 +160,7 @@ func TestSEC(t *testing.T) {
             tt.setupCPU(c)
             
             // CPU実行サイクルを使用して命令を実行
-            c.Execute()
+            c.Step()
 
             // 結果を検証
             checkFlag(t, "Carry", c.Registers.P.Carry, tt.expectedCarry)
@@ -205,7 +205,7 @@ func TestCLC(t *testing.T) {
             tt.setupCPU(c)
             
             // CPU実行サイクルを使用して命令を実行
-            c.Execute()
+            c.Step()
 
             // 結果を検証
             checkFlag(t, "Carry", c.Registers.P.Carry, tt.expectedCarry)
@@ -250,7 +250,7 @@ func TestCLV(t *testing.T) {
             tt.setupCPU(c)
             
             // CPU実行サイクルを使用して命令を実行
-            c.Execute()
+            c.Step()
 
             // 結果を検証
             checkFlag(t, "Overflow", c.Registers.P.Overflow, tt.expectedOverflow)
@@ -295,7 +295,7 @@ func TestSEI(t *testing.T) {
             tt.setupCPU(c)
             
             // CPU実行サイクルを使用して命令を実行
-            c.Execute()
+            c.Step()
 
             // 結果を検証
             checkFlag(t, "Interrupt", c.Registers.P.Interrupt, tt.expectedInterrupt)
@@ -340,7 +340,7 @@ func TestCLI(t *testing.T) {
             tt.setupCPU(c)
             
             // CPU実行サイクルを使用して命令を実行
-            c.Execute()
+            c.Step()
 
             // 結果を検証
             checkFlag(t, "Interrupt", c.Registers.P.Interrupt, tt.expectedInterrupt)
@@ -385,7 +385,7 @@ func TestSED(t *testing.T) {
             tt.setupCPU(c)
             
             // CPU実行サイクルを使用して命令を実行
-            c.Execute()
+            c.Step()
 
             // 結果を検証
             checkFlag(t, "Decimal", c.Registers.P.Decimal, tt.expectedDecimal)
@@ -430,7 +430,7 @@ func TestCLD(t *testing.T) {
             tt.setupCPU(c)
             
             // CPU実行サイクルを使用して命令を実行
-            c.Execute()
+            c.Step()
 
             // 結果を検証
             checkFlag(t, "Decimal", c.Registers.P.Decimal, tt.expectedDecimal)
@@ -598,7 +598,7 @@ func TestLDA(t *testing.T) {
             tt.setupMemory(c)
             
             // CPU実行サイクルを使用して命令を実行
-            c.Execute()
+            c.Step()
 
             // 結果を検証
             checkRegister(t, "A", c.Registers.A, tt.expectedA)
@@ -695,7 +695,7 @@ func TestLDX(t *testing.T) {
             tt.setupMemory(c)
             
             // CPU実行サイクルを使用して命令を実行
-            c.Execute()
+            c.Step()
 
             // 結果を検証
             checkRegister(t, "X", c.Registers.X, tt.expectedX)
@@ -792,7 +792,7 @@ func TestLDY(t *testing.T) {
             tt.setupMemory(c)
             
             // CPU実行サイクルを使用して命令を実行
-            c.Execute()
+            c.Step()
 
             // 結果を検証
             checkRegister(t, "Y", c.Registers.Y, tt.expectedY)
@@ -936,7 +936,7 @@ func TestSTA(t *testing.T) {
             tt.setupCPU(c)
 
             // CPU実行サイクルを使用して命令を実行
-            c.Execute()
+            c.Step()
 
             // メモリ内容を検証
             tt.checkMemory(t, c)
@@ -1008,7 +1008,7 @@ func TestSTX(t *testing.T) {
             tt.setupCPU(c)
             
             // CPU実行サイクルを使用して命令を実行
-            c.Execute()
+            c.Step()
 
             // メモリ内容を検証
             tt.checkMemory(t, c)
@@ -1080,7 +1080,7 @@ func TestSTY(t *testing.T) {
             tt.setupCPU(c)
             
             // CPU実行サイクルを使用して命令を実行
-            c.Execute()
+            c.Step()
 
             // メモリ内容を検証
             tt.checkMemory(t, c)
@@ -1143,7 +1143,7 @@ func TestTAX(t *testing.T) {
             tt.setupCPU(c)
             
             // CPU実行サイクルを使用して命令を実行
-            c.Execute()
+            c.Step()
 
             // 結果を検証
             checkRegister(t, "X", c.Registers.X, tt.expectedX)
@@ -1208,7 +1208,7 @@ func TestTAY(t *testing.T) {
             tt.setupCPU(c)
             
             // CPU実行サイクルを使用して命令を実行
-            c.Execute()
+            c.Step()
 
             // 結果を検証
             checkRegister(t, "Y", c.Registers.Y, tt.expectedY)
@@ -1273,7 +1273,7 @@ func TestTXA(t *testing.T) {
             tt.setupCPU(c)
             
             // CPU実行サイクルを使用して命令を実行
-            c.Execute()
+            c.Step()
 
             // 結果を検証
             checkRegister(t, "A", c.Registers.A, tt.expectedA)
@@ -1338,7 +1338,7 @@ func TestTYA(t *testing.T) {
             tt.setupCPU(c)
             
             // CPU実行サイクルを使用して命令を実行
-            c.Execute()
+            c.Step()
 
             // 結果を検証
             checkRegister(t, "A", c.Registers.A, tt.expectedA)
@@ -1396,7 +1396,7 @@ func TestTXS(t *testing.T) {
             tt.setupCPU(c)
             
             // CPU実行サイクルを使用して命令を実行
-            c.Execute()
+            c.Step()
 
             // 結果を検証（SPレジスタのみ）
             checkRegister(t, "SP", c.Registers.SP, tt.expectedSP)
@@ -1459,7 +1459,7 @@ func TestTSX(t *testing.T) {
             tt.setupCPU(c)
             
             // CPU実行サイクルを使用して命令を実行
-            c.Execute()
+            c.Step()
 
             // 結果を検証
             checkRegister(t, "X", c.Registers.X, tt.expectedX)
@@ -1703,7 +1703,7 @@ func TestADC(t *testing.T) {
             tt.setupCPU(c)
             
             // CPU実行サイクルを使用して命令を実行
-            c.Execute()
+            c.Step()
 
             // 結果を検証
             checkRegister(t, "A", c.Registers.A, tt.expectedA)
@@ -1947,7 +1947,7 @@ func TestSBC(t *testing.T) {
             tt.setupCPU(c)
             
             // CPU実行サイクルを使用して命令を実行
-            c.Execute()
+            c.Step()
 
             // 結果を検証
             checkRegister(t, "A", c.Registers.A, tt.expectedA)
@@ -2116,7 +2116,7 @@ func TestAND(t *testing.T) {
             tt.setupCPU(c)
             
             // CPU実行サイクルを使用して命令を実行
-            c.Execute()
+            c.Step()
 
             // 結果を検証
             checkRegister(t, "A", c.Registers.A, tt.expectedA)
@@ -2281,7 +2281,7 @@ func TestORA(t *testing.T) {
             tt.setupCPU(c)
             
             // CPU実行サイクルを使用して命令を実行
-            c.Execute()
+            c.Step()
 
             // 結果を検証
             checkRegister(t, "A", c.Registers.A, tt.expectedA)
@@ -2459,7 +2459,7 @@ func TestEOR(t *testing.T) {
             tt.setupCPU(c)
             
             // CPU実行サイクルを使用して命令を実行
-            c.Execute()
+            c.Step()
 
             // 結果を検証
             checkRegister(t, "A", c.Registers.A, tt.expectedA)
@@ -2537,7 +2537,7 @@ func TestBIT(t *testing.T) {
             tt.setupCPU(c)
             
             // CPU実行サイクルを使用して命令を実行
-            c.Execute()
+            c.Step()
 
             // 結果を検証
             checkRegister(t, "A", c.Registers.A, tt.expectedA) // Aレジスタは変更されないことを確認
@@ -2674,7 +2674,7 @@ func TestLSR(t *testing.T) {
             tt.setupCPU(c)
             
             // CPU実行サイクルを使用して命令を実行
-            c.Execute()
+            c.Step()
 
             // 結果を検証
             tt.checkResult(t, c)
@@ -2811,7 +2811,7 @@ func TestASL(t *testing.T) {
             tt.setupCPU(c)
             
             // CPU実行サイクルを使用して命令を実行
-            c.Execute()
+            c.Step()
 
             // 結果を検証
             tt.checkResult(t, c)
@@ -2970,7 +2970,7 @@ func TestROL(t *testing.T) {
             tt.setupCPU(c)
             
             // CPU実行サイクルを使用して命令を実行
-            c.Execute()
+            c.Step()
 
             // 結果を検証
             tt.checkResult(t, c)
@@ -3129,7 +3129,7 @@ func TestROR(t *testing.T) {
             tt.setupCPU(c)
             
             // CPU実行サイクルを使用して命令を実行
-            c.Execute()
+            c.Step()
 
             // 結果を検証
             tt.checkResult(t, c)
@@ -3310,7 +3310,7 @@ func TestCMP(t *testing.T) {
             tt.setupCPU(c)
             
             // CPU実行サイクルを使用して命令を実行
-            c.Execute()
+            c.Step()
 
             // 結果を検証
             checkFlag(t, "Carry", c.Registers.P.Carry, tt.expectedCarry)
@@ -3407,7 +3407,7 @@ func TestCPX(t *testing.T) {
             tt.setupCPU(c)
             
             // CPU実行サイクルを使用して命令を実行
-            c.Execute()
+            c.Step()
 
             // 結果を検証
             checkFlag(t, "Carry", c.Registers.P.Carry, tt.expectedCarry)
@@ -3504,7 +3504,7 @@ func TestCPY(t *testing.T) {
             tt.setupCPU(c)
             
             // CPU実行サイクルを使用して命令を実行
-            c.Execute()
+            c.Step()
 
             // 結果を検証
             checkFlag(t, "Carry", c.Registers.P.Carry, tt.expectedCarry)
@@ -3558,7 +3558,7 @@ func TestPHA(t *testing.T) {
             tt.setupCPU(c)
             
             // CPU実行サイクルを使用して命令を実行
-            c.Execute()
+            c.Step()
 
             // 結果を検証
             checkRegister(t, "SP", c.Registers.SP, tt.expectedSP)
@@ -3628,7 +3628,7 @@ func TestPHP(t *testing.T) {
             expectedStatus := c.Registers.P.ToByte()
             
             // CPU実行サイクルを使用して命令を実行
-            c.Execute()
+            c.Step()
 
             // 結果を検証
             checkRegister(t, "SP", c.Registers.SP, tt.expectedSP)
@@ -3705,7 +3705,7 @@ func TestPLA(t *testing.T) {
             tt.setupCPU(c)
             
             // CPU実行サイクルを使用して命令を実行
-            c.Execute()
+            c.Step()
 
             // 結果を検証
             checkRegister(t, "A", c.Registers.A, tt.expectedA)
@@ -3778,7 +3778,7 @@ func TestPLP(t *testing.T) {
             tt.setupCPU(c)
             
             // CPU実行サイクルを使用して命令を実行
-            c.Execute()
+            c.Step()
 
             // 結果を検証
             checkRegister(t, "SP", c.Registers.SP, tt.expectedSP)
@@ -3850,7 +3850,7 @@ func TestINX(t *testing.T) {
             tt.setupCPU(c)
             
             // CPU実行サイクルを使用して命令を実行
-            c.Execute()
+            c.Step()
 
             // 結果を検証
             checkRegister(t, "X", c.Registers.X, tt.expectedX)
@@ -3915,7 +3915,7 @@ func TestINY(t *testing.T) {
             tt.setupCPU(c)
             
             // CPU実行サイクルを使用して命令を実行
-            c.Execute()
+            c.Step()
 
             // 結果を検証
             checkRegister(t, "Y", c.Registers.Y, tt.expectedY)
@@ -3980,7 +3980,7 @@ func TestDEX(t *testing.T) {
             tt.setupCPU(c)
             
             // CPU実行サイクルを使用して命令を実行
-            c.Execute()
+            c.Step()
 
             // 結果を検証
             checkRegister(t, "X", c.Registers.X, tt.expectedX)
@@ -4045,7 +4045,7 @@ func TestDEY(t *testing.T) {
             tt.setupCPU(c)
             
             // CPU実行サイクルを使用して命令を実行
-            c.Execute()
+            c.Step()
 
             // 結果を検証
             checkRegister(t, "Y", c.Registers.Y, tt.expectedY)
@@ -4168,7 +4168,7 @@ func TestINC(t *testing.T) {
             tt.setupCPU(c)
             
             // CPU実行サイクルを使用して命令を実行
-            c.Execute()
+            c.Step()
 
             // 結果を検証
             tt.checkResult(t, c)
@@ -4291,7 +4291,7 @@ func TestDEC(t *testing.T) {
             tt.setupCPU(c)
             
             // CPU実行サイクルを使用して命令を実行
-            c.Execute()
+            c.Step()
 
             // 結果を検証
             tt.checkResult(t, c)
@@ -4362,7 +4362,7 @@ func TestJMP(t *testing.T) {
             tt.setupCPU(c)
             
             // CPU実行サイクルを使用して命令を実行
-            c.Execute()
+            c.Step()
 
             // 結果を検証
             if c.Registers.PC != tt.expectedPC {
@@ -4414,7 +4414,7 @@ func TestJSR(t *testing.T) {
             tt.setupCPU(c)
             
             // CPU実行サイクルを使用して命令を実行
-            c.Execute()
+            c.Step()
 
             // 結果を検証
             if c.Registers.PC != tt.expectedPC {
@@ -4462,7 +4462,7 @@ func TestRTS(t *testing.T) {
             tt.setupCPU(c)
             
             // CPU実行サイクルを使用して命令を実行
-            c.Execute()
+            c.Step()
 
             // 結果を検証
             if c.Registers.PC != tt.expectedPC {
@@ -4550,7 +4550,7 @@ func TestRTI(t *testing.T) {
             tt.setupCPU(c)
             
             // CPU実行サイクルを使用して命令を実行
-            c.Execute()
+            c.Step()
 
             // 結果を検証
             if c.Registers.PC != tt.expectedPC {
@@ -4620,7 +4620,7 @@ func TestBRK(t *testing.T) {
             tt.setupCPU(c)
             
             // CPU実行サイクルを使用して命令を実行
-            c.Execute()
+            c.Step()
 
             // 結果を検証
             if c.Registers.PC != tt.expectedPC {
@@ -4676,7 +4676,7 @@ func TestNOP(t *testing.T) {
             oldNegative := c.Registers.P.Negative
             
             // CPU実行サイクルを使用して命令を実行
-            c.Execute()
+            c.Step()
 
             // PC以外のレジスタが変わっていないことを検証
             checkRegister(t, "A", c.Registers.A, oldA)
@@ -4754,7 +4754,7 @@ func TestBMI(t *testing.T) {
             tt.setupCPU(c)
             
             // CPU実行サイクルを使用して命令を実行
-            c.Execute()
+            c.Step()
 
             // 結果を検証
             if c.Registers.PC != tt.expectedPC {
@@ -4817,7 +4817,7 @@ func TestBPL(t *testing.T) {
             tt.setupCPU(c)
             
             // CPU実行サイクルを使用して命令を実行
-            c.Execute()
+            c.Step()
 
             // 結果を検証
             if c.Registers.PC != tt.expectedPC {
@@ -4880,7 +4880,7 @@ func TestBVS(t *testing.T) {
             tt.setupCPU(c)
             
             // CPU実行サイクルを使用して命令を実行
-            c.Execute()
+            c.Step()
 
             // 結果を検証
             if c.Registers.PC != tt.expectedPC {
@@ -4943,7 +4943,7 @@ func TestBVC(t *testing.T) {
             tt.setupCPU(c)
             
             // CPU実行サイクルを使用して命令を実行
-            c.Execute()
+            c.Step()
 
             // 結果を検証
             if c.Registers.PC != tt.expectedPC {
@@ -5006,7 +5006,7 @@ func TestBCS(t *testing.T) {
             tt.setupCPU(c)
             
             // CPU実行サイクルを使用して命令を実行
-            c.Execute()
+            c.Step()
 
             // 結果を検証
             if c.Registers.PC != tt.expectedPC {
@@ -5069,7 +5069,7 @@ func TestBCC(t *testing.T) {
             tt.setupCPU(c)
             
             // CPU実行サイクルを使用して命令を実行
-            c.Execute()
+            c.Step()
 
             // 結果を検証
             if c.Registers.PC != tt.expectedPC {
@@ -5132,7 +5132,7 @@ func TestBEQ(t *testing.T) {
             tt.setupCPU(c)
             
             // CPU実行サイクルを使用して命令を実行
-            c.Execute()
+            c.Step()
 
             // 結果を検証
             if c.Registers.PC != tt.expectedPC {
@@ -5195,7 +5195,7 @@ func TestBNE(t *testing.T) {
             tt.setupCPU(c)
             
             // CPU実行サイクルを使用して命令を実行
-            c.Execute()
+            c.Step()
 
             // 結果を検証
             if c.Registers.PC != tt.expectedPC {

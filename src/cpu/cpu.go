@@ -50,8 +50,14 @@ func (c *CPU) Init(debug bool) {
 }
 
 // MARK:  命令の実行
-func (c *CPU) Execute() {
-	opecode := c.ReadByteFromWRAM(c.Registers.PC)
+func (c *CPU) Step() {
+	c.execute(func() {})
+}
+
+func (c *CPU) execute(callback func()) {
+	callback()
+
+		opecode := c.ReadByteFromWRAM(c.Registers.PC)
 	instruction, exists := c.InstructionSet[opecode]
 
 	if !exists {
@@ -75,6 +81,7 @@ func (c *CPU) Execute() {
 		fmt.Printf("PC: $%04X\n\n", c.Registers.PC)
 	}
 }
+
 
 // MARK: ワーキングメモリの参照 (1byte)
 func (c *CPU) ReadByteFromWRAM(address uint16) uint8 {
@@ -723,6 +730,6 @@ func (c *CPU) REPL(commands []uint8) {
 		if commands[i] == 0x00 {
 			return
 		}
-		c.Execute()
+		c.Step()
 	}
 }
