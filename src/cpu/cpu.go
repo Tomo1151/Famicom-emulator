@@ -157,36 +157,36 @@ func (c *CPU) updateNZFlags(result uint8) {
 
 // MARK: スタック操作
 func (c *CPU) pushByte(value uint8) {
-	c.Registers.SP--
 	stack_addr := 0x0100 | uint16(c.Registers.SP)
 	c.WriteByteToWRAM(stack_addr, value)
+	c.Registers.SP--
 }
 
 func (c *CPU) pushWord(value uint16) {
-	c.Registers.SP--
 	stack_addr := 0x0100 | uint16(c.Registers.SP)
 	c.WriteByteToWRAM(stack_addr, (uint8(value >> 8)))
-
 	c.Registers.SP--
+
 	stack_addr = 0x0100 | uint16(c.Registers.SP)
 	c.WriteByteToWRAM(stack_addr, (uint8(value & 0xFF)))
+	c.Registers.SP--
 }
 
 func (c *CPU) popByte() uint8 {
+	c.Registers.SP++
 	stack_addr := 0x0100 | uint16(c.Registers.SP)
 	value := c.ReadByteFromWRAM(stack_addr)
-	c.Registers.SP++
 	return value
 }
 
 func (c *CPU) popWord() uint16 {
+	c.Registers.SP++
 	stack_addr := 0x0100 | uint16(c.Registers.SP)
 	lower := c.ReadByteFromWRAM(stack_addr)
-	c.Registers.SP++
 
+	c.Registers.SP++
 	stack_addr = 0x0100 | uint16(c.Registers.SP)
 	upper := c.ReadByteFromWRAM(stack_addr)
-	c.Registers.SP++
 
 	return uint16(upper) << 8 | uint16(lower)
 }
