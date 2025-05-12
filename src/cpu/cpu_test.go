@@ -107,6 +107,18 @@ func TestAllCPUInstructions(t *testing.T) {
         TestBRK(t)
         TestNOP(t)
     })
+
+    // 分岐命令テスト
+    t.Run("Branch instructions", func(t *testing.T) {
+        TestBMI(t)
+        TestBPL(t)
+        TestBVS(t)
+        TestBVC(t)
+        TestBCS(t)
+        TestBCC(t)
+        TestBEQ(t)
+        TestBNE(t)
+    })
 }
 
 
@@ -4687,6 +4699,8 @@ func TestNOP(t *testing.T) {
     }
 }
 
+
+// MARK: 分岐命令
 // TestBMI はBMI命令（Branch if Minus）をテストします
 func TestBMI(t *testing.T) {
     tests := []struct {
