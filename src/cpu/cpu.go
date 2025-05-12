@@ -47,17 +47,15 @@ func (c *CPU) Init(debug bool) {
 	}
 	c.InstructionSet = generateInstructionSet(c)
 	c.log = debug
+	// fmt.Println(c.wram[0x0600:0x0600+309])
 }
 
 // MARK:  命令の実行
 func (c *CPU) Step() {
-	c.execute(func() {})
-}
+	// 命令のフェッチ
+	opecode := c.ReadByteFromWRAM(c.Registers.PC)
 
-func (c *CPU) execute(callback func()) {
-	callback()
-
-		opecode := c.ReadByteFromWRAM(c.Registers.PC)
+	// 命令の出コード
 	instruction, exists := c.InstructionSet[opecode]
 
 	if !exists {
@@ -79,6 +77,13 @@ func (c *CPU) execute(callback func()) {
 
 	if c.log {
 		fmt.Printf("PC: $%04X\n\n", c.Registers.PC)
+	}
+}
+
+func (c *CPU) Run(callback func(c *CPU)) {
+	for {
+		callback(c)
+		c.Step()
 	}
 }
 
