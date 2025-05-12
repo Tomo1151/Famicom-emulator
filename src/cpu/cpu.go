@@ -145,6 +145,9 @@ func (c *CPU) getOperandAddress(mode AddressingMode) uint16 {
 		lower := c.ReadByteFromWRAM(uint16(base))
 		upper := c.ReadByteFromWRAM(uint16(base + 1) & 0xFF)
 		return (uint16(upper) << 8 | uint16(lower)) + uint16(c.Registers.Y)
+	case Relative:
+		offset := int8(c.ReadByteFromWRAM(c.Registers.PC))
+		return uint16(offset)
 	default:
 		log.Fatalf("Unsupported addressing type: %v", mode)
 		return 0x0000
@@ -258,17 +261,26 @@ func (c *CPU) asl(mode AddressingMode) {
 
 // MARK: BCC命令の実装
 func (c *CPU) bcc(mode AddressingMode) {
-	// @TODO 実装
+	if !c.Registers.P.Carry {
+		offset := c.getOperandAddress(mode)
+		c.Registers.PC = uint16(int32(c.Registers.PC) + int32(offset)) // 符号反転させなずに足すためint32を用いる
+	}
 }
 
 // MARK: BCS命令の実装
 func (c *CPU) bcs(mode AddressingMode) {
-	// @TODO 実装
+	if c.Registers.P.Carry {
+		offset := c.getOperandAddress(mode)
+		c.Registers.PC = uint16(int32(c.Registers.PC) + int32(offset)) // 符号反転させなずに足すためint32を用いる
+	}
 }
 
 // MARK: BEQ命令の実装
 func (c *CPU) beq(mode AddressingMode) {
-	// @TODO 実装
+	if c.Registers.P.Zero {
+		offset := c.getOperandAddress(mode)
+		c.Registers.PC = uint16(int32(c.Registers.PC) + int32(offset)) // 符号反転させなずに足すためint32を用いる
+	}
 }
 
 // MARK: BIT命令の実装
@@ -284,17 +296,26 @@ func (c *CPU) bit(mode AddressingMode) {
 
 // MARK: BMI命令の実装
 func (c *CPU) bmi(mode AddressingMode) {
-	// @TODO 実装
+	if c.Registers.P.Negative {
+		offset := c.getOperandAddress(mode)
+		c.Registers.PC = uint16(int32(c.Registers.PC) + int32(offset)) // 符号反転させなずに足すためint32を用いる
+	}
 }
 
 // MARK: BNE命令の実装
 func (c *CPU) bne(mode AddressingMode) {
-	// @TODO 実装
+	if !c.Registers.P.Zero {
+		offset := c.getOperandAddress(mode)
+		c.Registers.PC = uint16(int32(c.Registers.PC) + int32(offset))
+	}
 }
 
 // MARK: BPL命令の実装
 func (c *CPU) bpl(mode AddressingMode) {
-	// @TODO 実装
+	if !c.Registers.P.Negative {
+		offset := c.getOperandAddress(mode)
+		c.Registers.PC = uint16(int32(c.Registers.PC) + int32(offset)) // 符号反転させなずに足すためint32を用いる
+	}
 }
 
 // MARK: BRK命令の実装
@@ -307,12 +328,18 @@ func (c *CPU) brk(mode AddressingMode) {
 
 // MARK: BVC命令の実装
 func (c *CPU) bvc(mode AddressingMode) {
-	// @TODO 実装
+	if !c.Registers.P.Overflow {
+		offset := c.getOperandAddress(mode)
+		c.Registers.PC = uint16(int32(c.Registers.PC) + int32(offset)) // 符号反転させなずに足すためint32を用いる
+	}
 }
 
 // MARK: BVS命令の実装
 func (c *CPU) bvs(mode AddressingMode) {
-	// @TODO 実装
+	if c.Registers.P.Overflow {
+		offset := c.getOperandAddress(mode)
+		c.Registers.PC = uint16(int32(c.Registers.PC) + int32(offset)) // 符号反転させなずに足すためint32を用いる
+	}
 }
 
 // MARK: CLC命令の実装

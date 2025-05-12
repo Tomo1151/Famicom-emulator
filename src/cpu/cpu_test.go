@@ -4686,3 +4686,507 @@ func TestNOP(t *testing.T) {
         })
     }
 }
+
+// TestBMI はBMI命令（Branch if Minus）をテストします
+func TestBMI(t *testing.T) {
+    tests := []struct {
+        name       string
+        opcode     uint8
+        addrMode   AddressingMode
+        setupCPU   func(*CPU)
+        expectedPC uint16
+    }{
+        {
+            name:     "BMI - Branch taken (negative flag set, positive offset)",
+            opcode:   0x30,
+            addrMode: Relative,
+            setupCPU: func(c *CPU) {
+                c.Registers.PC = 0x0200
+                c.Registers.P.Negative = true // 負数フラグをセット
+                c.WriteByteToWRAM(0x0200, 0x30) // BMI命令
+                c.WriteByteToWRAM(0x0201, 0x10) // オフセット: +16
+            },
+            expectedPC: 0x0212, // 0x0202 + 0x10 = 0x0212
+        },
+        {
+            name:     "BMI - Branch taken (negative flag set, negative offset)",
+            opcode:   0x30,
+            addrMode: Relative,
+            setupCPU: func(c *CPU) {
+                c.Registers.PC = 0x0200
+                c.Registers.P.Negative = true // 負数フラグをセット
+                c.WriteByteToWRAM(0x0200, 0x30) // BMI命令
+                c.WriteByteToWRAM(0x0201, 0xF0) // オフセット: -16 (2の補数表現)
+            },
+            expectedPC: 0x01F2, // 0x0202 + 0xF0 (符号拡張で-16) = 0x01F2
+        },
+        {
+            name:     "BMI - Branch not taken (negative flag clear)",
+            opcode:   0x30,
+            addrMode: Relative,
+            setupCPU: func(c *CPU) {
+                c.Registers.PC = 0x0200
+                c.Registers.P.Negative = false // 負数フラグをクリア
+                c.WriteByteToWRAM(0x0200, 0x30) // BMI命令
+                c.WriteByteToWRAM(0x0201, 0x10) // オフセット: +16
+            },
+            expectedPC: 0x0202, // 分岐が行われないので、PC+2のみ
+        },
+    }
+
+    for _, tt := range tests {
+        t.Run(tt.name, func(t *testing.T) {
+            c := setupCPU()
+            tt.setupCPU(c)
+            
+            // CPU実行サイクルを使用して命令を実行
+            c.Execute()
+
+            // 結果を検証
+            if c.Registers.PC != tt.expectedPC {
+                t.Errorf("PC = %#04x, want %#04x", c.Registers.PC, tt.expectedPC)
+            }
+        })
+    }
+}
+
+// TestBPL はBPL命令（Branch if Plus）をテストします
+func TestBPL(t *testing.T) {
+    tests := []struct {
+        name       string
+        opcode     uint8
+        addrMode   AddressingMode
+        setupCPU   func(*CPU)
+        expectedPC uint16
+    }{
+        {
+            name:     "BPL - Branch taken (negative flag clear, positive offset)",
+            opcode:   0x10,
+            addrMode: Relative,
+            setupCPU: func(c *CPU) {
+                c.Registers.PC = 0x0200
+                c.Registers.P.Negative = false // 負数フラグをクリア
+                c.WriteByteToWRAM(0x0200, 0x10) // BPL命令
+                c.WriteByteToWRAM(0x0201, 0x10) // オフセット: +16
+            },
+            expectedPC: 0x0212, // 0x0202 + 0x10 = 0x0212
+        },
+        {
+            name:     "BPL - Branch taken (negative flag clear, negative offset)",
+            opcode:   0x10,
+            addrMode: Relative,
+            setupCPU: func(c *CPU) {
+                c.Registers.PC = 0x0200
+                c.Registers.P.Negative = false // 負数フラグをクリア
+                c.WriteByteToWRAM(0x0200, 0x10) // BPL命令
+                c.WriteByteToWRAM(0x0201, 0xF0) // オフセット: -16 (2の補数表現)
+            },
+            expectedPC: 0x01F2, // 0x0202 + 0xF0 (符号拡張で-16) = 0x01F2
+        },
+        {
+            name:     "BPL - Branch not taken (negative flag set)",
+            opcode:   0x10,
+            addrMode: Relative,
+            setupCPU: func(c *CPU) {
+                c.Registers.PC = 0x0200
+                c.Registers.P.Negative = true // 負数フラグをセット
+                c.WriteByteToWRAM(0x0200, 0x10) // BPL命令
+                c.WriteByteToWRAM(0x0201, 0x10) // オフセット: +16
+            },
+            expectedPC: 0x0202, // 分岐が行われないので、PC+2のみ
+        },
+    }
+
+    for _, tt := range tests {
+        t.Run(tt.name, func(t *testing.T) {
+            c := setupCPU()
+            tt.setupCPU(c)
+            
+            // CPU実行サイクルを使用して命令を実行
+            c.Execute()
+
+            // 結果を検証
+            if c.Registers.PC != tt.expectedPC {
+                t.Errorf("PC = %#04x, want %#04x", c.Registers.PC, tt.expectedPC)
+            }
+        })
+    }
+}
+
+// TestBVS はBVS命令（Branch if Overflow Set）をテストします
+func TestBVS(t *testing.T) {
+    tests := []struct {
+        name       string
+        opcode     uint8
+        addrMode   AddressingMode
+        setupCPU   func(*CPU)
+        expectedPC uint16
+    }{
+        {
+            name:     "BVS - Branch taken (overflow flag set, positive offset)",
+            opcode:   0x70,
+            addrMode: Relative,
+            setupCPU: func(c *CPU) {
+                c.Registers.PC = 0x0200
+                c.Registers.P.Overflow = true // オーバーフローフラグをセット
+                c.WriteByteToWRAM(0x0200, 0x70) // BVS命令
+                c.WriteByteToWRAM(0x0201, 0x10) // オフセット: +16
+            },
+            expectedPC: 0x0212, // 0x0202 + 0x10 = 0x0212
+        },
+        {
+            name:     "BVS - Branch taken (overflow flag set, negative offset)",
+            opcode:   0x70,
+            addrMode: Relative,
+            setupCPU: func(c *CPU) {
+                c.Registers.PC = 0x0200
+                c.Registers.P.Overflow = true // オーバーフローフラグをセット
+                c.WriteByteToWRAM(0x0200, 0x70) // BVS命令
+                c.WriteByteToWRAM(0x0201, 0xF0) // オフセット: -16 (2の補数表現)
+            },
+            expectedPC: 0x01F2, // 0x0202 + 0xF0 (符号拡張で-16) = 0x01F2
+        },
+        {
+            name:     "BVS - Branch not taken (overflow flag clear)",
+            opcode:   0x70,
+            addrMode: Relative,
+            setupCPU: func(c *CPU) {
+                c.Registers.PC = 0x0200
+                c.Registers.P.Overflow = false // オーバーフローフラグをクリア
+                c.WriteByteToWRAM(0x0200, 0x70) // BVS命令
+                c.WriteByteToWRAM(0x0201, 0x10) // オフセット: +16
+            },
+            expectedPC: 0x0202, // 分岐が行われないので、PC+2のみ
+        },
+    }
+
+    for _, tt := range tests {
+        t.Run(tt.name, func(t *testing.T) {
+            c := setupCPU()
+            tt.setupCPU(c)
+            
+            // CPU実行サイクルを使用して命令を実行
+            c.Execute()
+
+            // 結果を検証
+            if c.Registers.PC != tt.expectedPC {
+                t.Errorf("PC = %#04x, want %#04x", c.Registers.PC, tt.expectedPC)
+            }
+        })
+    }
+}
+
+// TestBVC はBVC命令（Branch if Overflow Clear）をテストします
+func TestBVC(t *testing.T) {
+    tests := []struct {
+        name       string
+        opcode     uint8
+        addrMode   AddressingMode
+        setupCPU   func(*CPU)
+        expectedPC uint16
+    }{
+        {
+            name:     "BVC - Branch taken (overflow flag clear, positive offset)",
+            opcode:   0x50,
+            addrMode: Relative,
+            setupCPU: func(c *CPU) {
+                c.Registers.PC = 0x0200
+                c.Registers.P.Overflow = false // オーバーフローフラグをクリア
+                c.WriteByteToWRAM(0x0200, 0x50) // BVC命令
+                c.WriteByteToWRAM(0x0201, 0x10) // オフセット: +16
+            },
+            expectedPC: 0x0212, // 0x0202 + 0x10 = 0x0212
+        },
+        {
+            name:     "BVC - Branch taken (overflow flag clear, negative offset)",
+            opcode:   0x50,
+            addrMode: Relative,
+            setupCPU: func(c *CPU) {
+                c.Registers.PC = 0x0200
+                c.Registers.P.Overflow = false // オーバーフローフラグをクリア
+                c.WriteByteToWRAM(0x0200, 0x50) // BVC命令
+                c.WriteByteToWRAM(0x0201, 0xF0) // オフセット: -16 (2の補数表現)
+            },
+            expectedPC: 0x01F2, // 0x0202 + 0xF0 (符号拡張で-16) = 0x01F2
+        },
+        {
+            name:     "BVC - Branch not taken (overflow flag set)",
+            opcode:   0x50,
+            addrMode: Relative,
+            setupCPU: func(c *CPU) {
+                c.Registers.PC = 0x0200
+                c.Registers.P.Overflow = true // オーバーフローフラグをセット
+                c.WriteByteToWRAM(0x0200, 0x50) // BVC命令
+                c.WriteByteToWRAM(0x0201, 0x10) // オフセット: +16
+            },
+            expectedPC: 0x0202, // 分岐が行われないので、PC+2のみ
+        },
+    }
+
+    for _, tt := range tests {
+        t.Run(tt.name, func(t *testing.T) {
+            c := setupCPU()
+            tt.setupCPU(c)
+            
+            // CPU実行サイクルを使用して命令を実行
+            c.Execute()
+
+            // 結果を検証
+            if c.Registers.PC != tt.expectedPC {
+                t.Errorf("PC = %#04x, want %#04x", c.Registers.PC, tt.expectedPC)
+            }
+        })
+    }
+}
+
+// TestBCS はBCS命令（Branch if Carry Set）をテストします
+func TestBCS(t *testing.T) {
+    tests := []struct {
+        name       string
+        opcode     uint8
+        addrMode   AddressingMode
+        setupCPU   func(*CPU)
+        expectedPC uint16
+    }{
+        {
+            name:     "BCS - Branch taken (carry flag set, positive offset)",
+            opcode:   0xB0,
+            addrMode: Relative,
+            setupCPU: func(c *CPU) {
+                c.Registers.PC = 0x0200
+                c.Registers.P.Carry = true // キャリーフラグをセット
+                c.WriteByteToWRAM(0x0200, 0xB0) // BCS命令
+                c.WriteByteToWRAM(0x0201, 0x10) // オフセット: +16
+            },
+            expectedPC: 0x0212, // 0x0202 + 0x10 = 0x0212
+        },
+        {
+            name:     "BCS - Branch taken (carry flag set, negative offset)",
+            opcode:   0xB0,
+            addrMode: Relative,
+            setupCPU: func(c *CPU) {
+                c.Registers.PC = 0x0200
+                c.Registers.P.Carry = true // キャリーフラグをセット
+                c.WriteByteToWRAM(0x0200, 0xB0) // BCS命令
+                c.WriteByteToWRAM(0x0201, 0xF0) // オフセット: -16 (2の補数表現)
+            },
+            expectedPC: 0x01F2, // 0x0202 + 0xF0 (符号拡張で-16) = 0x01F2
+        },
+        {
+            name:     "BCS - Branch not taken (carry flag clear)",
+            opcode:   0xB0,
+            addrMode: Relative,
+            setupCPU: func(c *CPU) {
+                c.Registers.PC = 0x0200
+                c.Registers.P.Carry = false // キャリーフラグをクリア
+                c.WriteByteToWRAM(0x0200, 0xB0) // BCS命令
+                c.WriteByteToWRAM(0x0201, 0x10) // オフセット: +16
+            },
+            expectedPC: 0x0202, // 分岐が行われないので、PC+2のみ
+        },
+    }
+
+    for _, tt := range tests {
+        t.Run(tt.name, func(t *testing.T) {
+            c := setupCPU()
+            tt.setupCPU(c)
+            
+            // CPU実行サイクルを使用して命令を実行
+            c.Execute()
+
+            // 結果を検証
+            if c.Registers.PC != tt.expectedPC {
+                t.Errorf("PC = %#04x, want %#04x", c.Registers.PC, tt.expectedPC)
+            }
+        })
+    }
+}
+
+// TestBCC はBCC命令（Branch if Carry Clear）をテストします
+func TestBCC(t *testing.T) {
+    tests := []struct {
+        name       string
+        opcode     uint8
+        addrMode   AddressingMode
+        setupCPU   func(*CPU)
+        expectedPC uint16
+    }{
+        {
+            name:     "BCC - Branch taken (carry flag clear, positive offset)",
+            opcode:   0x90,
+            addrMode: Relative,
+            setupCPU: func(c *CPU) {
+                c.Registers.PC = 0x0200
+                c.Registers.P.Carry = false // キャリーフラグをクリア
+                c.WriteByteToWRAM(0x0200, 0x90) // BCC命令
+                c.WriteByteToWRAM(0x0201, 0x10) // オフセット: +16
+            },
+            expectedPC: 0x0212, // 0x0202 + 0x10 = 0x0212
+        },
+        {
+            name:     "BCC - Branch taken (carry flag clear, negative offset)",
+            opcode:   0x90,
+            addrMode: Relative,
+            setupCPU: func(c *CPU) {
+                c.Registers.PC = 0x0200
+                c.Registers.P.Carry = false // キャリーフラグをクリア
+                c.WriteByteToWRAM(0x0200, 0x90) // BCC命令
+                c.WriteByteToWRAM(0x0201, 0xF0) // オフセット: -16 (2の補数表現)
+            },
+            expectedPC: 0x01F2, // 0x0202 + 0xF0 (符号拡張で-16) = 0x01F2
+        },
+        {
+            name:     "BCC - Branch not taken (carry flag set)",
+            opcode:   0x90,
+            addrMode: Relative,
+            setupCPU: func(c *CPU) {
+                c.Registers.PC = 0x0200
+                c.Registers.P.Carry = true // キャリーフラグをセット
+                c.WriteByteToWRAM(0x0200, 0x90) // BCC命令
+                c.WriteByteToWRAM(0x0201, 0x10) // オフセット: +16
+            },
+            expectedPC: 0x0202, // 分岐が行われないので、PC+2のみ
+        },
+    }
+
+    for _, tt := range tests {
+        t.Run(tt.name, func(t *testing.T) {
+            c := setupCPU()
+            tt.setupCPU(c)
+            
+            // CPU実行サイクルを使用して命令を実行
+            c.Execute()
+
+            // 結果を検証
+            if c.Registers.PC != tt.expectedPC {
+                t.Errorf("PC = %#04x, want %#04x", c.Registers.PC, tt.expectedPC)
+            }
+        })
+    }
+}
+
+// TestBEQ はBEQ命令（Branch if Equal）をテストします
+func TestBEQ(t *testing.T) {
+    tests := []struct {
+        name       string
+        opcode     uint8
+        addrMode   AddressingMode
+        setupCPU   func(*CPU)
+        expectedPC uint16
+    }{
+        {
+            name:     "BEQ - Branch taken (zero flag set, positive offset)",
+            opcode:   0xF0,
+            addrMode: Relative,
+            setupCPU: func(c *CPU) {
+                c.Registers.PC = 0x0200
+                c.Registers.P.Zero = true // ゼロフラグをセット
+                c.WriteByteToWRAM(0x0200, 0xF0) // BEQ命令
+                c.WriteByteToWRAM(0x0201, 0x10) // オフセット: +16
+            },
+            expectedPC: 0x0212, // 0x0202 + 0x10 = 0x0212
+        },
+        {
+            name:     "BEQ - Branch taken (zero flag set, negative offset)",
+            opcode:   0xF0,
+            addrMode: Relative,
+            setupCPU: func(c *CPU) {
+                c.Registers.PC = 0x0200
+                c.Registers.P.Zero = true // ゼロフラグをセット
+                c.WriteByteToWRAM(0x0200, 0xF0) // BEQ命令
+                c.WriteByteToWRAM(0x0201, 0xF0) // オフセット: -16 (2の補数表現)
+            },
+            expectedPC: 0x01F2, // 0x0202 + 0xF0 (符号拡張で-16) = 0x01F2
+        },
+        {
+            name:     "BEQ - Branch not taken (zero flag clear)",
+            opcode:   0xF0,
+            addrMode: Relative,
+            setupCPU: func(c *CPU) {
+                c.Registers.PC = 0x0200
+                c.Registers.P.Zero = false // ゼロフラグをクリア
+                c.WriteByteToWRAM(0x0200, 0xF0) // BEQ命令
+                c.WriteByteToWRAM(0x0201, 0x10) // オフセット: +16
+            },
+            expectedPC: 0x0202, // 分岐が行われないので、PC+2のみ
+        },
+    }
+
+    for _, tt := range tests {
+        t.Run(tt.name, func(t *testing.T) {
+            c := setupCPU()
+            tt.setupCPU(c)
+            
+            // CPU実行サイクルを使用して命令を実行
+            c.Execute()
+
+            // 結果を検証
+            if c.Registers.PC != tt.expectedPC {
+                t.Errorf("PC = %#04x, want %#04x", c.Registers.PC, tt.expectedPC)
+            }
+        })
+    }
+}
+
+// TestBNE はBNE命令（Branch if Not Equal）をテストします
+func TestBNE(t *testing.T) {
+    tests := []struct {
+        name       string
+        opcode     uint8
+        addrMode   AddressingMode
+        setupCPU   func(*CPU)
+        expectedPC uint16
+    }{
+        {
+            name:     "BNE - Branch taken (zero flag clear, positive offset)",
+            opcode:   0xD0,
+            addrMode: Relative,
+            setupCPU: func(c *CPU) {
+                c.Registers.PC = 0x0200
+                c.Registers.P.Zero = false // ゼロフラグをクリア
+                c.WriteByteToWRAM(0x0200, 0xD0) // BNE命令
+                c.WriteByteToWRAM(0x0201, 0x10) // オフセット: +16
+            },
+            expectedPC: 0x0212, // 0x0202 + 0x10 = 0x0212
+        },
+        {
+            name:     "BNE - Branch taken (zero flag clear, negative offset)",
+            opcode:   0xD0,
+            addrMode: Relative,
+            setupCPU: func(c *CPU) {
+                c.Registers.PC = 0x0200
+                c.Registers.P.Zero = false // ゼロフラグをクリア
+                c.WriteByteToWRAM(0x0200, 0xD0) // BNE命令
+                c.WriteByteToWRAM(0x0201, 0xF0) // オフセット: -16 (2の補数表現)
+            },
+            expectedPC: 0x01F2, // 0x0202 + 0xF0 (符号拡張で-16) = 0x01F2
+        },
+        {
+            name:     "BNE - Branch not taken (zero flag set)",
+            opcode:   0xD0,
+            addrMode: Relative,
+            setupCPU: func(c *CPU) {
+                c.Registers.PC = 0x0200
+                c.Registers.P.Zero = true // ゼロフラグをセット
+                c.WriteByteToWRAM(0x0200, 0xD0) // BNE命令
+                c.WriteByteToWRAM(0x0201, 0x10) // オフセット: +16
+            },
+            expectedPC: 0x0202, // 分岐が行われないので、PC+2のみ
+        },
+    }
+
+    for _, tt := range tests {
+        t.Run(tt.name, func(t *testing.T) {
+            c := setupCPU()
+            tt.setupCPU(c)
+            
+            // CPU実行サイクルを使用して命令を実行
+            c.Execute()
+
+            // 結果を検証
+            if c.Registers.PC != tt.expectedPC {
+                t.Errorf("PC = %#04x, want %#04x", c.Registers.PC, tt.expectedPC)
+            }
+        })
+    }
+}
