@@ -1,14 +1,13 @@
 package main
 
 import (
+	"Famicom-emulator/cpu"
 	"fmt"
 	"log"
 	"math/rand"
 	"os"
 	"time"
 	"unsafe"
-
-	"Famicom-emulator/cpu"
 
 	"github.com/veandco/go-sdl2/sdl"
 )
@@ -93,13 +92,13 @@ func createWindow(c *cpu.CPU) {
 				if e.State == sdl.PRESSED {
 					switch e.Keysym.Sym {
 					case sdl.K_w:
-						c.WriteByteToWRAM(0xFF, 0x77)
+						c.WriteByteAt(0xFF, 0x77)
 					case sdl.K_s:
-						c.WriteByteToWRAM(0xFF, 0x73)
+						c.WriteByteAt(0xFF, 0x73)
 					case sdl.K_a:
-						c.WriteByteToWRAM(0xFF, 0x61)
+						c.WriteByteAt(0xFF, 0x61)
 					case sdl.K_d:
-						c.WriteByteToWRAM(0xFF, 0x64)
+						c.WriteByteAt(0xFF, 0x64)
 					default:
 					}
 				}
@@ -107,7 +106,7 @@ func createWindow(c *cpu.CPU) {
 		}
 
 		// 0xFEに乱数を書き込み（1-15の範囲）
-		c.WriteByteToWRAM(0xFE, uint8(rand.Intn(15)+1))
+		c.WriteByteAt(0xFE, uint8(rand.Intn(15)+1))
 
 		// 画面状態の更新をチェックし、変更があれば描画
 		if readScreenState(c, &screenState) {
@@ -139,7 +138,7 @@ func readScreenState(c *cpu.CPU, frame *[32 * 3 * 32]uint8) bool {
 	frameIdx := 0
 	update := false
 	for i := 0x0200; i < 0x0600; i++ {
-		colorIdx := c.ReadByteFromWRAM(uint16(i))
+		colorIdx := c.ReadByteFrom(uint16(i))
 		col := color(colorIdx)
 		if frame[frameIdx] != col.R || frame[frameIdx+1] != col.G || frame[frameIdx+2] != col.B {
 			frame[frameIdx] = col.R
@@ -188,12 +187,12 @@ func runCPUTestGame() {
 
 	// スネークゲームは$0600 ~ をゲームデータとして使う
 	for _, data := range GAME {
-		c.WriteByteToWRAM(baseAddr, data)
+		c.WriteByteAt(baseAddr, data)
 		baseAddr++
 	}
 
 	// CPUは0xFFFCからの1wordをPCの初期値とする
-	c.WriteWordToWRAM(0xFFFC, 0x0600)
+	c.WriteWordAt(0xFFFC, 0x0600)
 	c.Init(true)
 
 	// ウィンドウとレンダラーを準備

@@ -3,10 +3,8 @@ package cpu
 import (
 	"fmt"
 	"log"
-)
 
-const (
-	CPU_WRAM_SIZE = 0xFFFF
+	"Famicom-emulator/bus"
 )
 
 // MARK: CPUの定義
@@ -14,8 +12,7 @@ type CPU struct {
 	Registers registers // レジスタ
 	InstructionSet instructionSet // 命令セット
 
-	wram [CPU_WRAM_SIZE+1]uint8 // WRAM
-
+	Bus bus.Bus
 	log bool // デバッグ出力フラグ
 }
 
@@ -43,8 +40,10 @@ func (c *CPU) Init(debug bool) {
 			Carry:     false,
 		},
 		SP: 0xFD,
-		PC: c.ReadWordFromWRAM(0xFFFC),
+		PC: c.ReadWordFrom(0xFFFC),
 	}
+	c.Bus = bus.Bus{}
+	c.Bus.Init()
 	c.InstructionSet = generateInstructionSet(c)
 	c.log = debug
 	// fmt.Println(c.wram[0x0600:0x0600+309])
@@ -53,7 +52,7 @@ func (c *CPU) Init(debug bool) {
 // MARK:  命令の実行
 func (c *CPU) Step() {
 	// 命令のフェッチ
-	opecode := c.ReadByteFromWRAM(c.Registers.PC)
+	opecode := c.ReadByteFrom(c.Registers.PC)
 
 	// 命令の出コード
 	instruction, exists := c.InstructionSet[opecode]
@@ -89,29 +88,23 @@ func (c *CPU) Run(callback func(c *CPU)) {
 
 
 // MARK: ワーキングメモリの参照 (1byte)
-func (c *CPU) ReadByteFromWRAM(address uint16) uint8 {
-	return c.wram[address]
+func (c *CPU) ReadByteFrom(address uint16) uint8 {
+	return c.Bus.ReadByteFrom(address)
 }
 
 // MARK: ワーキングメモリの参照 (2byte)
-func (c *CPU) ReadWordFromWRAM(address uint16) uint16 {
-	lower := c.ReadByteFromWRAM(address)
-	upper := c.ReadByteFromWRAM(address + 1)
-
-	return uint16(upper) << 8 | uint16((lower))
+func (c *CPU) ReadWordFrom(address uint16) uint16 {
+	return c.Bus.ReadWordFrom(address)
 }
 
 // MARK: ワーキングメモリへの書き込み (1byte)
-func (c *CPU) WriteByteToWRAM(address uint16, data uint8) {
-	c.wram[address] = data
+func (c *CPU) WriteByteAt(address uint16, data uint8) {
+	c.Bus.WriteByteAt(address, data)
 }
 
 // MARK: ワーキングメモリへの書き込み (2byte)
-func (c *CPU) WriteWordToWRAM(address uint16, data uint16) {
-	upper := uint8(data >> 8)
-	lower := uint8(data & 0xFF)
-	c.WriteByteToWRAM(address, lower)
-	c.WriteByteToWRAM(address + 1, upper)
+func (c *CPU) WriteWordAt(address uint16, data uint16) {
+	c.Bus.WriteWordAt(address, data)
 }
 
 
@@ -121,40 +114,40 @@ func (c *CPU) getOperandAddress(mode AddressingMode) uint16 {
 	case Immediate:
 		return c.Registers.PC
 	case ZeroPage:
-		return uint16(c.ReadByteFromWRAM(c.Registers.PC))
+		return uint16(c.ReadByteFrom(c.Registers.PC))
 	case Absolute:
-		return c.ReadWordFromWRAM(c.Registers.PC)
+		return c.ReadWordFrom(c.Registers.PC)
 	case ZeroPageXIndexed:
-		origin := c.ReadByteFromWRAM(c.Registers.PC)
+		origin := c.ReadByteFrom(c.Registers.PC)
 		return uint16(origin + c.Registers.X)
 	case ZeroPageYIndexed:
-		origin := c.ReadByteFromWRAM(c.Registers.PC)
+		origin := c.ReadByteFrom(c.Registers.PC)
 		return uint16(origin + c.Registers.Y)
 	case AbsoluteXIndexed:
-		origin := c.ReadWordFromWRAM(c.Registers.PC)
+		origin := c.ReadWordFrom(c.Registers.PC)
 		return origin + uint16(c.Registers.X)
 	case AbsoluteYIndexed:
-		origin := c.ReadWordFromWRAM(c.Registers.PC)
+		origin := c.ReadWordFrom(c.Registers.PC)
 		return origin + uint16(c.Registers.Y)
 	case Indirect:
-		ptr := c.ReadWordFromWRAM(c.Registers.PC)
+		ptr := c.ReadWordFrom(c.Registers.PC)
 		// ページ境界をまたぐ際のバグを再現
 		if (ptr & 0xFF) == 0xFF {
-			lower := c.ReadByteFromWRAM(ptr)
-			upper := c.ReadByteFromWRAM(ptr & 0xFF00)
+			lower := c.ReadByteFrom(ptr)
+			upper := c.ReadByteFrom(ptr & 0xFF00)
 			return uint16(upper) << 8 | uint16(lower)
 		} else {
-			return c.ReadWordFromWRAM(ptr)
+			return c.ReadWordFrom(ptr)
 		}
 	case IndirectXIndexed:
-		base := c.ReadByteFromWRAM(c.Registers.PC)
+		base := c.ReadByteFrom(c.Registers.PC)
 		ptr := base + c.Registers.X
-		return c.ReadWordFromWRAM(uint16(ptr))
+		return c.ReadWordFrom(uint16(ptr))
 	case IndirectYIndexed:
-		base := c.ReadByteFromWRAM(c.Registers.PC)
-		return c.ReadWordFromWRAM(uint16(base)) + uint16(c.Registers.Y)
+		base := c.ReadByteFrom(c.Registers.PC)
+		return c.ReadWordFrom(uint16(base)) + uint16(c.Registers.Y)
 	case Relative:
-		offset := int8(c.ReadByteFromWRAM(c.Registers.PC))
+		offset := int8(c.ReadByteFrom(c.Registers.PC))
 		return uint16(offset)
 	case Accumulator:
 		log.Fatalf("Error: Mode Accumulator doesn't take any operands")
@@ -191,35 +184,35 @@ func (c *CPU) updateNZFlags(result uint8) {
 // MARK: スタック操作
 func (c *CPU) pushByte(value uint8) {
 	stack_addr := 0x0100 | uint16(c.Registers.SP)
-	c.WriteByteToWRAM(stack_addr, value)
+	c.WriteByteAt(stack_addr, value)
 	c.Registers.SP--
 }
 
 func (c *CPU) pushWord(value uint16) {
 	stack_addr := 0x0100 | uint16(c.Registers.SP)
-	c.WriteByteToWRAM(stack_addr, (uint8(value >> 8)))
+	c.WriteByteAt(stack_addr, (uint8(value >> 8)))
 	c.Registers.SP--
 
 	stack_addr = 0x0100 | uint16(c.Registers.SP)
-	c.WriteByteToWRAM(stack_addr, (uint8(value & 0xFF)))
+	c.WriteByteAt(stack_addr, (uint8(value & 0xFF)))
 	c.Registers.SP--
 }
 
 func (c *CPU) popByte() uint8 {
 	c.Registers.SP++
 	stack_addr := 0x0100 | uint16(c.Registers.SP)
-	value := c.ReadByteFromWRAM(stack_addr)
+	value := c.ReadByteFrom(stack_addr)
 	return value
 }
 
 func (c *CPU) popWord() uint16 {
 	c.Registers.SP++
 	stack_addr := 0x0100 | uint16(c.Registers.SP)
-	lower := c.ReadByteFromWRAM(stack_addr)
+	lower := c.ReadByteFrom(stack_addr)
 
 	c.Registers.SP++
 	stack_addr = 0x0100 | uint16(c.Registers.SP)
-	upper := c.ReadByteFromWRAM(stack_addr)
+	upper := c.ReadByteFrom(stack_addr)
 
 	return uint16(upper) << 8 | uint16(lower)
 }
@@ -228,7 +221,7 @@ func (c *CPU) popWord() uint16 {
 // MARK: ADC命令の実装
 func (c *CPU) adc(mode AddressingMode) {
 	addr := c.getOperandAddress(mode)
-	value := c.ReadByteFromWRAM(addr)
+	value := c.ReadByteFrom(addr)
 	sum := uint16(c.Registers.A) + uint16(value)
 
 	if c.Registers.P.Carry {
@@ -251,7 +244,7 @@ func (c *CPU) adc(mode AddressingMode) {
 // MARK: AND命令の実装
 func (c *CPU) and(mode AddressingMode) {
 	addr := c.getOperandAddress(mode)
-	value := c.ReadByteFromWRAM(addr)
+	value := c.ReadByteFrom(addr)
 	c.Registers.A &= value
 
 	c.updateNZFlags(c.Registers.A)
@@ -265,10 +258,10 @@ func (c *CPU) asl(mode AddressingMode) {
 		c.updateNZFlags(c.Registers.A)
 	} else {
 		addr := c.getOperandAddress(mode)
-		value := c.ReadByteFromWRAM(addr)
+		value := c.ReadByteFrom(addr)
 		c.Registers.P.Carry = (value >> 7) != 0
 		value <<= 1
-		c.WriteByteToWRAM(addr, value)
+		c.WriteByteAt(addr, value)
 		c.updateNZFlags(value)
 	}
 }
@@ -300,7 +293,7 @@ func (c *CPU) beq(mode AddressingMode) {
 // MARK: BIT命令の実装
 func (c *CPU) bit(mode AddressingMode) {
 	addr := c.getOperandAddress(mode)
-	value := c.ReadByteFromWRAM(addr)
+	value := c.ReadByteFrom(addr)
 	mask := c.Registers.A
 
 	c.Registers.P.Zero = (value & mask) == 0x00
@@ -337,7 +330,7 @@ func (c *CPU) brk(mode AddressingMode) {
 	c.pushWord(c.Registers.PC + 1)
 	c.Registers.P.Break = true
 	c.pushByte(c.Registers.P.ToByte())
-	c.Registers.PC = c.ReadWordFromWRAM(0xFFFE)
+	c.Registers.PC = c.ReadWordFrom(0xFFFE)
 }
 
 // MARK: BVC命令の実装
@@ -379,7 +372,7 @@ func (c *CPU) clv(mode AddressingMode) {
 // MARK: CMP命令の実装
 func (c *CPU) cmp(mode AddressingMode) {
 	addr := c.getOperandAddress(mode)
-	value := c.ReadByteFromWRAM(addr)
+	value := c.ReadByteFrom(addr)
 
 	c.Registers.P.Carry = c.Registers.A >= value
 	c.updateNZFlags(c.Registers.A - value)
@@ -388,7 +381,7 @@ func (c *CPU) cmp(mode AddressingMode) {
 // MARK: CPX命令の実装
 func (c *CPU) cpx(mode AddressingMode) {
 	addr := c.getOperandAddress(mode)
-	value := c.ReadByteFromWRAM(addr)
+	value := c.ReadByteFrom(addr)
 
 	c.Registers.P.Carry = c.Registers.X >= value
 	c.updateNZFlags(c.Registers.X - value)
@@ -397,7 +390,7 @@ func (c *CPU) cpx(mode AddressingMode) {
 // MARK: CPY命令の実装
 func (c *CPU) cpy(mode AddressingMode) {
 	addr := c.getOperandAddress(mode)
-	value := c.ReadByteFromWRAM(addr)
+	value := c.ReadByteFrom(addr)
 
 	c.Registers.P.Carry = c.Registers.Y >= value
 	c.updateNZFlags(c.Registers.Y - value)
@@ -406,8 +399,8 @@ func (c *CPU) cpy(mode AddressingMode) {
 // MARK: DEC命令の実装
 func (c *CPU) dec(mode AddressingMode) {
 	addr := c.getOperandAddress(mode)
-	value := c.ReadByteFromWRAM(addr) - 1
-	c.WriteByteToWRAM(addr, value)
+	value := c.ReadByteFrom(addr) - 1
+	c.WriteByteAt(addr, value)
 	c.updateNZFlags(value)
 }
 
@@ -426,7 +419,7 @@ func (c *CPU) dey(mode AddressingMode) {
 // MARK: EOR命令の実装
 func (c *CPU) eor(mode AddressingMode) {
 	addr := c.getOperandAddress(mode)
-	value := c.ReadByteFromWRAM(addr)
+	value := c.ReadByteFrom(addr)
 	c.Registers.A ^= value
 	c.updateNZFlags(c.Registers.A)
 }
@@ -434,8 +427,8 @@ func (c *CPU) eor(mode AddressingMode) {
 // MARK: INC命令の実装
 func (c *CPU) inc(mode AddressingMode) {
 	addr := c.getOperandAddress(mode)
-	value := c.ReadByteFromWRAM(addr) + 1
-	c.WriteByteToWRAM(addr, value)
+	value := c.ReadByteFrom(addr) + 1
+	c.WriteByteAt(addr, value)
 	c.updateNZFlags(value)
 }
 
@@ -466,7 +459,7 @@ func (c *CPU) jsr(mode AddressingMode) {
 // MARK: LDA命令の実装
 func (c *CPU) lda(mode AddressingMode) {
 	addr := c.getOperandAddress(mode)
-	operand := c.ReadByteFromWRAM(addr)
+	operand := c.ReadByteFrom(addr)
 
 	c.Registers.A = uint8(operand)
 	c.updateNZFlags(c.Registers.A)
@@ -475,7 +468,7 @@ func (c *CPU) lda(mode AddressingMode) {
 // MARK: LDX命令の実装
 func (c *CPU) ldx(mode AddressingMode) {
 	addr := c.getOperandAddress(mode)
-	operand := c.ReadByteFromWRAM(addr)
+	operand := c.ReadByteFrom(addr)
 
 	c.Registers.X = uint8(operand)
 	c.updateNZFlags(c.Registers.X)
@@ -484,7 +477,7 @@ func (c *CPU) ldx(mode AddressingMode) {
 // MARK: LDY命令の実装
 func (c *CPU) ldy(mode AddressingMode) {
 	addr := c.getOperandAddress(mode)
-	operand := c.ReadByteFromWRAM(addr)
+	operand := c.ReadByteFrom(addr)
 
 	c.Registers.Y = uint8(operand)
 	c.updateNZFlags(c.Registers.Y)
@@ -498,10 +491,10 @@ func (c *CPU) lsr(mode AddressingMode) {
 		c.updateNZFlags(c.Registers.A)
 	} else {
 		addr := c.getOperandAddress(mode)
-		value := c.ReadByteFromWRAM(addr)
+		value := c.ReadByteFrom(addr)
 		c.Registers.P.Carry = (value & 0x01) != 0
 		value >>= 1
-		c.WriteByteToWRAM(addr, value)
+		c.WriteByteAt(addr, value)
 		c.updateNZFlags(value)
 	}
 }
@@ -513,7 +506,7 @@ func (c *CPU) nop(mode AddressingMode) {
 // MARK: ORA命令の実装
 func (c *CPU) ora(mode AddressingMode) {
 	addr := c.getOperandAddress(mode)
-	value := c.ReadByteFromWRAM(addr)
+	value := c.ReadByteFrom(addr)
 
 	c.Registers.A |= value
 	c.updateNZFlags(c.Registers.A)
@@ -554,7 +547,7 @@ func (c *CPU) rol(mode AddressingMode) {
 		c.updateNZFlags(c.Registers.A)
 	} else {
 		addr := c.getOperandAddress(mode)
-		value := c.ReadByteFromWRAM(addr)
+		value := c.ReadByteFrom(addr)
 
 		carry := value >> 7 != 0
 		value <<= 1
@@ -567,7 +560,7 @@ func (c *CPU) rol(mode AddressingMode) {
 		c.Registers.P.Negative = value >> 7 != 0
 		c.updateNZFlags(value)
 
-		c.WriteByteToWRAM(addr, value)
+		c.WriteByteAt(addr, value)
 	}
 }
 
@@ -585,7 +578,7 @@ func (c *CPU) ror(mode AddressingMode) {
 		c.updateNZFlags(c.Registers.A)
 	} else {
 		addr := c.getOperandAddress(mode)
-		value := c.ReadByteFromWRAM(addr)
+		value := c.ReadByteFrom(addr)
 
 		carry := value & 0x01 != 0
 		value >>= 1
@@ -598,7 +591,7 @@ func (c *CPU) ror(mode AddressingMode) {
 		c.Registers.P.Negative = value >> 7 != 0
 		c.updateNZFlags(value)
 
-		c.WriteByteToWRAM(addr, value)
+		c.WriteByteAt(addr, value)
 	}
 }
 
@@ -621,7 +614,7 @@ func (c *CPU) rts(mode AddressingMode) {
 // MARK: SBC命令の実装
 func (c *CPU) sbc(mode AddressingMode) {
 	addr := c.getOperandAddress(mode)
-	value := c.ReadByteFromWRAM(addr)
+	value := c.ReadByteFrom(addr)
 
 	sum := uint16(c.Registers.A) + uint16(^value)
 
@@ -657,19 +650,19 @@ func (c *CPU) sei(mode AddressingMode) {
 // MARK: STA命令の実装
 func (c *CPU) sta(mode AddressingMode) {
 	addr := c.getOperandAddress(mode)
-	c.WriteByteToWRAM(addr, c.Registers.A)
+	c.WriteByteAt(addr, c.Registers.A)
 }
 
 // MARK: STX命令の実装
 func (c *CPU) stx(mode AddressingMode) {
 	addr := c.getOperandAddress(mode)
-	c.WriteByteToWRAM(addr, c.Registers.X)
+	c.WriteByteAt(addr, c.Registers.X)
 }
 
 // MARK: STY命令の実装
 func (c *CPU) sty(mode AddressingMode) {
 	addr := c.getOperandAddress(mode)
-	c.WriteByteToWRAM(addr, c.Registers.Y)
+	c.WriteByteAt(addr, c.Registers.Y)
 }
 
 // MARK: TAX命令の実装
@@ -727,7 +720,7 @@ func (c *CPU) REPL(commands []uint8) {
 	c.Init(true)
 
 	for addr, opecode := range commands {
-		c.WriteByteToWRAM(uint16(addr), opecode)
+		c.WriteByteAt(uint16(addr), opecode)
 	}
 
 	for i := range commands {
