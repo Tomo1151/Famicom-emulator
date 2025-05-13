@@ -5,6 +5,7 @@ import (
 	"log"
 
 	"Famicom-emulator/bus"
+	"Famicom-emulator/cartridge"
 )
 
 // MARK: CPUの定義
@@ -19,7 +20,7 @@ type CPU struct {
 // MARK: CPUの作成関数
 func CreateCPU(debug bool) *CPU {
 	cpu := &CPU{}
-	cpu.Init(debug)
+	// cpu.Init(debug)
 	return cpu
 }
 
@@ -47,6 +48,30 @@ func (c *CPU) Init(debug bool) {
 	c.InstructionSet = generateInstructionSet(c)
 	c.log = debug
 	// fmt.Println(c.wram[0x0600:0x0600+309])
+}
+
+func (c *CPU) InitWithCartridge(cartridge *cartridge.Cartridge, debug bool) {
+	c.Bus = bus.Bus{}
+	c.Bus.InitWithCartridge(cartridge)
+	c.Registers = registers{
+		A: 0x00,
+		X: 0x00,
+		Y: 0x00,
+		P: statusRegister{
+			Negative:  false,
+			Overflow:  false,
+			Reserved:  true,
+			Break:     true,
+			Decimal:   false,
+			Interrupt: true,
+			Zero:      false,
+			Carry:     false,
+		},
+		SP: 0xFD,
+		PC: c.ReadWordFrom(0xFFFC),
+	}
+	c.InstructionSet = generateInstructionSet(c)
+	c.log = debug
 }
 
 // MARK:  命令の実行

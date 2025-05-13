@@ -1,6 +1,9 @@
 package bus
 
-import "fmt"
+import (
+	"Famicom-emulator/cartridge"
+	"fmt"
+)
 
 const (
 	CPU_WRAM_SIZE  = 2 * 1024 // 2kB
@@ -13,6 +16,7 @@ const (
 
 type Bus struct {
 	wram [CPU_WRAM_SIZE+1]uint8
+	cartridge cartridge.Cartridge
 }
 
 
@@ -23,6 +27,12 @@ func (b *Bus) Init() {
 	}
 }
 
+func (b *Bus) InitWithCartridge(cartridge *cartridge.Cartridge) {
+	for addr := range b.wram {
+		b.wram[addr] = 0x00
+	}
+	b.cartridge = *cartridge
+}
 
 
 // MARK: WRAMの読み取り/書き込み
@@ -35,6 +45,8 @@ func (b *Bus) ReadByteFrom(address uint16) uint8 {
 		ptr := address & 0b00100000_00000111
 		fmt.Printf("READ (PPU): $04%X\n", ptr)
 		return 0x0000
+	case 0x8000 <= address && address <= 0xFFFF:
+		return b.ReadProgramROM(address)
 	default:
 		fmt.Printf("READ (out of bounds): $%04X\n", address)
 		return 0x0000
@@ -55,7 +67,9 @@ func (b *Bus) WriteByteAt(address uint16, data uint8) {
 		b.wram[ptr] = data
 	case PPU_REG_START <= address && address <= PPU_REG_END:
 		ptr := address & 0b00100000_00000111
-		fmt.Printf("READ (PPU): $04%X\n", ptr)
+		fmt.Printf("READ (PPU): $%04X\n", ptr)
+	case 0x8000 <= address && address <= 0xFFFF:
+		fmt.Printf("READ (CART): $%04X\n", address)
 	default:
 		fmt.Printf("READ (out of bounds): $%04X\n", address)
 	}
@@ -66,4 +80,14 @@ func (b *Bus) WriteWordAt(address uint16, data uint16) {
 	lower := uint8(data & 0xFF)
 	b.WriteByteAt(address, lower)
 	b.WriteByteAt(address + 1, upper)
+}
+
+func (b *Bus) ReadProgramROM(address uint16) uint8 {
+	// fmt.Printf("READ PRG: $%04X -> $%04X\n", address, address - 0x8000)
+	// fmt.Println(b.cartridge)
+	address -= 0x8000
+	if len(b.cartridge.ProgramROM) == 0x4000 && address >= 0x4000 {
+		address %= 0x4000
+	}
+	return b.cartridge.ProgramROM[address]
 }
