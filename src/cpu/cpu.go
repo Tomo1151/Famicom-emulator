@@ -3,6 +3,7 @@ package cpu
 import (
 	"fmt"
 	"log"
+	"strings"
 
 	"Famicom-emulator/bus"
 	"Famicom-emulator/cartridge"
@@ -34,7 +35,7 @@ func (c *CPU) Init(debug bool) {
 			Negative:  false,
 			Overflow:  false,
 			Reserved:  true,
-			Break:     true,
+			Break:     false,
 			Decimal:   false,
 			Interrupt: true,
 			Zero:      false,
@@ -61,14 +62,14 @@ func (c *CPU) InitWithCartridge(cartridge *cartridge.Cartridge, debug bool) {
 			Negative:  false,
 			Overflow:  false,
 			Reserved:  true,
-			Break:     true,
+			Break:     false,
 			Decimal:   false,
 			Interrupt: true,
 			Zero:      false,
 			Carry:     false,
 		},
 		SP: 0xFD,
-		PC: c.ReadWordFrom(0xFFFC),
+		PC: 0xC000,
 	}
 	c.InstructionSet = generateInstructionSet(c)
 	c.log = debug
@@ -87,21 +88,55 @@ func (c *CPU) Step() {
 	}
 
 	if c.log {
-		fmt.Printf("opecode: $%02X (%s) from: $%04X\n", opecode, instruction.Code.ToString(), c.Registers.PC)
-	}
+		// 命令の長さに応じてバイトを表示
+		var byteStr string
+		switch instruction.Bytes {
+		case 1:
+				byteStr = fmt.Sprintf("%02X       ", opecode)
+		case 2:
+				byteStr = fmt.Sprintf("%02X %02X    ", opecode, c.ReadByteFrom(c.Registers.PC+1))
+		case 3:
+				byteStr = fmt.Sprintf("%02X %02X %02X ", opecode, c.ReadByteFrom(c.Registers.PC+1), c.ReadByteFrom(c.Registers.PC+2))
+		}
+		
+		// アドレッシングモードに応じた適切な表記を生成
+		var addrStr string
+		switch instruction.AddressingMode {
+		case Immediate:
+				addrStr = fmt.Sprintf("#$%02X", c.ReadByteFrom(c.Registers.PC+1))
+		case Relative:
+				offset := int8(c.ReadByteFrom(c.Registers.PC+1))
+				target := uint16(int32(c.Registers.PC+2) + int32(offset))
+				addrStr = fmt.Sprintf("$%04X", target)
+		case Absolute:
+				addrStr = fmt.Sprintf("$%04X", c.ReadWordFrom(c.Registers.PC+1))
+		// ...その他のアドレッシングモードも同様に処理
+		case Implied:
+				addrStr = ""
+		}
+		
+		fmt.Printf("%04X  %s %s %s%s A:%02X X:%02X Y:%02X P:%02X SP:%02X\n",
+				c.Registers.PC,
+				byteStr,
+				instruction.Code.ToString(),
+				addrStr,
+				strings.Repeat(" ", 25-len(addrStr)),
+				c.Registers.A, c.Registers.X, c.Registers.Y,
+				c.Registers.P.ToByte(), c.Registers.SP)
+}
 
 	// オペコード分プログラムカウンタを進める
-	c.Registers.PC++
+	// c.Registers.PC++
 	instruction.Handler(instruction.AddressingMode)
 
 	if instruction.Code != JMP && instruction.Code != JSR && instruction.Code != RTS && instruction.Code != RTI {
 		// オペランド分プログラムカウンタを進める (オペコードの分 -1)
-		c.Registers.PC += uint16(instruction.Bytes-1)
+		c.Registers.PC += uint16(instruction.Bytes)
 	}
 
-	if c.log {
-		fmt.Printf("PC: $%04X\n\n", c.Registers.PC)
-	}
+	// if c.log {
+	// 	fmt.Printf("PC: $%04X\n\n", c.Registers.PC)
+	// }
 }
 
 func (c *CPU) Run(callback func(c *CPU)) {
@@ -137,25 +172,25 @@ func (c *CPU) WriteWordAt(address uint16, data uint16) {
 func (c *CPU) getOperandAddress(mode AddressingMode) uint16 {
 	switch mode {
 	case Immediate:
-		return c.Registers.PC
+		return c.Registers.PC+1
 	case ZeroPage:
-		return uint16(c.ReadByteFrom(c.Registers.PC))
+		return uint16(c.ReadByteFrom(c.Registers.PC+1))
 	case Absolute:
-		return c.ReadWordFrom(c.Registers.PC)
+		return c.ReadWordFrom(c.Registers.PC+1)
 	case ZeroPageXIndexed:
-		origin := c.ReadByteFrom(c.Registers.PC)
+		origin := c.ReadByteFrom(c.Registers.PC+1)
 		return uint16(origin + c.Registers.X)
 	case ZeroPageYIndexed:
-		origin := c.ReadByteFrom(c.Registers.PC)
+		origin := c.ReadByteFrom(c.Registers.PC+1)
 		return uint16(origin + c.Registers.Y)
 	case AbsoluteXIndexed:
-		origin := c.ReadWordFrom(c.Registers.PC)
+		origin := c.ReadWordFrom(c.Registers.PC+1)
 		return origin + uint16(c.Registers.X)
 	case AbsoluteYIndexed:
-		origin := c.ReadWordFrom(c.Registers.PC)
+		origin := c.ReadWordFrom(c.Registers.PC+1)
 		return origin + uint16(c.Registers.Y)
 	case Indirect:
-		ptr := c.ReadWordFrom(c.Registers.PC)
+		ptr := c.ReadWordFrom(c.Registers.PC+1)
 		// ページ境界をまたぐ際のバグを再現
 		if (ptr & 0xFF) == 0xFF {
 			lower := c.ReadByteFrom(ptr)
@@ -165,23 +200,29 @@ func (c *CPU) getOperandAddress(mode AddressingMode) uint16 {
 			return c.ReadWordFrom(ptr)
 		}
 	case IndirectXIndexed:
-		base := c.ReadByteFrom(c.Registers.PC)
-		ptr := base + c.Registers.X
-		return c.ReadWordFrom(uint16(ptr))
+		base := c.ReadByteFrom(c.Registers.PC+1)
+		ptr := uint8(base + c.Registers.X)
+		lower := c.ReadByteFrom(uint16(ptr))
+		upper := c.ReadByteFrom(uint16(ptr + 1) & 0xFF)
+		return uint16(upper) << 8 | uint16(lower)
 	case IndirectYIndexed:
-		base := c.ReadByteFrom(c.Registers.PC)
-		return c.ReadWordFrom(uint16(base)) + uint16(c.Registers.Y)
+		base := c.ReadByteFrom(c.Registers.PC+1)
+		ptr := uint8(base)
+		lower := c.ReadByteFrom(uint16(ptr))
+		upper := c.ReadByteFrom(uint16(ptr + 1) & 0xFF)
+		addr := uint16(upper) << 8 | uint16(lower)
+		return addr + uint16(c.Registers.Y)
 	case Relative:
-		offset := int8(c.ReadByteFrom(c.Registers.PC))
+		offset := int8(c.ReadByteFrom(c.Registers.PC+1))
 		return uint16(offset)
 	case Accumulator:
-		log.Fatalf("Error: Mode Accumulator doesn't take any operands")
+		// log.Fatalf("Error: Mode Accumulator doesn't take any operands")
 		return 0x0000
 	case Implied:
-		log.Fatalf("Error: Mode Implied doesn't take any operands")
+		// log.Fatalf("Error: Mode Implied doesn't take any operands")
 		return 0x0000
 	default:
-		log.Fatalf("Error: Unsupported addressing type '%v'", mode)
+		// log.Fatalf("Error: Unsupported addressing type '%v'", mode)
 		return 0x0000
 	}
 }
@@ -322,8 +363,8 @@ func (c *CPU) bit(mode AddressingMode) {
 	mask := c.Registers.A
 
 	c.Registers.P.Zero = (value & mask) == 0x00
-	c.Registers.P.Overflow = (value >> 6) != 0
-	c.Registers.P.Negative = (value >> 7) != 0
+	c.Registers.P.Overflow = (value & 0b0100_0000) != 0
+	c.Registers.P.Negative = (value & 0b1000_0000) != 0
 }
 
 // MARK: BMI命令の実装
@@ -476,7 +517,7 @@ func (c *CPU) jmp(mode AddressingMode) {
 
 // MARK: JSR命令の実装
 func (c *CPU) jsr(mode AddressingMode) {
-	c.pushWord(c.Registers.PC + 1)
+	c.pushWord(c.Registers.PC + 2)
 	addr := c.getOperandAddress(mode)
 	c.Registers.PC = addr
 }
@@ -544,7 +585,9 @@ func (c *CPU) pha(mode AddressingMode) {
 
 // MARK: PHP命令の実装
 func (c *CPU) php(mode AddressingMode) {
-	c.pushByte(c.Registers.P.ToByte())
+	// PHPでプッシュされるステータスレジスタはブレークフラグが立つ
+	// 参考: https://pgate1.at-ninja.jp/NES_on_FPGA/nes_cpu.htm#trap
+	c.pushByte(c.Registers.P.ToByte() | 0x30)
 }
 
 // MARK: PLA命令の実装
@@ -555,7 +598,10 @@ func (c *CPU) pla(mode AddressingMode) {
 
 // MARK: PLP命令の実装
 func (c *CPU) plp(mode AddressingMode) {
-	c.Registers.P.SetFromByte(c.popByte())
+	value := c.popByte()
+	// PLPでフラグレジスタを復元するときには常にBreakはリセット, Reservedはセット?
+	value = (value &^ 0x10) | 0x20
+	c.Registers.P.SetFromByte(value)
 }
 
 // MARK: ROL命令の実装
@@ -625,6 +671,8 @@ func (c *CPU) rti(mode AddressingMode) {
 	status := c.popByte()
 	addr := c.popWord()
 
+	// RTIかにて復帰時には常にBreakはリセット, Reservedはセット？
+	status = (status &^ 0x10) | 0x20
 	c.Registers.P.SetFromByte(status)
 	c.Registers.PC = addr
 	c.Registers.P.Break = false

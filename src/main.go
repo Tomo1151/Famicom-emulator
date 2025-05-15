@@ -16,7 +16,7 @@ import (
 func main() {
 	fmt.Println("Hello, world!")
 
-	filedata, err := os.ReadFile("../rom/snake.nes")
+	filedata, err := os.ReadFile("../rom/nestest.nes")
 
 	if err != nil {
 		log.Fatalf("Error occured in 'os.ReadFile()'")
@@ -199,6 +199,8 @@ func runCPUTestGame(cartridge *cartridge.Cartridge) {
 	c := cpu.CreateCPU(true)
 
 	c.InitWithCartridge(cartridge, true)
+
+	fmt.Printf("Entry point: $%04X\n", c.ReadByteFrom(0xFFFC))
 
 	// ウィンドウとレンダラーを準備
 	createWindow(c)

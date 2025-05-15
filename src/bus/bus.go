@@ -2,7 +2,6 @@ package bus
 
 import (
 	"Famicom-emulator/cartridge"
-	"fmt"
 )
 
 const (
@@ -42,13 +41,13 @@ func (b *Bus) ReadByteFrom(address uint16) uint8 {
 		ptr := address & 0b00000111_11111111 // 11bitにマスク
 		return b.wram[ptr]
 	case PPU_REG_START <= address && address <= PPU_REG_END:
-		ptr := address & 0b00100000_00000111
-		fmt.Printf("READ (PPU): $04%X\n", ptr)
+		// ptr := address & 0b00100000_00000111
+		// fmt.Printf("READ (PPU): $04%X\n", ptr)
 		return 0x0000
 	case 0x8000 <= address && address <= 0xFFFF:
 		return b.ReadProgramROM(address)
 	default:
-		fmt.Printf("READ (out of bounds): $%04X\n", address)
+		// fmt.Printf("READ (out of bounds): $%04X\n", address)
 		return 0x0000
 	}
 }
@@ -66,12 +65,12 @@ func (b *Bus) WriteByteAt(address uint16, data uint8) {
 		ptr := address & 0b00000111_11111111 // 11bitにマスク
 		b.wram[ptr] = data
 	case PPU_REG_START <= address && address <= PPU_REG_END:
-		ptr := address & 0b00100000_00000111
-		fmt.Printf("READ (PPU): $%04X\n", ptr)
+		// ptr := address & 0b00100000_00000111
+		// fmt.Printf("READ (PPU): $%04X\n", ptr)
 	case 0x8000 <= address && address <= 0xFFFF:
-		fmt.Printf("READ (CART): $%04X\n", address)
+		// fmt.Printf("READ (CART): $%04X\n", address)
 	default:
-		fmt.Printf("READ (out of bounds): $%04X\n", address)
+		// fmt.Printf("READ (out of bounds): $%04X\n", address)
 	}
 }
 
@@ -89,5 +88,6 @@ func (b *Bus) ReadProgramROM(address uint16) uint8 {
 	if len(b.cartridge.ProgramROM) == 0x4000 && address >= 0x4000 {
 		address %= 0x4000
 	}
+	// fmt.Printf("CARTRIDGE: $%04X\n", address)
 	return b.cartridge.ProgramROM[address]
 }
