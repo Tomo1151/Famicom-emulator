@@ -285,6 +285,16 @@ func (c *CPU) popWord() uint16 {
 }
 
 
+// MARK: AAC命令の実装
+func (c *CPU) aac(mode AddressingMode) {
+	// @TODO 実装
+}
+
+// MARK: AAX命令の実装
+func (c *CPU) aax(mode AddressingMode) {
+	// @TODO 実装
+}
+
 // MARK: ADC命令の実装
 func (c *CPU) adc(mode AddressingMode) {
 	addr := c.getOperandAddress(mode)
@@ -317,6 +327,11 @@ func (c *CPU) and(mode AddressingMode) {
 	c.updateNZFlags(c.Registers.A)
 }
 
+// MARK: ARR命令の実装
+func (c *CPU) arr(mode AddressingMode) {
+	// @TODO 実装
+}
+
 // MARK: ASL命令の実装
 func (c *CPU) asl(mode AddressingMode) {
 	if mode == Accumulator {
@@ -331,6 +346,26 @@ func (c *CPU) asl(mode AddressingMode) {
 		c.WriteByteAt(addr, value)
 		c.updateNZFlags(value)
 	}
+}
+
+// MARK: ASR命令の実装
+func (c *CPU) asr(mode AddressingMode) {
+	// @TODO 実装
+}
+
+// MARK: ATX命令の実装
+func (c *CPU) atx(mode AddressingMode) {
+	// @TODO 実装
+}
+
+// MARK: AXA命令の実装
+func (c *CPU) axa(mode AddressingMode) {
+	// @TODO 実装
+}
+
+// MARK: AXS命令の実装
+func (c *CPU) axs(mode AddressingMode) {
+	// @TODO 実装
 }
 
 // MARK: BCC命令の実装
@@ -463,6 +498,11 @@ func (c *CPU) cpy(mode AddressingMode) {
 	c.updateNZFlags(c.Registers.Y - value)
 }
 
+// MARK: DCP命令の実装
+func (c *CPU) dcp(mode AddressingMode) {
+	// @TODO 実装
+}
+
 // MARK: DEC命令の実装
 func (c *CPU) dec(mode AddressingMode) {
 	addr := c.getOperandAddress(mode)
@@ -481,6 +521,11 @@ func (c *CPU) dex(mode AddressingMode) {
 func (c *CPU) dey(mode AddressingMode) {
 	c.Registers.Y--
 	c.updateNZFlags(c.Registers.Y)
+}
+
+// MARK: DOP命令の実装
+func (c *CPU) dop(mode AddressingMode) {
+	// @TODO 実装
 }
 
 // MARK: EOR命令の実装
@@ -511,6 +556,11 @@ func (c *CPU) iny(mode AddressingMode) {
 	c.updateNZFlags(c.Registers.Y)
 }
 
+// MARK: ISC命令の実装
+func (c *CPU) isc(mode AddressingMode) {
+	// @TODO 実装
+}
+
 // MARK: JMP命令の実装
 func (c *CPU) jmp(mode AddressingMode) {
 	c.Registers.PC = c.getOperandAddress(mode)
@@ -521,6 +571,21 @@ func (c *CPU) jsr(mode AddressingMode) {
 	c.pushWord(c.Registers.PC + 2)
 	addr := c.getOperandAddress(mode)
 	c.Registers.PC = addr
+}
+
+// MARK: KIL命令の実装
+func (c *CPU) kil(mode AddressingMode) {
+	// @TODO 実装
+}
+
+// MARK: LAR命令の実装
+func (c *CPU) lar(mode AddressingMode) {
+	// @TODO 実装
+}
+
+// MARK: LAX命令の実装
+func (c *CPU) lax(mode AddressingMode) {
+	// @TODO 実装
 }
 
 // MARK: LDA命令の実装
@@ -636,6 +701,11 @@ func (c *CPU) rol(mode AddressingMode) {
 	}
 }
 
+// MARK: RLA命令の実装
+func (c *CPU) rla(mode AddressingMode) {
+	// @TODO 実装
+}
+
 // MARK: ROR命令の実装
 func (c *CPU) ror(mode AddressingMode) {
 	if mode == Accumulator {
@@ -665,6 +735,11 @@ func (c *CPU) ror(mode AddressingMode) {
 
 		c.WriteByteAt(addr, value)
 	}
+}
+
+// MARK: RRA命令の実装
+func (c *CPU) rra(mode AddressingMode) {
+	// @TODO 実装
 }
 
 // MARK: RTI命令の実装
@@ -721,6 +796,16 @@ func (c *CPU) sei(mode AddressingMode) {
 	c.Registers.P.Interrupt = true
 }
 
+// MARK: SLO命令の実装
+func (c *CPU) slo(mode AddressingMode) {
+	// @TODO 実装
+}
+
+// MARK: SRE命令の実装
+func (c *CPU) sre(mode AddressingMode) {
+	// @TODO 実装
+}
+
 // MARK: STA命令の実装
 func (c *CPU) sta(mode AddressingMode) {
 	addr := c.getOperandAddress(mode)
@@ -739,6 +824,16 @@ func (c *CPU) sty(mode AddressingMode) {
 	c.WriteByteAt(addr, c.Registers.Y)
 }
 
+// MARK: SXA命令の実装
+func (c *CPU) sxa(mode AddressingMode) {
+	// @TODO 実装
+}
+
+// MARK: SYA命令の実装
+func (c *CPU) sya(mode AddressingMode) {
+	// @TODO 実装
+}
+
 // MARK: TAX命令の実装
 func (c *CPU) tax(mode AddressingMode) {
 	c.Registers.X = c.Registers.A
@@ -749,6 +844,11 @@ func (c *CPU) tax(mode AddressingMode) {
 func (c *CPU) tay(mode AddressingMode) {
 	c.Registers.Y = c.Registers.A
 	c.updateNZFlags(c.Registers.Y)
+}
+
+// MARK: TOP命令の実装
+func (c *CPU) top(mode AddressingMode) {
+	// @TODO 実装
 }
 
 // MARK: TSX命令の実装
@@ -772,6 +872,16 @@ func (c *CPU) txs(mode AddressingMode) {
 func (c *CPU) tya(mode AddressingMode) {
 	c.Registers.A = c.Registers.Y
 	c.updateNZFlags(c.Registers.A)
+}
+
+// MARK: XAA命令の実装
+func (c *CPU) xaa(mode AddressingMode) {
+	// @TODO 実装
+}
+
+// MARK: XAS命令の実装
+func (c *CPU) xas(mode AddressingMode) {
+	// @TODO 実装
 }
 
 

@@ -44,9 +44,16 @@ const (
 
 
 const (
-	ADC InstructionCode = iota
+	AAC InstructionCode = iota
+	AAX
+	ADC
 	AND
+	ARR
 	ASL
+	ASR
+	ATX
+	AXA
+	AXS
 	BCC
 	BCS
 	BEQ
@@ -64,15 +71,21 @@ const (
 	CMP
 	CPX
 	CPY
+	DCP
 	DEC
 	DEX
 	DEY
+	DOP
 	EOR
 	INC
 	INX
 	INY
+	ISC
 	JMP
 	JSR
+	KIL
+	LAR
+	LAX
 	LDA
 	LDX
 	LDY
@@ -83,29 +96,102 @@ const (
 	PHP
 	PLA
 	PLP
+	RLA
 	ROL
 	ROR
+	RRA
 	RTI
 	RTS
 	SBC
 	SEC
 	SED
 	SEI
+	SLO
+	SRE
 	STA
 	STX
 	STY
+	SXA
+	SYA
 	TAX
 	TAY
+	TOP
 	TSX
 	TXA
 	TXS
 	TYA
+	XAA
+	XAS
 )
 
 
 // 命令セットの生成
 func generateInstructionSet(c *CPU) instructionSet {
 	instructionSet := make(instructionSet)
+
+	// MARK: AAC命令
+	instructionSet[0x0B] = Instruction{
+		Opecode: 0x0B,
+		Code: AAC,
+		AddressingMode: Immediate,
+		Bytes: 2,
+		Cycles: 2,
+		PageCycles: 0,
+		Handler: c.aac,
+	}
+
+	instructionSet[0x2B] = Instruction{
+		Opecode: 0x2B,
+		Code: AAC,
+		AddressingMode: Immediate,
+		Bytes: 2,
+		Cycles: 2,
+		PageCycles: 0,
+		Handler: c.aac,
+	}
+
+
+	// MARK: AAX命令
+	instructionSet[0x87] = Instruction{
+		Opecode: 0x87,
+		Code: AAX,
+		AddressingMode: ZeroPage,
+		Bytes: 2,
+		Cycles: 3,
+		PageCycles: 0,
+		Handler: c.aax,
+	}
+
+	instructionSet[0x97] = Instruction{
+		Opecode: 0x97,
+		Code: AAX,
+		AddressingMode: ZeroPageYIndexed,
+		Bytes: 2,
+		Cycles: 4,
+		PageCycles: 0,
+		Handler: c.aax,
+	}
+
+	instructionSet[0x83] = Instruction{
+		Opecode: 0x83,
+		Code: AAX,
+		AddressingMode: ZeroPageXIndexed,
+		Bytes: 2,
+		Cycles: 6,
+		PageCycles: 0,
+		Handler: c.aax,
+	}
+
+	instructionSet[0x8F] = Instruction{
+		Opecode: 0x8F,
+		Code: AAX,
+		AddressingMode: Absolute,
+		Bytes: 3,
+		Cycles: 4,
+		PageCycles: 0,
+		Handler: c.aax,
+	}
+
 
 	// MARK: ADC命令
 	instructionSet[0x69] = Instruction{
@@ -271,6 +357,18 @@ func generateInstructionSet(c *CPU) instructionSet {
 	}
 
 
+	// MARK: ARR命令
+	instructionSet[0x6B] = Instruction{
+		Opecode: 0x6B,
+		Code: ARR,
+		AddressingMode: Immediate,
+		Bytes: 2,
+		Cycles: 2,
+		PageCycles: 0,
+		Handler: c.arr,
+	}
+
+
 	// MARK: ASL命令
 	instructionSet[0x0A] = Instruction{
 		Opecode: 0x0A,
@@ -320,6 +418,64 @@ func generateInstructionSet(c *CPU) instructionSet {
 		Cycles: 7,
 		PageCycles: 0,
 		Handler: c.asl,
+	}
+
+
+	// MARK: ASR命令
+	instructionSet[0x4B] = Instruction{
+		Opecode: 0x4B,
+		Code: ASR,
+		AddressingMode: Immediate,
+		Bytes: 2,
+		Cycles: 2,
+		PageCycles: 0,
+		Handler: c.aax,
+	}
+
+
+	// MARK: ATX命令
+	instructionSet[0xAB] = Instruction{
+		Opecode: 0xAB,
+		Code: ATX,
+		AddressingMode: Immediate,
+		Bytes: 2,
+		Cycles: 2,
+		PageCycles: 0,
+		Handler: c.atx,
+	}
+
+
+	// MARK: AXA命令
+	instructionSet[0x9F] = Instruction{
+		Opecode: 0x9F,
+		Code: AXA,
+		AddressingMode: AbsoluteYIndexed,
+		Bytes: 3,
+		Cycles: 5,
+		PageCycles: 0,
+		Handler: c.axa,
+	}
+
+	instructionSet[0x93] = Instruction{
+		Opecode: 0x93,
+		Code: AXA,
+		AddressingMode: IndirectYIndexed,
+		Bytes: 2,
+		Cycles: 6,
+		PageCycles: 0,
+		Handler: c.axa,
+	}
+
+
+	// MARK: AXS命令
+		instructionSet[0xCB] = Instruction{
+		Opecode: 0xCB,
+		Code: AXS,
+		AddressingMode: Immediate,
+		Bytes: 2,
+		Cycles: 2,
+		PageCycles: 0,
+		Handler: c.axs,
 	}
 
 
@@ -647,6 +803,78 @@ func generateInstructionSet(c *CPU) instructionSet {
 	}
 
 
+	// MARK: DCP命令
+	instructionSet[0xC7] = Instruction{
+		Opecode: 0xC7,
+		Code: DCP,
+		AddressingMode: ZeroPage,
+		Bytes: 2,
+		Cycles: 5,
+		PageCycles: 0,
+		Handler: c.dcp,
+	}
+
+	instructionSet[0xD7] = Instruction{
+		Opecode: 0xD7,
+		Code: DCP,
+		AddressingMode: ZeroPageXIndexed,
+		Bytes: 2,
+		Cycles: 6,
+		PageCycles: 0,
+		Handler: c.dcp,
+	}
+
+	instructionSet[0xCF] = Instruction{
+		Opecode: 0xCF,
+		Code: DCP,
+		AddressingMode: Absolute,
+		Bytes: 3,
+		Cycles: 6,
+		PageCycles: 0,
+		Handler: c.dcp,
+	}
+
+	instructionSet[0xDF] = Instruction{
+		Opecode: 0xDF,
+		Code: DCP,
+		AddressingMode: AbsoluteXIndexed,
+		Bytes: 3,
+		Cycles: 7,
+		PageCycles: 0,
+		Handler: c.dcp,
+	}
+
+	instructionSet[0xDB] = Instruction{
+		Opecode: 0xDB,
+		Code: DCP,
+		AddressingMode: AbsoluteYIndexed,
+		Bytes: 3,
+		Cycles: 7,
+		PageCycles: 0,
+		Handler: c.dcp,
+	}
+
+	instructionSet[0xC3] = Instruction{
+		Opecode: 0xC3,
+		Code: DCP,
+		AddressingMode: IndirectXIndexed,
+		Bytes: 2,
+		Cycles: 8,
+		PageCycles: 0,
+		Handler: c.dcp,
+	}
+
+	instructionSet[0xD3] = Instruction{
+		Opecode: 0xD3,
+		Code: DCP,
+		AddressingMode: IndirectYIndexed,
+		Bytes: 2,
+		Cycles: 8,
+		PageCycles: 0,
+		Handler: c.dcp,
+	}
+
+
 	// MARK: DEC命令
 	instructionSet[0xC6] = Instruction{
 		Opecode: 0xC6,
@@ -710,6 +938,148 @@ func generateInstructionSet(c *CPU) instructionSet {
 		Cycles: 2,
 		PageCycles: 0,
 		Handler: c.dey,
+	}
+
+
+	// MARK: DOP命令
+	instructionSet[0x04] = Instruction{
+		Opecode: 0x04,
+		Code: DOP,
+		AddressingMode: ZeroPage,
+		Bytes: 2,
+		Cycles: 3,
+		PageCycles: 0,
+		Handler: c.dop,
+	}
+
+	instructionSet[0x14] = Instruction{
+		Opecode: 0x14,
+		Code: DOP,
+		AddressingMode: ZeroPageXIndexed,
+		Bytes: 2,
+		Cycles: 4,
+		PageCycles: 0,
+		Handler: c.dop,
+	}
+
+	instructionSet[0x34] = Instruction{
+		Opecode: 0x34,
+		Code: DOP,
+		AddressingMode: ZeroPageXIndexed,
+		Bytes: 2,
+		Cycles: 4,
+		PageCycles: 0,
+		Handler: c.dop,
+	}
+
+	instructionSet[0x44] = Instruction{
+		Opecode: 0x44,
+		Code: DOP,
+		AddressingMode: ZeroPage,
+		Bytes: 2,
+		Cycles: 3,
+		PageCycles: 0,
+		Handler: c.dop,
+	}
+
+	instructionSet[0x54] = Instruction{
+		Opecode: 0x54,
+		Code: DOP,
+		AddressingMode: ZeroPageXIndexed,
+		Bytes: 2,
+		Cycles: 4,
+		PageCycles: 0,
+		Handler: c.dop,
+	}
+
+	instructionSet[0x64] = Instruction{
+		Opecode: 0x64,
+		Code: DOP,
+		AddressingMode: ZeroPage,
+		Bytes: 2,
+		Cycles: 3,
+		PageCycles: 0,
+		Handler: c.dop,
+	}
+
+	instructionSet[0x74] = Instruction{
+		Opecode: 0x74,
+		Code: DOP,
+		AddressingMode: ZeroPageXIndexed,
+		Bytes: 2,
+		Cycles: 4,
+		PageCycles: 0,
+		Handler: c.dop,
+	}
+
+	instructionSet[0x80] = Instruction{
+		Opecode: 0x80,
+		Code: DOP,
+		AddressingMode: Immediate,
+		Bytes: 2,
+		Cycles: 2,
+		PageCycles: 0,
+		Handler: c.dop,
+	}
+
+	instructionSet[0x82] = Instruction{
+		Opecode: 0x82,
+		Code: DOP,
+		AddressingMode: Immediate,
+		Bytes: 2,
+		Cycles: 2,
+		PageCycles: 0,
+		Handler: c.dop,
+	}
+
+	instructionSet[0x89] = Instruction{
+		Opecode: 0x89,
+		Code: DOP,
+		AddressingMode: Immediate,
+		Bytes: 2,
+		Cycles: 2,
+		PageCycles: 0,
+		Handler: c.dop,
+	}
+
+	instructionSet[0xC2] = Instruction{
+		Opecode: 0xC2,
+		Code: DOP,
+		AddressingMode: Immediate,
+		Bytes: 2,
+		Cycles: 2,
+		PageCycles: 0,
+		Handler: c.dop,
+	}
+
+	instructionSet[0xD4] = Instruction{
+		Opecode: 0xD4,
+		Code: DOP,
+		AddressingMode: ZeroPageXIndexed,
+		Bytes: 2,
+		Cycles: 4,
+		PageCycles: 0,
+		Handler: c.dop,
+	}
+
+	instructionSet[0xE2] = Instruction{
+		Opecode: 0xE2,
+		Code: DOP,
+		AddressingMode: Immediate,
+		Bytes: 2,
+		Cycles: 2,
+		PageCycles: 0,
+		Handler: c.dop,
+	}
+
+	instructionSet[0xF4] = Instruction{
+		Opecode: 0xF4,
+		Code: DOP,
+		AddressingMode: ZeroPageXIndexed,
+		Bytes: 2,
+		Cycles: 4,
+		PageCycles: 0,
+		Handler: c.dop,
 	}
 
 
@@ -861,6 +1231,78 @@ func generateInstructionSet(c *CPU) instructionSet {
 	}
 
 
+	// MARK: ISC命令
+	instructionSet[0xE7] = Instruction{
+		Opecode: 0xE7,
+		Code: ISC,
+		AddressingMode: ZeroPage,
+		Bytes: 2,
+		Cycles: 5,
+		PageCycles: 0,
+		Handler: c.isc,
+	}
+
+	instructionSet[0xF7] = Instruction{
+		Opecode: 0xF7,
+		Code: ISC,
+		AddressingMode: ZeroPageXIndexed,
+		Bytes: 2,
+		Cycles: 6,
+		PageCycles: 0,
+		Handler: c.isc,
+	}
+
+	instructionSet[0xEF] = Instruction{
+		Opecode: 0xEF,
+		Code: ISC,
+		AddressingMode: Absolute,
+		Bytes: 3,
+		Cycles: 6,
+		PageCycles: 0,
+		Handler: c.isc,
+	}
+
+	instructionSet[0xFF] = Instruction{
+		Opecode: 0xFF,
+		Code: ISC,
+		AddressingMode: AbsoluteXIndexed,
+		Bytes: 3,
+		Cycles: 7,
+		PageCycles: 0,
+		Handler: c.isc,
+	}
+
+	instructionSet[0xFB] = Instruction{
+		Opecode: 0xFB,
+		Code: ISC,
+		AddressingMode: AbsoluteYIndexed,
+		Bytes: 3,
+		Cycles: 7,
+		PageCycles: 0,
+		Handler: c.isc,
+	}
+
+	instructionSet[0xE3] = Instruction{
+		Opecode: 0xE3,
+		Code: ISC,
+		AddressingMode: IndirectXIndexed,
+		Bytes: 2,
+		Cycles: 8,
+		PageCycles: 0,
+		Handler: c.isc,
+	}
+
+	instructionSet[0xF3] = Instruction{
+		Opecode: 0xF3,
+		Code: ISC,
+		AddressingMode: IndirectYIndexed,
+		Bytes: 2,
+		Cycles: 8,
+		PageCycles: 0,
+		Handler: c.isc,
+	}
+
+
 	// MARK: JMP命令
 	instructionSet[0x4C] = Instruction{
 		Opecode: 0x4C,
@@ -892,6 +1334,202 @@ func generateInstructionSet(c *CPU) instructionSet {
 		Cycles: 6,
 		PageCycles: 0,
 		Handler: c.jsr,
+	}
+
+
+	// MARK: KIL命令
+	instructionSet[0x02] = Instruction{
+		Opecode: 0x02,
+		Code: KIL,
+		AddressingMode: Implied,
+		Bytes: 1,
+		Cycles: 0,
+		PageCycles: 0,
+		Handler: c.kil,
+	}
+
+	instructionSet[0x12] = Instruction{
+		Opecode: 0x12,
+		Code: KIL,
+		AddressingMode: Implied,
+		Bytes: 1,
+		Cycles: 0,
+		PageCycles: 0,
+		Handler: c.kil,
+	}
+
+	instructionSet[0x22] = Instruction{
+		Opecode: 0x22,
+		Code: KIL,
+		AddressingMode: Implied,
+		Bytes: 1,
+		Cycles: 0,
+		PageCycles: 0,
+		Handler: c.kil,
+	}
+
+	instructionSet[0x32] = Instruction{
+		Opecode: 0x32,
+		Code: KIL,
+		AddressingMode: Implied,
+		Bytes: 1,
+		Cycles: 0,
+		PageCycles: 0,
+		Handler: c.kil,
+	}
+
+	instructionSet[0x42] = Instruction{
+		Opecode: 0x42,
+		Code: KIL,
+		AddressingMode: Implied,
+		Bytes: 1,
+		Cycles: 0,
+		PageCycles: 0,
+		Handler: c.kil,
+	}
+
+	instructionSet[0x52] = Instruction{
+		Opecode: 0x52,
+		Code: KIL,
+		AddressingMode: Implied,
+		Bytes: 1,
+		Cycles: 0,
+		PageCycles: 0,
+		Handler: c.kil,
+	}
+
+	instructionSet[0x62] = Instruction{
+		Opecode: 0x62,
+		Code: KIL,
+		AddressingMode: Implied,
+		Bytes: 1,
+		Cycles: 0,
+		PageCycles: 0,
+		Handler: c.kil,
+	}
+
+	instructionSet[0x72] = Instruction{
+		Opecode: 0x72,
+		Code: KIL,
+		AddressingMode: Implied,
+		Bytes: 1,
+		Cycles: 0,
+		PageCycles: 0,
+		Handler: c.kil,
+	}
+
+	instructionSet[0x92] = Instruction{
+		Opecode: 0x92,
+		Code: KIL,
+		AddressingMode: Implied,
+		Bytes: 1,
+		Cycles: 0,
+		PageCycles: 0,
+		Handler: c.kil,
+	}
+
+	instructionSet[0xB2] = Instruction{
+		Opecode: 0xB2,
+		Code: KIL,
+		AddressingMode: Implied,
+		Bytes: 1,
+		Cycles: 0,
+		PageCycles: 0,
+		Handler: c.kil,
+	}
+
+	instructionSet[0xD2] = Instruction{
+		Opecode: 0xD2,
+		Code: KIL,
+		AddressingMode: Implied,
+		Bytes: 1,
+		Cycles: 0,
+		PageCycles: 0,
+		Handler: c.kil,
+	}
+
+	instructionSet[0xF2] = Instruction{
+		Opecode: 0xF2,
+		Code: KIL,
+		AddressingMode: Implied,
+		Bytes: 1,
+		Cycles: 0,
+		PageCycles: 0,
+		Handler: c.kil,
+	}
+
+
+	// MARK: LAR命令
+	instructionSet[0xBB] = Instruction{
+		Opecode: 0xBB,
+		Code: LAR,
+		AddressingMode: AbsoluteYIndexed,
+		Bytes: 3,
+		Cycles: 4,
+		PageCycles: 1,
+		Handler: c.lar,
+	}
+
+
+	// MARK: LAX命令
+	instructionSet[0xA7] = Instruction{
+		Opecode: 0xA7,
+		Code: LAX,
+		AddressingMode: ZeroPage,
+		Bytes: 2,
+		Cycles: 3,
+		PageCycles: 0,
+		Handler: c.lax,
+	}
+
+	instructionSet[0xB7] = Instruction{
+		Opecode: 0xB7,
+		Code: LAX,
+		AddressingMode: ZeroPageYIndexed,
+		Bytes: 2,
+		Cycles: 4,
+		PageCycles: 0,
+		Handler: c.lax,
+	}
+
+	instructionSet[0xAF] = Instruction{
+		Opecode: 0xAF,
+		Code: LAX,
+		AddressingMode: Absolute,
+		Bytes: 3,
+		Cycles: 4,
+		PageCycles: 0,
+		Handler: c.lax,
+	}
+
+	instructionSet[0xBF] = Instruction{
+		Opecode: 0xBF,
+		Code: LAX,
+		AddressingMode: AbsoluteYIndexed,
+		Bytes: 3,
+		Cycles: 4,
+		PageCycles: 1,
+		Handler: c.lax,
+	}
+
+	instructionSet[0xA3] = Instruction{
+		Opecode: 0xA3,
+		Code: LAX,
+		AddressingMode: IndirectXIndexed,
+		Bytes: 2,
+		Cycles: 6,
+		PageCycles: 0,
+		Handler: c.lax,
+	}
+
+	instructionSet[0xB3] = Instruction{
+		Opecode: 0xB3,
+		Code: LAX,
+		AddressingMode: IndirectYIndexed,
+		Bytes: 2,
+		Cycles: 5,
+		PageCycles: 1,
+		Handler: c.lax,
 	}
 
 
@@ -1144,6 +1782,66 @@ func generateInstructionSet(c *CPU) instructionSet {
 		Handler: c.nop,
 	}
 
+	instructionSet[0x1A] = Instruction{
+		Opecode: 0x1A,
+		Code: NOP,
+		AddressingMode: Implied,
+		Bytes: 1,
+		Cycles: 2,
+		PageCycles: 0,
+		Handler: c.nop,
+	}
+
+	instructionSet[0x3A] = Instruction{
+		Opecode: 0x3A,
+		Code: NOP,
+		AddressingMode: Implied,
+		Bytes: 1,
+		Cycles: 2,
+		PageCycles: 0,
+		Handler: c.nop,
+	}
+
+	instructionSet[0x5A] = Instruction{
+		Opecode: 0x5A,
+		Code: NOP,
+		AddressingMode: Implied,
+		Bytes: 1,
+		Cycles: 2,
+		PageCycles: 0,
+		Handler: c.nop,
+	}
+
+	instructionSet[0x7A] = Instruction{
+		Opecode: 0x7A,
+		Code: NOP,
+		AddressingMode: Implied,
+		Bytes: 1,
+		Cycles: 2,
+		PageCycles: 0,
+		Handler: c.nop,
+	}
+
+	instructionSet[0xDA] = Instruction{
+		Opecode: 0xDA,
+		Code: NOP,
+		AddressingMode: Implied,
+		Bytes: 1,
+		Cycles: 2,
+		PageCycles: 0,
+		Handler: c.nop,
+	}
+
+	instructionSet[0xFA] = Instruction{
+		Opecode: 0xFA,
+		Code: NOP,
+		AddressingMode: Implied,
+		Bytes: 1,
+		Cycles: 2,
+		PageCycles: 0,
+		Handler: c.nop,
+	}
+
 
 	// MARK: ORA命令
 	instructionSet[0x09] = Instruction{
@@ -1275,6 +1973,78 @@ func generateInstructionSet(c *CPU) instructionSet {
 	}
 
 
+	// MARK: RLA命令
+	instructionSet[0x27] = Instruction{
+		Opecode: 0x27,
+		Code: RLA,
+		AddressingMode: ZeroPage,
+		Bytes: 2,
+		Cycles: 5,
+		PageCycles: 0,
+		Handler: c.rla,
+	}
+
+	instructionSet[0x37] = Instruction{
+		Opecode: 0x37,
+		Code: RLA,
+		AddressingMode: ZeroPageXIndexed,
+		Bytes: 2,
+		Cycles: 6,
+		PageCycles: 0,
+		Handler: c.rla,
+	}
+
+	instructionSet[0x2F] = Instruction{
+		Opecode: 0x2F,
+		Code: RLA,
+		AddressingMode: Absolute,
+		Bytes: 3,
+		Cycles: 6,
+		PageCycles: 0,
+		Handler: c.rla,
+	}
+
+	instructionSet[0x3F] = Instruction{
+		Opecode: 0x3F,
+		Code: RLA,
+		AddressingMode: AbsoluteXIndexed,
+		Bytes: 3,
+		Cycles: 7,
+		PageCycles: 0,
+		Handler: c.rla,
+	}
+
+	instructionSet[0x3B] = Instruction{
+		Opecode: 0x3B,
+		Code: RLA,
+		AddressingMode: AbsoluteYIndexed,
+		Bytes: 3,
+		Cycles: 7,
+		PageCycles: 0,
+		Handler: c.rla,
+	}
+
+	instructionSet[0x23] = Instruction{
+		Opecode: 0x23,
+		Code: RLA,
+		AddressingMode: IndirectXIndexed,
+		Bytes: 2,
+		Cycles: 8,
+		PageCycles: 0,
+		Handler: c.rla,
+	}
+
+	instructionSet[0x33] = Instruction{
+		Opecode: 0x33,
+		Code: RLA,
+		AddressingMode: IndirectYIndexed,
+		Bytes: 2,
+		Cycles: 8,
+		PageCycles: 0,
+		Handler: c.rla,
+	}
+
+
 	// MARK: ROL命令
 	instructionSet[0x2A] = Instruction{
 		Opecode: 0x2A,
@@ -1376,6 +2146,78 @@ func generateInstructionSet(c *CPU) instructionSet {
 		Cycles: 7,
 		PageCycles: 0,
 		Handler: c.ror,
+	}
+
+
+	// MARK: RRA命令
+	instructionSet[0x67] = Instruction{
+		Opecode: 0x67,
+		Code: RRA,
+		AddressingMode: ZeroPage,
+		Bytes: 2,
+		Cycles: 5,
+		PageCycles: 0,
+		Handler: c.rra,
+	}
+
+	instructionSet[0x77] = Instruction{
+		Opecode: 0x77,
+		Code: RRA,
+		AddressingMode: ZeroPageXIndexed,
+		Bytes: 2,
+		Cycles: 6,
+		PageCycles: 0,
+		Handler: c.rra,
+	}
+
+	instructionSet[0x6F] = Instruction{
+		Opecode: 0x6F,
+		Code: RRA,
+		AddressingMode: Absolute,
+		Bytes: 3,
+		Cycles: 6,
+		PageCycles: 0,
+		Handler: c.rra,
+	}
+
+	instructionSet[0x7F] = Instruction{
+		Opecode: 0x7F,
+		Code: RRA,
+		AddressingMode: AbsoluteXIndexed,
+		Bytes: 3,
+		Cycles: 7,
+		PageCycles: 0,
+		Handler: c.rra,
+	}
+
+	instructionSet[0x7B] = Instruction{
+		Opecode: 0x7B,
+		Code: RRA,
+		AddressingMode: AbsoluteYIndexed,
+		Bytes: 3,
+		Cycles: 7,
+		PageCycles: 0,
+		Handler: c.rra,
+	}
+
+	instructionSet[0x63] = Instruction{
+		Opecode: 0x63,
+		Code: RRA,
+		AddressingMode: IndirectXIndexed,
+		Bytes: 2,
+		Cycles: 8,
+		PageCycles: 0,
+		Handler: c.rra,
+	}
+
+	instructionSet[0x73] = Instruction{
+		Opecode: 0x73,
+		Code: RRA,
+		AddressingMode: IndirectYIndexed,
+		Bytes: 2,
+		Cycles: 8,
+		PageCycles: 0,
+		Handler: c.rra,
 	}
 
 
@@ -1484,6 +2326,16 @@ func generateInstructionSet(c *CPU) instructionSet {
 		Handler: c.sbc,
 	}
 
+	instructionSet[0xEB] = Instruction{
+		Opecode: 0xEB,
+		Code: SBC,
+		AddressingMode: Immediate,
+		Bytes: 2,
+		Cycles: 2,
+		PageCycles: 0,
+		Handler: c.sbc,
+	}
+
 
 	// MARK: SEC命令
 	instructionSet[0x38] = Instruction{
@@ -1518,6 +2370,150 @@ func generateInstructionSet(c *CPU) instructionSet {
 		Cycles: 2,
 		PageCycles: 0,
 		Handler: c.sei,
+	}
+
+
+	// MARK: SLO命令
+	instructionSet[0x07] = Instruction{
+		Opecode: 0x07,
+		Code: SLO,
+		AddressingMode: ZeroPage,
+		Bytes: 2,
+		Cycles: 5,
+		PageCycles: 0,
+		Handler: c.slo,
+	}
+
+	instructionSet[0x17] = Instruction{
+		Opecode: 0x17,
+		Code: SLO,
+		AddressingMode: ZeroPageXIndexed,
+		Bytes: 2,
+		Cycles: 6,
+		PageCycles: 0,
+		Handler: c.slo,
+	}
+
+	instructionSet[0x0F] = Instruction{
+		Opecode: 0x0F,
+		Code: SLO,
+		AddressingMode: Absolute,
+		Bytes: 3,
+		Cycles: 6,
+		PageCycles: 0,
+		Handler: c.slo,
+	}
+
+	instructionSet[0x1F] = Instruction{
+		Opecode: 0x1F,
+		Code: SLO,
+		AddressingMode: AbsoluteXIndexed,
+		Bytes: 3,
+		Cycles: 7,
+		PageCycles: 0,
+		Handler: c.slo,
+	}
+
+	instructionSet[0x1B] = Instruction{
+		Opecode: 0x1B,
+		Code: SLO,
+		AddressingMode: AbsoluteYIndexed,
+		Bytes: 3,
+		Cycles: 7,
+		PageCycles: 0,
+		Handler: c.slo,
+	}
+
+	instructionSet[0x03] = Instruction{
+		Opecode: 0x03,
+		Code: SLO,
+		AddressingMode: IndirectXIndexed,
+		Bytes: 2,
+		Cycles: 8,
+		PageCycles: 0,
+		Handler: c.slo,
+	}
+
+	instructionSet[0x13] = Instruction{
+		Opecode: 0x13,
+		Code: SLO,
+		AddressingMode: IndirectYIndexed,
+		Bytes: 2,
+		Cycles: 8,
+		PageCycles: 0,
+		Handler: c.slo,
+	}
+
+
+	// MARK: SRE命令
+	instructionSet[0x47] = Instruction{
+		Opecode: 0x47,
+		Code: SRE,
+		AddressingMode: ZeroPage,
+		Bytes: 2,
+		Cycles: 5,
+		PageCycles: 0,
+		Handler: c.sre,
+	}
+
+	instructionSet[0x57] = Instruction{
+		Opecode: 0x57,
+		Code: SRE,
+		AddressingMode: ZeroPageXIndexed,
+		Bytes: 2,
+		Cycles: 6,
+		PageCycles: 0,
+		Handler: c.sre,
+	}
+
+	instructionSet[0x4F] = Instruction{
+		Opecode: 0x4F,
+		Code: SRE,
+		AddressingMode: Absolute,
+		Bytes: 3,
+		Cycles: 6,
+		PageCycles: 0,
+		Handler: c.sre,
+	}
+
+	instructionSet[0x5F] = Instruction{
+		Opecode: 0x5F,
+		Code: SRE,
+		AddressingMode: AbsoluteXIndexed,
+		Bytes: 3,
+		Cycles: 7,
+		PageCycles: 0,
+		Handler: c.sre,
+	}
+
+	instructionSet[0x5B] = Instruction{
+		Opecode: 0x5B,
+		Code: SRE,
+		AddressingMode: AbsoluteYIndexed,
+		Bytes: 3,
+		Cycles: 7,
+		PageCycles: 0,
+		Handler: c.sre,
+	}
+
+	instructionSet[0x43] = Instruction{
+		Opecode: 0x43,
+		Code: SRE,
+		AddressingMode: IndirectXIndexed,
+		Bytes: 2,
+		Cycles: 8,
+		PageCycles: 0,
+		Handler: c.sre,
+	}
+
+	instructionSet[0x53] = Instruction{
+		Opecode: 0x53,
+		Code: SRE,
+		AddressingMode: IndirectYIndexed,
+		Bytes: 2,
+		Cycles: 8,
+		PageCycles: 0,
+		Handler: c.sre,
 	}
 
 
@@ -1657,6 +2653,30 @@ func generateInstructionSet(c *CPU) instructionSet {
 	}
 
 
+	// MARK: SXA命令
+	instructionSet[0x9E] = Instruction{
+		Opecode: 0x9E,
+		Code: SXA,
+		AddressingMode: AbsoluteYIndexed,
+		Bytes: 3,
+		Cycles: 5,
+		PageCycles: 0,
+		Handler: c.sxa,
+	}
+
+
+	// MARK: SYA命令
+	instructionSet[0x9C] = Instruction{
+		Opecode: 0x9C,
+		Code: SYA,
+		AddressingMode: AbsoluteXIndexed,
+		Bytes: 3,
+		Cycles: 5,
+		PageCycles: 0,
+		Handler: c.sya,
+	}
+
+
 	// MARK: TAX命令
 	instructionSet[0xAA] = Instruction{
 		Opecode: 0xAA,
@@ -1678,6 +2698,78 @@ func generateInstructionSet(c *CPU) instructionSet {
 		Cycles: 2,
 		PageCycles: 0,
 		Handler: c.tay,
+	}
+
+
+	// MARK: TOP
+	instructionSet[0x0C] = Instruction{
+		Opecode: 0x0C,
+		Code: TOP,
+		AddressingMode: Absolute,
+		Bytes: 3,
+		Cycles: 4,
+		PageCycles: 0,
+		Handler: c.top,
+	}
+
+	instructionSet[0x1C] = Instruction{
+		Opecode: 0x1C,
+		Code: TOP,
+		AddressingMode: AbsoluteXIndexed,
+		Bytes: 3,
+		Cycles: 4,
+		PageCycles: 1,
+		Handler: c.top,
+	}
+
+	instructionSet[0x3C] = Instruction{
+		Opecode: 0x3C,
+		Code: TOP,
+		AddressingMode: AbsoluteXIndexed,
+		Bytes: 3,
+		Cycles: 4,
+		PageCycles: 1,
+		Handler: c.top,
+	}
+
+	instructionSet[0x5C] = Instruction{
+		Opecode: 0x5C,
+		Code: TOP,
+		AddressingMode: AbsoluteXIndexed,
+		Bytes: 3,
+		Cycles: 4,
+		PageCycles: 1,
+		Handler: c.top,
+	}
+
+	instructionSet[0x7C] = Instruction{
+		Opecode: 0x7C,
+		Code: TOP,
+		AddressingMode: AbsoluteXIndexed,
+		Bytes: 3,
+		Cycles: 4,
+		PageCycles: 1,
+		Handler: c.top,
+	}
+
+	instructionSet[0xDC] = Instruction{
+		Opecode: 0xDC,
+		Code: TOP,
+		AddressingMode: AbsoluteXIndexed,
+		Bytes: 3,
+		Cycles: 4,
+		PageCycles: 1,
+		Handler: c.top,
+	}
+
+	instructionSet[0xFC] = Instruction{
+		Opecode: 0xFC,
+		Code: TOP,
+		AddressingMode: AbsoluteXIndexed,
+		Bytes: 3,
+		Cycles: 4,
+		PageCycles: 1,
+		Handler: c.top,
 	}
 
 
@@ -1728,6 +2820,30 @@ func generateInstructionSet(c *CPU) instructionSet {
 		Handler: c.tya,
 	}
 
+
+	// MARK: XAA命令
+	instructionSet[0x8B] = Instruction{
+		Opecode: 0x8B,
+		Code: XAA,
+		AddressingMode: Immediate,
+		Bytes: 2,
+		Cycles: 2,
+		PageCycles: 0,
+		Handler: c.xaa,
+	}
+
+
+	// MARK: XAS命令
+	instructionSet[0x9B] = Instruction{
+		Opecode: 0x9B,
+		Code: XAS,
+		AddressingMode: AbsoluteYIndexed,
+		Bytes: 3,
+		Cycles: 5,
+		PageCycles: 0,
+		Handler: c.xas,
+	}
+
 	return instructionSet
 }
 
@@ -1735,7 +2851,7 @@ func generateInstructionSet(c *CPU) instructionSet {
 // 命令名取得メソッド
 func (ic InstructionCode) ToString() string {
 	names := [...]string {
-		"ADC", "AND", "ASL", "BCC", "BCS", "BEQ",	"BIT", "BMI","BNE", "BPL",	"BRK","BVC","BVS","CLC","CLD","CLI","CLV","CMP","CPX","CPY","DEC","DEX","DEY","EOR","INC","INX","INY","JMP","JSR","LDA","LDX","LDY","LSR","NOP","ORA","PHA","PHP","PLA","PLP","ROL","ROR","RTI","RTS","SBC","SEC","SED","SEI","STA","STX","STY","TAX","TAY","TSX","TXA","TXS","TYA",
+		"AAC", "AAX", "ADC", "AND", "ARR", "ASL", "ASR", "ATX", "AXA", "AXS", "BCC", "BCS", "BEQ", "BIT", "BMI", "BNE", "BPL", "BRK", "BVC", "BVS", "CLC","CLD", "CLI", "CLV", "CMP", "CPX", "CPY", "DCP", "DEC", "DEX", "DEY", "DOP","EOR", "INC", "INX", "INY", "ISC", "JMP", "JSR", "KIL", "LAR", "LAX", "LDA","LDX", "LDY", "LSR", "NOP", "ORA", "PHA", "PHP", "PLA", "PLP", "RLA", "ROL","ROR", "RRA", "RTI", "RTS", "SBC", "SEC", "SED", "SEI", "SLO", "SRE", "STA","STX", "STY", "SXA", "SYA", "TAX", "TAY", "TOP", "TSX", "TXA", "TXS", "TYA", "XAA", "XAS",
 	}
 
 	if int(ic) < len(names) {
