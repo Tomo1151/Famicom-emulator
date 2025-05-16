@@ -44,16 +44,16 @@ const (
 
 
 const (
-	AAC InstructionCode = iota
-	AAX
+	AAC InstructionCode = iota // (ANC) [ANC]
+	AAX // (SAX) [AXS]
 	ADC
 	AND
-	ARR
+	ARR // (ARR) [ARR]
 	ASL
-	ASR
-	ATX
-	AXA
-	AXS
+	ASR // (ASR) [ALR]
+	ATX // (LXA) [OAL]
+	AXA // (SHA) [AXA]
+	AXS // (SBX) [SAX]
 	BCC
 	BCS
 	BEQ
@@ -71,21 +71,21 @@ const (
 	CMP
 	CPX
 	CPY
-	DCP
+	DCP // (DCP) [DCM]
 	DEC
 	DEX
 	DEY
-	DOP
+	DOP // (NOP) [SKB]
 	EOR
 	INC
 	INX
 	INY
-	ISC
+	ISC // (ISB) [INS]
 	JMP
 	JSR
-	KIL
-	LAR
-	LAX
+	KIL // (JAM) [HLT]
+	LAR // (LAE) [LAS]
+	LAX // (LAX) [LAX]
 	LDA
 	LDX
 	LDY
@@ -96,32 +96,32 @@ const (
 	PHP
 	PLA
 	PLP
-	RLA
+	RLA // (RLA) [RLA]
 	ROL
 	ROR
-	RRA
+	RRA // (RRA) [RRA]
 	RTI
 	RTS
 	SBC
 	SEC
 	SED
 	SEI
-	SLO
-	SRE
+	SLO // (SLO) [ASO]
+	SRE // (SRE) [LSE]
 	STA
 	STX
 	STY
-	SXA
-	SYA
+	SXA // (SHX) [XAS]
+	SYA // (SHY) [SAY]
 	TAX
 	TAY
-	TOP
+	TOP // (NOP) [SKW]
 	TSX
 	TXA
 	TXS
 	TYA
-	XAA
-	XAS
+	XAA // (ANE) [XAA]
+	XAS // (SHS) [TAS]
 )
 
 
