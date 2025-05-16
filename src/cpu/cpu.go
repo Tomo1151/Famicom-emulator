@@ -35,14 +35,15 @@ func (c *CPU) Init(debug bool) {
 			Negative:  false,
 			Overflow:  false,
 			Reserved:  true,
-			Break:     false,
+			Break:     true,
 			Decimal:   false,
 			Interrupt: true,
 			Zero:      false,
 			Carry:     false,
 		},
 		SP: 0xFD,
-		PC: c.ReadWordFrom(0xFFFC),
+		PC: 0x0000,
+		// PC: c.ReadWordFrom(0xFFFC),
 	}
 	c.Bus = bus.Bus{}
 	c.Bus.Init()
