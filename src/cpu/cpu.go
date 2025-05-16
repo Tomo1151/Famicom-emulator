@@ -287,12 +287,21 @@ func (c *CPU) popWord() uint16 {
 
 // MARK: AAC命令の実装
 func (c *CPU) aac(mode AddressingMode) {
-	// @TODO 実装
+	addr := c.getOperandAddress(mode)
+	value := c.ReadByteFrom(addr)
+	c.Registers.A &= value
+
+	c.updateNZFlags(c.Registers.A)
+	c.Registers.P.Carry = c.Registers.P.Negative
 }
 
 // MARK: AAX命令の実装
 func (c *CPU) aax(mode AddressingMode) {
-	// @TODO 実装
+	addr := c.getOperandAddress(mode)
+	result := c.Registers.X & c.Registers.A
+
+	c.WriteByteAt(addr, result)
+	c.updateNZFlags(result)
 }
 
 // MARK: ADC命令の実装
@@ -329,7 +338,21 @@ func (c *CPU) and(mode AddressingMode) {
 
 // MARK: ARR命令の実装
 func (c *CPU) arr(mode AddressingMode) {
-	// @TODO 実装
+	addr := c.getOperandAddress(mode)
+	value := c.ReadByteFrom(addr)
+	c.Registers.A &= value
+
+	// 1ビット右回転
+	c.Registers.A = c.Registers.A >> 1
+
+	if (c.Registers.P.Carry) {
+		c.Registers.A |= 1 << 7
+	}
+
+	c.Registers.P.Carry = c.Registers.A >> 6 != 0
+	c.Registers.P.Overflow = (c.Registers.A >> 6) != (c.Registers.A >> 5) // XOR
+	c.updateNZFlags(c.Registers.A)
+
 }
 
 // MARK: ASL命令の実装
