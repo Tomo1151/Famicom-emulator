@@ -70,7 +70,7 @@ func (c *CPU) InitWithCartridge(cartridge *cartridge.Cartridge, debug bool) {
 			Carry:     false,
 		},
 		SP: 0xFD,
-		PC: 0xC000,
+		PC: c.ReadWordFrom(0xFFFC),
 	}
 	c.InstructionSet = generateInstructionSet(c)
 	c.log = debug
@@ -88,56 +88,13 @@ func (c *CPU) Step() {
 		log.Fatalf("Error: Unknown opecode $%02X at PC=%04X", opecode, c.Registers.PC)
 	}
 
-	if c.log {
-		// 命令の長さに応じてバイトを表示
-		var byteStr string
-		switch instruction.Bytes {
-		case 1:
-				byteStr = fmt.Sprintf("%02X       ", opecode)
-		case 2:
-				byteStr = fmt.Sprintf("%02X %02X    ", opecode, c.ReadByteFrom(c.Registers.PC+1))
-		case 3:
-				byteStr = fmt.Sprintf("%02X %02X %02X ", opecode, c.ReadByteFrom(c.Registers.PC+1), c.ReadByteFrom(c.Registers.PC+2))
-		}
-		
-		// アドレッシングモードに応じた適切な表記を生成
-		var addrStr string
-		switch instruction.AddressingMode {
-		case Immediate:
-				addrStr = fmt.Sprintf("#$%02X", c.ReadByteFrom(c.Registers.PC+1))
-		case Relative:
-				offset := int8(c.ReadByteFrom(c.Registers.PC+1))
-				target := uint16(int32(c.Registers.PC+2) + int32(offset))
-				addrStr = fmt.Sprintf("$%04X", target)
-		case Absolute:
-				addrStr = fmt.Sprintf("$%04X", c.ReadWordFrom(c.Registers.PC+1))
-		// ...その他のアドレッシングモードも同様に処理
-		case Implied:
-				addrStr = ""
-		}
-		
-		fmt.Printf("%04X  %s %s %s%s A:%02X X:%02X Y:%02X P:%02X SP:%02X\n",
-				c.Registers.PC,
-				byteStr,
-				instruction.Code.ToString(),
-				addrStr,
-				strings.Repeat(" ", 25-len(addrStr)),
-				c.Registers.A, c.Registers.X, c.Registers.Y,
-				c.Registers.P.ToByte(), c.Registers.SP)
-}
 
-	// オペコード分プログラムカウンタを進める
-	// c.Registers.PC++
 	instruction.Handler(instruction.AddressingMode)
 
 	if instruction.Code != JMP && instruction.Code != JSR && instruction.Code != RTS && instruction.Code != RTI {
 		// オペランド分プログラムカウンタを進める (オペコードの分 -1)
 		c.Registers.PC += uint16(instruction.Bytes)
 	}
-
-	// if c.log {
-	// 	fmt.Printf("PC: $%04X\n\n", c.Registers.PC)
-	// }
 }
 
 func (c *CPU) Run(callback func(c *CPU)) {
@@ -301,7 +258,6 @@ func (c *CPU) aax(mode AddressingMode) {
 	result := c.Registers.X & c.Registers.A
 
 	c.WriteByteAt(addr, result)
-	c.updateNZFlags(result) // @NOTE フラグ更新はいらないかも
 }
 
 // MARK: ADC命令の実装
@@ -931,7 +887,7 @@ func (c *CPU) xaa(mode AddressingMode) {
 	// @NOTE 未定義動作
 	addr := c.getOperandAddress(mode)
 	value := c.ReadByteFrom(addr)
-	c.Registers.A = (c.Registers.A | 0) & c.Registers.X & value
+	c.Registers.A = (c.Registers.A | 0x80) & c.Registers.X & value
 }
 
 // MARK: XAS命令の実装
@@ -944,16 +900,99 @@ func (c *CPU) xas(mode AddressingMode) {
 
 
 // MARK: デバッグ用表示メソッド
-func (c *CPU) Dump() {
-	fmt.Printf("REG_A: $%02X\n", c.Registers.A)
-	fmt.Printf("REG_X: $%02X\n", c.Registers.X)
-	fmt.Printf("REG_Y: $%02X\n", c.Registers.Y)
-	fmt.Printf("REG_SP: $%02X\n", c.Registers.SP)
-	fmt.Printf("REG_PC: $%04X\n", c.Registers.PC)
-	fmt.Println("P.Negative: ", c.Registers.P.Negative)
-	fmt.Println("P.Zero: ", c.Registers.P.Zero)
-	fmt.Println("P.Carry: ", c.Registers.P.Carry)
-	fmt.Printf("P.Overflow: %v\n\n", c.Registers.P.Overflow)
+func (c *CPU) Trace() string {
+	opecode := c.ReadByteFrom(c.Registers.PC)
+	instruction := c.InstructionSet[opecode]
+	begin := c.Registers.PC
+
+	var hexDump []uint8
+	hexDump = append(hexDump, opecode)
+
+	var addr uint16
+	var value uint8
+
+	switch instruction.AddressingMode {
+	case Immediate, Implied:
+		addr = 0
+		value = 0
+	default:
+		addr = c.getOperandAddress(instruction.AddressingMode)
+		value = c.ReadByteFrom(addr)
+	}
+
+	var tmp string
+	
+	switch instruction.Bytes {
+	case 1:
+		if instruction.AddressingMode == Accumulator {
+			tmp = "A "
+		}
+	case 2:
+		address := c.ReadByteFrom(begin + 1)
+		hexDump = append(hexDump, address)
+		
+		switch instruction.AddressingMode {
+		case Immediate:
+			tmp = fmt.Sprintf("#$%02X", address)
+		case ZeroPage:
+			tmp = fmt.Sprintf("$%02X = %02X", addr, value)
+		case ZeroPageXIndexed:
+			tmp = fmt.Sprintf("$%02X,X @ %02X = %02X", address, addr, value)
+		case ZeroPageYIndexed:
+			tmp = fmt.Sprintf("$%02X,Y @ %02X = %02X", address, addr, value)
+		case IndirectXIndexed:
+			tmp = fmt.Sprintf("($%02X,X) @ %02X = %04X = %02X", address, address + c.Registers.X, addr, value)
+		case IndirectYIndexed:
+			tmp = fmt.Sprintf("($%02X),Y = %04X @ %04X = %02X", address, addr - uint16(c.Registers.Y), addr, value)
+		case Relative:
+			tmp = fmt.Sprintf("$%04X", (uint(begin) + 2 + uint(int8(address))) & 0xFFFFFFFF)
+		default:
+			panic(fmt.Sprintf("unexpected addressing mode %v has opecode length 2. code %02X", instruction.AddressingMode.ToString(), instruction.Opecode))
+		}
+	case 3:
+		addressLower := c.ReadByteFrom(begin + 1)
+		addressUpper := c.ReadByteFrom(begin + 2)
+		hexDump = append(hexDump, addressLower)
+		hexDump = append(hexDump, addressUpper)
+
+		address := c.ReadWordFrom(begin + 1)
+
+		switch instruction.AddressingMode {
+		case Indirect:
+			if instruction.Opecode == 0x6C {
+				// JMP (indirect)
+				var jmpAddr uint16
+				if address & 0x00FF == 0x00FF {
+					lower := c.ReadByteFrom(address)
+					upper := c.ReadByteFrom(address & 0xFF00)
+					jmpAddr = uint16(upper) << 8 | uint16(lower)
+				} else {
+					jmpAddr = c.ReadWordFrom(address)
+				}
+				tmp = fmt.Sprintf("($%04X) = %04X", address, jmpAddr)
+			} else {
+				tmp = fmt.Sprintf("$%04X", address)
+			}
+		case Absolute:
+			tmp = fmt.Sprintf("$%04X = %02X", addr, value)
+		case AbsoluteXIndexed:
+			tmp = fmt.Sprintf("$%04X,X @ %04X = %02X", address, addr, value)
+		case AbsoluteYIndexed:
+			tmp = fmt.Sprintf("$%04X,Y @ %04X = %02X", address, addr, value)
+		default:
+			panic(fmt.Sprintf("unexpected addressing mode %v has opecode length 3. code: %02X", instruction.AddressingMode.ToString(), instruction.Opecode))
+		}
+	}
+
+	var hexParts []string
+	for _, hex := range hexDump {
+		hexParts = append(hexParts, fmt.Sprintf("%02X", hex))
+	}
+
+	hexStr := strings.Join(hexParts, " ")
+	asmStr := fmt.Sprintf("%04X  %-8s %4s %s", begin, hexStr, instruction.Code.ToString(), tmp)
+
+	return fmt.Sprintf("%-47s A:%02X X:%02X Y:%02X P:%02X SP:%02X", asmStr, c.Registers.A, c.Registers.X, c.Registers.Y, c.Registers.P.ToByte(), c.Registers.SP)
 }
 
 
