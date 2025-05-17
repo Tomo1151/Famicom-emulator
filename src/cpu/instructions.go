@@ -175,7 +175,7 @@ func generateInstructionSet(c *CPU) instructionSet {
 	instructionSet[0x83] = Instruction{
 		Opecode: 0x83,
 		Code: AAX,
-		AddressingMode: ZeroPageXIndexed,
+		AddressingMode: IndirectXIndexed,
 		Bytes: 2,
 		Cycles: 6,
 		PageCycles: 0,
@@ -2858,5 +2858,29 @@ func (ic InstructionCode) ToString() string {
 		return names[ic]
 	} else {
 		return fmt.Sprintf("Unknown(%d)", ic)
+	}
+}
+
+func (am AddressingMode) ToString() string {
+	names := [...]string {
+	"Implied",
+	"Accumulator", // A
+	"Immediate", // #
+	"ZeroPage", // zpg
+	"ZeroPageXIndexed", // zpg,X
+	"ZeroPageYIndexed", // zpg,Y
+	"Absolute", // abs
+	"AbsoluteXIndexed", // abs,X
+	"AbsoluteYIndexed", // abs,Y
+	"Relative", // rel
+	"Indirect", // Ind
+	"IndirectXIndexed", // X,Ind
+	"IndirectYIndexed", // Ind,Y
+	}
+
+	if int(am) < len(names) {
+		return names[am]
+	} else {
+		return fmt.Sprintf("Unknown(%d)", am)
 	}
 }
