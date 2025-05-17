@@ -9,6 +9,7 @@ type Instruction struct {
 	Bytes uint8 // 命令のバイト数
 	Cycles uint8 // 基本サイクル数
 	PageCycles uint8 // ページ協会を越えた場合の追加サイクル
+	Jump bool // PCを書き換える命令かどうか
 	Handler InstructionHandler // 命令の実装
 }
 
@@ -1311,6 +1312,7 @@ func generateInstructionSet(c *CPU) instructionSet {
 		Bytes: 3,
 		Cycles: 3,
 		PageCycles: 0,
+		Jump: true,
 		Handler: c.jmp,
 	}
 
@@ -1321,6 +1323,7 @@ func generateInstructionSet(c *CPU) instructionSet {
 		Bytes: 3,
 		Cycles: 5,
 		PageCycles: 0,
+		Jump: true,
 		Handler: c.jmp,
 	}
 
@@ -1333,6 +1336,7 @@ func generateInstructionSet(c *CPU) instructionSet {
 		Bytes: 3,
 		Cycles: 6,
 		PageCycles: 0,
+		Jump: true,
 		Handler: c.jsr,
 	}
 
@@ -2229,6 +2233,7 @@ func generateInstructionSet(c *CPU) instructionSet {
 		Bytes: 1,
 		Cycles: 6,
 		PageCycles: 0,
+		Jump: true,
 		Handler: c.rti,
 	}
 
@@ -2241,6 +2246,7 @@ func generateInstructionSet(c *CPU) instructionSet {
 		Bytes: 1,
 		Cycles: 6,
 		PageCycles: 0,
+		Jump: true,
 		Handler: c.rts,
 	}
 

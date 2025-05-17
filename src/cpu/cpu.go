@@ -91,7 +91,7 @@ func (c *CPU) Step() {
 
 	instruction.Handler(instruction.AddressingMode)
 
-	if instruction.Code != JMP && instruction.Code != JSR && instruction.Code != RTS && instruction.Code != RTI {
+	if !instruction.Jump {
 		// オペランド分プログラムカウンタを進める (オペコードの分 -1)
 		c.Registers.PC += uint16(instruction.Bytes)
 	}
