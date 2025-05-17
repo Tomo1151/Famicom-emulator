@@ -2,6 +2,7 @@ package bus
 
 import (
 	"Famicom-emulator/cartridge"
+	"fmt"
 )
 
 const (
@@ -44,10 +45,11 @@ func (b *Bus) ReadByteFrom(address uint16) uint8 {
 		// ptr := address & 0b00100000_00000111
 		// fmt.Printf("READ (PPU): $04%X\n", ptr)
 		return 0x0000
-	case 0x8000 <= address && address <= 0xFFFF:
+	case 0x8000 <= address:
 		return b.ReadProgramROM(address)
 	default:
 		// fmt.Printf("READ (out of bounds): $%04X\n", address)
+		fmt.Printf("Error: illegal memory read $%04X", address)
 		return 0x0000
 	}
 }
@@ -67,10 +69,10 @@ func (b *Bus) WriteByteAt(address uint16, data uint8) {
 	case PPU_REG_START <= address && address <= PPU_REG_END:
 		// ptr := address & 0b00100000_00000111
 		// fmt.Printf("READ (PPU): $%04X\n", ptr)
-	case 0x8000 <= address && address <= 0xFFFF:
-		// fmt.Printf("READ (CART): $%04X\n", address)
+	case 0x8000 <= address:
+		panic(fmt.Sprintf("Error: illegal memory write $%04X, 0x%02X", address, data))
 	default:
-		// fmt.Printf("READ (out of bounds): $%04X\n", address)
+		fmt.Printf("Error: illegal memory write $%04X, 0x%02X", address, data)
 	}
 }
 
