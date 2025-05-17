@@ -301,7 +301,7 @@ func (c *CPU) aax(mode AddressingMode) {
 	result := c.Registers.X & c.Registers.A
 
 	c.WriteByteAt(addr, result)
-	c.updateNZFlags(result)
+	c.updateNZFlags(result) // @NOTE フラグ更新はいらないかも
 }
 
 // MARK: ADC命令の実装
@@ -373,22 +373,36 @@ func (c *CPU) asl(mode AddressingMode) {
 
 // MARK: ASR命令の実装
 func (c *CPU) asr(mode AddressingMode) {
-	// @TODO 実装
+	c.and(mode)
+	c.lsr(Accumulator)
 }
 
 // MARK: ATX命令の実装
 func (c *CPU) atx(mode AddressingMode) {
-	// @TODO 実装
+	addr := c.getOperandAddress(mode)
+	value := c.ReadByteFrom(addr)
+	c.Registers.A &= value
+	c.Registers.X = c.Registers.A
+	c.updateNZFlags(c.Registers.X)
 }
 
 // MARK: AXA命令の実装
 func (c *CPU) axa(mode AddressingMode) {
-	// @TODO 実装
+	addr := c.getOperandAddress(mode)
+	result := (c.Registers.X & c.Registers.A) & 7
+	c.WriteByteAt(addr, result)
 }
 
 // MARK: AXS命令の実装
 func (c *CPU) axs(mode AddressingMode) {
-	// @TODO 実装
+	addr := c.getOperandAddress(mode)
+	value := c.ReadByteFrom(addr)
+	c.Registers.X &= c.Registers.A
+
+	c.Registers.P.Carry = c.Registers.X >= value
+	c.Registers.X -= value
+
+	c.updateNZFlags(c.Registers.X)
 }
 
 // MARK: BCC命令の実装
@@ -523,7 +537,8 @@ func (c *CPU) cpy(mode AddressingMode) {
 
 // MARK: DCP命令の実装
 func (c *CPU) dcp(mode AddressingMode) {
-	// @TODO 実装
+	c.dec(mode)
+	c.cmp(mode)
 }
 
 // MARK: DEC命令の実装
@@ -548,7 +563,6 @@ func (c *CPU) dey(mode AddressingMode) {
 
 // MARK: DOP命令の実装
 func (c *CPU) dop(mode AddressingMode) {
-	// @TODO 実装
 }
 
 // MARK: EOR命令の実装
@@ -581,7 +595,8 @@ func (c *CPU) iny(mode AddressingMode) {
 
 // MARK: ISC命令の実装
 func (c *CPU) isc(mode AddressingMode) {
-	// @TODO 実装
+	c.inc(mode)
+	c.sbc(mode)
 }
 
 // MARK: JMP命令の実装
@@ -598,17 +613,24 @@ func (c *CPU) jsr(mode AddressingMode) {
 
 // MARK: KIL命令の実装
 func (c *CPU) kil(mode AddressingMode) {
-	// @TODO 実装
 }
 
 // MARK: LAR命令の実装
 func (c *CPU) lar(mode AddressingMode) {
-	// @TODO 実装
+	addr := c.getOperandAddress(mode)
+	value := c.ReadByteFrom(addr)
+	result := c.Registers.SP & value
+
+	c.Registers.A = result
+	c.Registers.X = result
+	c.Registers.SP = result
+	c.updateNZFlags(result)
 }
 
 // MARK: LAX命令の実装
 func (c *CPU) lax(mode AddressingMode) {
-	// @TODO 実装
+	c.lda(mode)
+	c.tax(mode)
 }
 
 // MARK: LDA命令の実装
@@ -726,7 +748,8 @@ func (c *CPU) rol(mode AddressingMode) {
 
 // MARK: RLA命令の実装
 func (c *CPU) rla(mode AddressingMode) {
-	// @TODO 実装
+	c.rol(mode)
+	c.and(mode)
 }
 
 // MARK: ROR命令の実装
@@ -762,7 +785,8 @@ func (c *CPU) ror(mode AddressingMode) {
 
 // MARK: RRA命令の実装
 func (c *CPU) rra(mode AddressingMode) {
-	// @TODO 実装
+	c.ror(mode)
+	c.adc(mode)
 }
 
 // MARK: RTI命令の実装
@@ -821,12 +845,14 @@ func (c *CPU) sei(mode AddressingMode) {
 
 // MARK: SLO命令の実装
 func (c *CPU) slo(mode AddressingMode) {
-	// @TODO 実装
+	c.asl(mode)
+	c.ora(mode)
 }
 
 // MARK: SRE命令の実装
 func (c *CPU) sre(mode AddressingMode) {
-	// @TODO 実装
+	c.lsr(mode)
+	c.eor(mode)
 }
 
 // MARK: STA命令の実装
@@ -849,12 +875,16 @@ func (c *CPU) sty(mode AddressingMode) {
 
 // MARK: SXA命令の実装
 func (c *CPU) sxa(mode AddressingMode) {
-	// @TODO 実装
+	addr := c.getOperandAddress(mode)
+	result := c.Registers.X & (uint8(addr >> 8) + 1)
+	c.WriteByteAt(addr, result)
 }
 
 // MARK: SYA命令の実装
 func (c *CPU) sya(mode AddressingMode) {
-	// @TODO 実装
+	addr := c.getOperandAddress(mode)
+	result := c.Registers.Y & (uint8(addr >> 8) + 1)
+	c.WriteByteAt(addr, result)
 }
 
 // MARK: TAX命令の実装
@@ -871,7 +901,6 @@ func (c *CPU) tay(mode AddressingMode) {
 
 // MARK: TOP命令の実装
 func (c *CPU) top(mode AddressingMode) {
-	// @TODO 実装
 }
 
 // MARK: TSX命令の実装
@@ -899,12 +928,18 @@ func (c *CPU) tya(mode AddressingMode) {
 
 // MARK: XAA命令の実装
 func (c *CPU) xaa(mode AddressingMode) {
-	// @TODO 実装
+	// @NOTE 未定義動作
+	addr := c.getOperandAddress(mode)
+	value := c.ReadByteFrom(addr)
+	c.Registers.A = (c.Registers.A | 0) & c.Registers.X & value
 }
 
 // MARK: XAS命令の実装
 func (c *CPU) xas(mode AddressingMode) {
-	// @TODO 実装
+	addr := c.getOperandAddress(mode)
+	c.Registers.SP = c.Registers.X & c.Registers.A
+	result := c.Registers.SP & (uint8(addr >> 8) + 1)
+	c.WriteByteAt(addr, result)
 }
 
 
