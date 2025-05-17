@@ -46,21 +46,28 @@ func (c *Cartridge) Load(raw []uint8) error {
 	isVertical := (raw[6] & 0b0001) != 0
 	
 	var mirroring Mirroring
-	switch {
-	case isFourScreen:
+	
+	if isFourScreen {
 		mirroring = FOUR_SCREEN
-	case isVertical:
+	} else if isVertical {
 		mirroring = VERTICAL
-	default:
+	} else {
 		mirroring = HORIZONTAL
 	}
 
-	prgROMSize := uint(raw[4]) * PRG_ROM_PAGE_SIZE
-	chrROMSize := uint(raw[5]) * CHR_ROM_PAGE_SIZE
+	prgROMSize := uint16(raw[4]) * uint16(PRG_ROM_PAGE_SIZE)
+	chrROMSize := uint16(raw[5]) * uint16(CHR_ROM_PAGE_SIZE)
 
-	skipTrainer := (uint(raw[6]) & 0b100) * 512
+	skipTrainer := (raw[6] & 0b100) != 0
 
-	prgROMStart := 16 + skipTrainer
+	var trainerOffset uint16
+	if skipTrainer {
+		trainerOffset = 512
+	} else {
+		trainerOffset = 0
+	}
+
+	prgROMStart := 16 + trainerOffset
 	chrROMStart := prgROMStart + prgROMSize
 
 	// fmt.Printf("PRG_ROM_START: %04X, SIZE: %d\n", prgROMStart, prgROMSize)
