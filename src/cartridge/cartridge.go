@@ -16,9 +16,9 @@ type Cartridge struct {
 type Mirroring uint8
 
 const (
-	VERTICAL Mirroring = iota
-	HORIZONTAL
-	FOUR_SCREEN
+	MIRRORING_VERTICAL Mirroring = iota
+	MIRRORING_HORIZONTAL
+	MIRRORING_FOUR_SCREEN
 )
 
 const (
@@ -43,16 +43,16 @@ func (c *Cartridge) Load(raw []uint8) error {
 	}
 
 	isFourScreen := (raw[6] & 0b1000) != 0
-	isVertical := (raw[6] & 0b0001) != 0
+	isMIRRORING_VERTICAL := (raw[6] & 0b0001) != 0
 	
 	var mirroring Mirroring
 	
 	if isFourScreen {
-		mirroring = FOUR_SCREEN
-	} else if isVertical {
-		mirroring = VERTICAL
+		mirroring = MIRRORING_FOUR_SCREEN
+	} else if isMIRRORING_VERTICAL {
+		mirroring = MIRRORING_VERTICAL
 	} else {
-		mirroring = HORIZONTAL
+		mirroring = MIRRORING_HORIZONTAL
 	}
 
 	prgROMSize := uint16(raw[4]) * uint16(PRG_ROM_PAGE_SIZE)
