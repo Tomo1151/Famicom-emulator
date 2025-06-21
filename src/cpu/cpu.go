@@ -25,7 +25,7 @@ func CreateCPU(debug bool) *CPU {
 	return cpu
 }
 
-// MARK: CPUの初期化メソッド
+// MARK: CPUの初期化メソッド (カートリッジ無し，デバッグ・テスト用)
 func (c *CPU) Init(debug bool) {
 	c.Registers = registers{
 		A: 0x00,
@@ -52,6 +52,7 @@ func (c *CPU) Init(debug bool) {
 	// fmt.Println(c.wram[0x0600:0x0600+309])
 }
 
+// MARK: CPUの初期化メソッド (カートリッジ有り)
 func (c *CPU) InitWithCartridge(cartridge *cartridge.Cartridge, debug bool) {
 	c.Bus = bus.Bus{}
 	c.Bus.InitWithCartridge(cartridge)

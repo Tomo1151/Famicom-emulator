@@ -11,6 +11,7 @@ const (
 	OAM_DATA_SIZE uint16 = 64 * 4
 )
 
+// MARK: PPUの定義
 type PPU struct {
 	CHR_ROM []uint8
 	PaletteTable [PALETTE_TABLE_SIZE+1]uint8
@@ -24,6 +25,7 @@ type PPU struct {
 	internalDataBuffer uint8
 }
 
+// MARK: PPUの初期化メソッド
 func (p *PPU) Init(chr_rom []uint8, mirroring cartridge.Mirroring){
 	p.CHR_ROM = chr_rom
 	p.Mirroring = mirroring
@@ -36,14 +38,17 @@ func (p *PPU) Init(chr_rom []uint8, mirroring cartridge.Mirroring){
 	p.internalDataBuffer = 0x00
 }
 
+// MARK: PPUアドレスレジスタへの書き込み
 func (p *PPU) WriteToPPUAddrRegister(value uint8) {
 	p.addrRegister.update(value)
 }
 
+// PPUコントロールレジスタへの書き込み
 func (p *PPU) WriteToPPUControlRegister(value uint8) {
 	p.ctrlRegister.update(value)
 }
 
+// VRAMアドレス
 func (p *PPU) incrementVRAMAddr() {
 	p.addrRegister.increment(p.ctrlRegister.GetVRAMAddrIncrement())
 }
