@@ -44,6 +44,8 @@ func (b *Bus) InitWithCartridge(cartridge *cartridge.Cartridge) {
 // MARK: メモリの読み取り (1byte)
 func (b *Bus) ReadByteFrom(address uint16) uint8 {
 	/*
+		CPUメモリマップ
+
 		$0000–$07FF	$0800	2kBのWRAM
 
 		$0800–$0FFF	$0800	$0000–$07FF (WRAM) のミラーリング×3
@@ -98,6 +100,8 @@ func (b *Bus) ReadWordFrom(address uint16) uint16 {
 // MARK: メモリの書き込み (1byte)
 func (b *Bus) WriteByteAt(address uint16, data uint8) {
 	/*
+		CPU メモリマップ
+
 		$0000–$07FF	$0800	2kBのWRAM
 
 		$0800–$0FFF	$0800	$0000–$07FF (WRAM) のミラーリング×3
@@ -132,7 +136,7 @@ func (b *Bus) WriteByteAt(address uint16, data uint8) {
 	case address == 0x2006: // PPUADDR
 		b.ppu.WriteToPPUAddrRegister(data)
 	case address == 0x2007: // PPUDATA
-		// b.ppu.WriteToData(data)
+		b.ppu.WriteVRAM(data)
 	case 0x2008 <= address && address <= PPU_REG_END: // PPUレジスタのミラーリング
 		// $2000 ~ $2007 (8bytesを繰り返すようにマスク)
 		ptr := address & 0b00100000_00000111

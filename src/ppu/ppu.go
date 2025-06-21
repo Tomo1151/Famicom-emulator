@@ -43,39 +43,77 @@ func (p *PPU) WriteToPPUAddrRegister(value uint8) {
 	p.addrRegister.update(value)
 }
 
-// PPUコントロールレジスタへの書き込み
+// MARK: PPUコントロールレジスタへの書き込み
 func (p *PPU) WriteToPPUControlRegister(value uint8) {
 	p.ctrlRegister.update(value)
 }
 
-// VRAMアドレス
+// MARK: VRAMアドレスをインクリメント
 func (p *PPU) incrementVRAMAddr() {
 	p.addrRegister.increment(p.ctrlRegister.GetVRAMAddrIncrement())
 }
 
-func (p *PPU) ReadVRAM() uint8 {
+// MARK: VRAMへの書き込み
+func (p *PPU) WriteVRAM(value uint8) {
+	/*
+		PPUメモリマップ
+
+		$0000-$1FFF $2000 パレットテーブル (CHR ROM)
+		$2000-$3EFF $1F00 ネームテーブル (VRAM)
+		$3F00-$3FFF $0100 パレット
+		$4000-$FFFF $4000 $0000-$3FFF のミラーリング
+	*/
+
 	addr := p.addrRegister.get()
 	p.incrementVRAMAddr()
 
 	switch {
-	case 0x0000 <= addr && addr <= 0x1FFF:
+	case addr <= 0x1FFF:
+		panic(fmt.Sprintf("addr space 0x0000..0x1FFF is not expected to write, requested: %04X", addr))
+	case 0x2000 <= addr && addr <= 0x3EFF:
+		p.vram[p.mirrorVRAMAddr(addr)] = value
+	case 0x3F00 <= addr && addr <= 0x3FFF:
+		p.PaletteTable[addr - 0x3F00] = value
+	default:
+		panic(fmt.Sprintf("Unexpected write to mirrored space: %04X", addr))
+	}
+}
+
+// MARK: VRAMの読み取り
+func (p *PPU) ReadVRAM() uint8 {
+	/*
+		PPUメモリマップ
+
+		$0000-$1FFF $2000 パレットテーブル (CHR ROM)
+		$2000-$3EFF $1F00 ネームテーブル (VRAM)
+		$3F00-$3FFF $0100 パレット
+		$4000-$FFFF $4000 $0000-$3FFF のミラーリング
+	*/
+
+	addr := p.addrRegister.get()
+	p.incrementVRAMAddr()
+
+	switch {
+	case addr <= 0x1FFF:
 		value := p.internalDataBuffer
 		p.internalDataBuffer = p.CHR_ROM[addr]
 		return value
 	case 0x2000 <= addr && addr <= 0x2FFF:
+		// 一回遅れで価は反映されるため，内部バッファを更新し，元のバッファ値を返す
 		value := p.internalDataBuffer
 		p.internalDataBuffer = p.vram[p.mirrorVRAMAddr(addr)]
 		return value
 		// fmt.Println("@TODO read from VRAM")
 	case 0x3000 <= addr && addr <= 0x3EFF:
-		panic(fmt.Sprintf("addr space 0x3000..0x3eff is not expected to be used, requested: %04X", addr))
+		panic(fmt.Sprintf("addr space 0x3000..0x3eff is not expected to read, requested: %04X", addr))
 	case 0x3F00 <= addr && addr <= 0x3FFF:
 		return p.PaletteTable[addr - 0x3F00]
 	default:
-		panic(fmt.Sprintf("Unexpected access to mirrored space: %04X", addr))
+		panic(fmt.Sprintf("Unexpected read to mirrored space: %04X", addr))
 	}
 }
 
+// MARK: VRAMアドレスのミラーリング
 func (p *PPU) mirrorVRAMAddr(addr uint16) uint16 {
 	// 0x3000-0x3eff から 0x2000 - 0x2eff へミラーリング
 	mirroredVRAMAddr := addr & PPU_ADDR_MIRROR_MASK
