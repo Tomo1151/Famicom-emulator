@@ -19,10 +19,13 @@ type PPU struct {
 	oam [OAM_DATA_SIZE+1]uint8
 	Mirroring cartridge.Mirroring
 
-	addrRegister AddrRegister
-	ctrlRegister ControlRegister
+	ctrlRegister ControlRegister // $2000
+	maskRegister MaskRegister // $2001
+	scrollRegister ScrollRegister // $2005
+	addrRegister AddrRegister // $2006
 
 	internalDataBuffer uint8
+	writeLatch bool
 }
 
 // MARK: PPUの初期化メソッド
@@ -49,7 +52,7 @@ func (p *PPU) WriteToPPUControlRegister(value uint8) {
 }
 
 // MARK: VRAMアドレスをインクリメント
-func (p *PPU) incrementVRAMAddr() {
+func (p *PPU) incrementVRAMAddress() {
 	p.addrRegister.increment(p.ctrlRegister.GetVRAMAddrIncrement())
 }
 
@@ -65,13 +68,13 @@ func (p *PPU) WriteVRAM(value uint8) {
 	*/
 
 	addr := p.addrRegister.get()
-	p.incrementVRAMAddr()
+	p.incrementVRAMAddress()
 
 	switch {
 	case addr <= 0x1FFF:
 		panic(fmt.Sprintf("addr space 0x0000..0x1FFF is not expected to write, requested: %04X", addr))
 	case 0x2000 <= addr && addr <= 0x3EFF:
-		p.vram[p.mirrorVRAMAddr(addr)] = value
+		p.vram[p.mirrorVRAMAddress(addr)] = value
 	case 0x3F00 <= addr && addr <= 0x3FFF:
 		p.PaletteTable[addr - 0x3F00] = value
 	default:
@@ -91,7 +94,7 @@ func (p *PPU) ReadVRAM() uint8 {
 	*/
 
 	addr := p.addrRegister.get()
-	p.incrementVRAMAddr()
+	p.incrementVRAMAddress()
 
 	switch {
 	case addr <= 0x1FFF:
@@ -101,7 +104,7 @@ func (p *PPU) ReadVRAM() uint8 {
 	case 0x2000 <= addr && addr <= 0x2FFF:
 		// 一回遅れで価は反映されるため，内部バッファを更新し，元のバッファ値を返す
 		value := p.internalDataBuffer
-		p.internalDataBuffer = p.vram[p.mirrorVRAMAddr(addr)]
+		p.internalDataBuffer = p.vram[p.mirrorVRAMAddress(addr)]
 		return value
 		// fmt.Println("@TODO read from VRAM")
 	case 0x3000 <= addr && addr <= 0x3EFF:
@@ -114,7 +117,7 @@ func (p *PPU) ReadVRAM() uint8 {
 }
 
 // MARK: VRAMアドレスのミラーリング
-func (p *PPU) mirrorVRAMAddr(addr uint16) uint16 {
+func (p *PPU) mirrorVRAMAddress(addr uint16) uint16 {
 	// 0x3000-0x3eff から 0x2000 - 0x2eff へミラーリング
 	mirroredVRAMAddr := addr & PPU_ADDR_MIRROR_MASK
 
