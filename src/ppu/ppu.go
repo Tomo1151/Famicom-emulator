@@ -6,9 +6,17 @@ import (
 )
 
 const (
-	VRAM_SIZE uint16 = 2 * 1024 // 2kB
-	PALETTE_TABLE_SIZE uint8 = 32
-	OAM_DATA_SIZE uint16 = 64 * 4
+	VRAM_SIZE          uint16 = 2 * 1024 // 2kB
+	PALETTE_TABLE_SIZE  uint8 = 32
+	OAM_DATA_SIZE      uint16 = 64 * 4
+)
+
+const (
+	SCANLINE_START      = 0
+	SCANLINE_POSTRENDER = 240
+	SCANLINE_VBLANK     = 241
+	SCANLINE_PRERENDER  = 261
+	SCANLINE_END        = 341
 )
 
 // MARK: PPUの定義
@@ -19,13 +27,17 @@ type PPU struct {
 	oam [OAM_DATA_SIZE+1]uint8
 	Mirroring cartridge.Mirroring
 
-	ctrlRegister ControlRegister // $2000
-	maskRegister MaskRegister // $2001
-	scrollRegister ScrollRegister // $2005
-	addrRegister AddrRegister // $2006
+	ctrlRegister   ControlRegister // $2000
+	maskRegister   MaskRegister    // $2001
+	statusRegister StatusRegister  // $2002
+	scrollRegister ScrollRegister  // $2005
+	addrRegister   AddrRegister    // $2006
 
+	scanline uint16 // 現在描画中のスキャンライン
+	cycles uint16 // PPUサイクル
 	internalDataBuffer uint8
-	writeLatch bool
+
+	NMI *uint8
 }
 
 // MARK: PPUの初期化メソッド
@@ -38,7 +50,11 @@ func (p *PPU) Init(chr_rom []uint8, mirroring cartridge.Mirroring){
 	p.addrRegister.Init()
 	p.ctrlRegister.Init()
 
+	p.scanline = 1
+	p.cycles = 0
 	p.internalDataBuffer = 0x00
+
+	p.NMI = nil
 }
 
 // MARK: PPUアドレスレジスタへの書き込み
@@ -48,7 +64,13 @@ func (p *PPU) WriteToPPUAddrRegister(value uint8) {
 
 // MARK: PPUコントロールレジスタへの書き込み
 func (p *PPU) WriteToPPUControlRegister(value uint8) {
+	prev := p.ctrlRegister.GenerateVBlankNMI()
 	p.ctrlRegister.update(value)
+
+	// VBlank中にGenerateNMIが立つタイミングでNMIを発生させる
+	if !prev && p.ctrlRegister.GenerateVBlankNMI() && p.statusRegister.IsInVBlank() {
+		*p.NMI = 0x01
+	}
 }
 
 // MARK: VRAMアドレスをインクリメント
@@ -148,4 +170,44 @@ func (p *PPU) mirrorVRAMAddress(addr uint16) uint16 {
 	}
 
 	return vramIndex
+}
+
+// MARK: 待機しているNMIを取得
+func (p *PPU) GetNMI() *uint8 {
+	if p.NMI != nil {
+		value := p.NMI
+		p.NMI = nil
+		return value
+	} else {
+		return nil
+	}
+}
+
+// MARK: サイクルを進める
+func (p *PPU) Tick(cycles uint8) bool {
+	p.cycles += uint16(cycles)
+
+	if p.cycles >= SCANLINE_END {
+		// サイクル数を0に戻す
+		p.cycles %= SCANLINE_END
+
+		// スキャンラインを進める
+		p.scanline++
+
+		// VBlankに突入
+		if p.scanline == SCANLINE_VBLANK {
+			if p.ctrlRegister.GenerateVBlankNMI() {
+				p.statusRegister.SetVBlankStatus(true)
+				// @TODO NMIインタラプトを発生させる
+			}
+		}
+
+		// 可視スキャンラインを超えた時
+		if p.scanline >= SCANLINE_PRERENDER {
+			p.scanline = 0
+			p.statusRegister.ClearVBlankStatus()
+			return true
+		}
+	}
+	return false
 }

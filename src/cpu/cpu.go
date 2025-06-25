@@ -98,11 +98,31 @@ func (c *CPU) Step() {
 	}
 }
 
+// MARK: ループ実行
 func (c *CPU) Run(callback func(c *CPU)) {
 	for {
+		nmi := c.Bus.GetNMIStatus()
+		if nmi != nil {
+			c.interruptNMI()
+		}
 		callback(c)
 		c.Step()
 	}
+}
+
+// MARK: NMIのハンドリング
+func (c *CPU) interruptNMI() {
+	// 現在のPCを退避
+	c.pushWord(c.Registers.PC)
+
+	status := c.Registers.P
+	status.Break = false
+	status.Reserved = true
+	c.pushByte(status.ToByte())
+
+	c.Registers.P.Interrupt = true
+	c.Bus.Tick(2)
+	c.Registers.PC = c.ReadWordFrom(0xFFFA) // 割り込みベクタ (NMI)
 }
 
 

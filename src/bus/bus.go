@@ -20,6 +20,7 @@ type Bus struct {
 	wram [CPU_WRAM_SIZE+1]uint8 // CPUのWRAM (2kB)
 	cartridge cartridge.Cartridge // カートリッジ
 	ppu ppu.PPU // PPU
+	cycles uint16 // CPUサイクル
 }
 
 
@@ -40,6 +41,20 @@ func (b *Bus) InitWithCartridge(cartridge *cartridge.Cartridge) {
 	b.ppu.Init(b.cartridge.CharacterROM, b.cartridge.ScreenMirroring)
 }
 
+// MARK: NMIを取得
+func (b *Bus) GetNMIStatus() *uint8 {
+	return b.ppu.GetNMI()
+}
+
+// MARK: サイクルを進める
+func (b *Bus) Tick(cycles uint8) {
+	b.cycles += uint16(cycles)
+
+	// PPUはCPUの3倍のクロック周波数
+	for range [3]int{} {
+		b.ppu.Tick(cycles)
+	}
+}
 
 // MARK: メモリの読み取り (1byte)
 func (b *Bus) ReadByteFrom(address uint16) uint8 {
