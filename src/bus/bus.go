@@ -82,16 +82,24 @@ func (b *Bus) ReadByteFrom(address uint16) uint8 {
 	case CPU_WRAM_START <= address && address <= CPU_WRAM_END: // WRAM
 		ptr := address & 0b00000111_11111111 // 11bitにマスク
 		return b.wram[ptr]
-	case // PPUレジスタ
-			address == 0x2000 ||
-			address == 0x2001 ||
-			address == 0x2003 ||
-			address == 0x2005 ||
-			address == 0x2006 ||
-			address == 0x4014:
-		panic(fmt.Sprintf("Error: attempt to read from write only ppu address $%04X", address))
-	case address == 0x2007:
+	case address == 0x2000: // PPU_CTRL
+		panic("Error: attempt to read from PPU Control register")
+	case address == 0x2001: // PPU_MASK
+		panic("Error: attempt to read from PPU Mask register")
+	case address == 0x2002: // PPU_STATUS
+		return b.ppu.ReadPPUStatus()
+	case address == 0x2003: // OAM_ADDR
+		panic("Error: attempt to read from OAM Address register")
+	case address == 0x2004: // OAM_DATA
+		return b.ppu.ReadOAMData() // OAMはDMA転送を使用するため，ほとんど使わないはず?
+	case address == 0x2005: // PPU_SCROLL
+		panic("Error: attempt to read from PPU Scroll register")
+	case address == 0x2006: // PPU_ADDR
+		panic("Error: attempt to read from PPU Address register")
+	case address == 0x2007: // PPU_DATA
 		return b.ppu.ReadVRAM()
+	case address == 0x4014: // OAM_DATA (DMA)
+		panic("Error: attempt to read from OAM Data register")
 	case 0x2008 <= address && address <= PPU_REG_END: // PPUレジスタのミラーリング
 		// $2000 ~ $2007 (8bytesを繰り返すようにマスク)
 		ptr := address & 0b00100000_00000111
@@ -146,14 +154,24 @@ func (b *Bus) WriteByteAt(address uint16, data uint8) {
 	case CPU_WRAM_START <= address && address <= CPU_WRAM_END: // WRAM
 		ptr := address & 0b00000111_11111111 // 11bitにマスク
 		b.wram[ptr] = data
-	case address == 0x2000: // PPUCTRL
+	case address == 0x2000: // PPU_CTRL
 		b.ppu.WriteToPPUControlRegister(data)
-	case address == 0x2006: // PPUADDR
+	case address == 0x2001: // PPU_MASK
+		b.ppu.WriteToPPUMaskRegister(data)
+	case address == 0x2002: // PPU_STATUS
+		panic(fmt.Sprintf("Error: attempt to write to PPU Status register"))
+	case address == 0x2003: // OAM_ADDR
+		b.ppu.WriteToOAMAddressRegister(data)
+	case address == 0x2004: // OAM_DATA
+		b.ppu.WriteToOAMDataRegister(data)
+	case address == 0x2005: // PPU_SCROLL
+		b.ppu.WriteToPPUScrollRegister(data)
+	case address == 0x2006: // PPU_ADDR
 		b.ppu.WriteToPPUAddrRegister(data)
-	case address == 0x2007: // PPUDATA
+	case address == 0x2007: // PPU_DATA
 		b.ppu.WriteVRAM(data)
 	case 0x2008 <= address && address <= PPU_REG_END: // PPUレジスタのミラーリング
-		// $2000 ~ $2007 (8bytesを繰り返すようにマスク)
+		// $2008 ~ $3FFF は $2000 ~ $2007 (8bytesを繰り返すようにマスク) へミラーリング
 		ptr := address & 0b00100000_00000111
 		b.WriteByteAt(ptr, data)
 	case 0x8000 <= address: // プログラムROM

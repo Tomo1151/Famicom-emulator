@@ -27,15 +27,16 @@ type PPU struct {
 	oam [OAM_DATA_SIZE+1]uint8
 	Mirroring cartridge.Mirroring
 
-	ctrlRegister   ControlRegister // $2000
-	maskRegister   MaskRegister    // $2001
-	statusRegister StatusRegister  // $2002
-	scrollRegister ScrollRegister  // $2005
-	addrRegister   AddrRegister    // $2006
+	control   ControlRegister // $2000
+	maskl   MaskRegister    // $2001
+	status StatusRegister  // $2002
+	scroll ScrollRegister  // $2005
+	address   AddrRegister    // $2006
 
 	scanline uint16 // 現在描画中のスキャンライン
 	cycles uint16 // PPUサイクル
 	internalDataBuffer uint8
+	oamAddress uint8 // OAM書き込みのポインタ
 
 	NMI *uint8
 }
@@ -47,8 +48,11 @@ func (p *PPU) Init(chr_rom []uint8, mirroring cartridge.Mirroring){
 	for addr := range p.vram { p.vram[addr] = 0x00 }
 	for addr := range p.oam { p.oam[addr] = 0x00 }
 	for addr := range p.PaletteTable { p.PaletteTable[addr] = 0x00 }
-	p.addrRegister.Init()
-	p.ctrlRegister.Init()
+	p.control.Init()
+	p.maskl.Init()
+	p.status.Init()
+	p.scroll.Init()
+	p.address.Init()
 
 	p.scanline = 1
 	p.cycles = 0
@@ -59,23 +63,53 @@ func (p *PPU) Init(chr_rom []uint8, mirroring cartridge.Mirroring){
 
 // MARK: PPUアドレスレジスタへの書き込み
 func (p *PPU) WriteToPPUAddrRegister(value uint8) {
-	p.addrRegister.update(value)
+	p.address.update(value)
 }
 
-// MARK: PPUコントロールレジスタへの書き込み
+// MARK: PPUコントロールレジスタ($2000)への書き込み
 func (p *PPU) WriteToPPUControlRegister(value uint8) {
-	prev := p.ctrlRegister.GenerateVBlankNMI()
-	p.ctrlRegister.update(value)
+	prev := p.control.GenerateVBlankNMI()
+	p.control.update(value)
 
 	// VBlank中にGenerateNMIが立つタイミングでNMIを発生させる
-	if !prev && p.ctrlRegister.GenerateVBlankNMI() && p.statusRegister.IsInVBlank() {
+	if !prev && p.control.GenerateVBlankNMI() && p.status.IsInVBlank() {
 		*p.NMI = 0x01
 	}
 }
 
+// MARK: PPUマスクレジスタ($2001)への書き込み
+func (p *PPU) WriteToPPUMaskRegister(value uint8) {
+	p.maskl.update(value)
+}
+
+// MARK: OAM ADDR($2003) への書き込み
+func (p *PPU) WriteToOAMAddressRegister(addr uint8) {
+	p.oamAddress = addr
+}
+
+// MARK: PPUスクロールレジスタ($2005)への書き込み
+func (p *PPU) WriteToPPUScrollRegister(data uint8) {
+	p.scroll.Write(data)
+}
+
+// MARK: OAM DATA($4014) への書き込み
+func (p *PPU) WriteToOAMDataRegister(data uint8) {
+	p.oam[p.oamAddress] = data
+	p.oamAddress++
+}
+
+// MARK: DMA転送を行う ([256]u8 の配列のアドレスを受け取る)
+func (p *PPU) DMATransfer(bytes *[0xFF]uint8) {
+	for _, byte := range *bytes {
+		p.oam[uint16(p.oamAddress)] = byte
+		p.oamAddress++
+	}
+}
+
+
 // MARK: VRAMアドレスをインクリメント
 func (p *PPU) incrementVRAMAddress() {
-	p.addrRegister.increment(p.ctrlRegister.GetVRAMAddrIncrement())
+	p.address.increment(p.control.GetVRAMAddrIncrement())
 }
 
 // MARK: VRAMへの書き込み
@@ -89,7 +123,7 @@ func (p *PPU) WriteVRAM(value uint8) {
 		$4000-$FFFF $4000 $0000-$3FFF のミラーリング
 	*/
 
-	addr := p.addrRegister.get()
+	addr := p.address.get()
 	p.incrementVRAMAddress()
 
 	switch {
@@ -104,6 +138,16 @@ func (p *PPU) WriteVRAM(value uint8) {
 	}
 }
 
+// MARK: PPUステータスレジスタの読み取り
+func (p *PPU) ReadPPUStatus() uint8 {
+	return p.status.ToByte()
+}
+
+// MARK: OAM DATAの読み取り
+func (p *PPU) ReadOAMData() uint8 {
+	return p.oam[p.oamAddress]
+}
+
 // MARK: VRAMの読み取り
 func (p *PPU) ReadVRAM() uint8 {
 	/*
@@ -115,7 +159,7 @@ func (p *PPU) ReadVRAM() uint8 {
 		$4000-$FFFF $4000 $0000-$3FFF のミラーリング
 	*/
 
-	addr := p.addrRegister.get()
+	addr := p.address.get()
 	p.incrementVRAMAddress()
 
 	switch {
@@ -196,8 +240,8 @@ func (p *PPU) Tick(cycles uint8) bool {
 
 		// VBlankに突入
 		if p.scanline == SCANLINE_VBLANK {
-			if p.ctrlRegister.GenerateVBlankNMI() {
-				p.statusRegister.SetVBlankStatus(true)
+			if p.control.GenerateVBlankNMI() {
+				p.status.SetVBlankStatus(true)
 				// @TODO NMIインタラプトを発生させる
 			}
 		}
@@ -205,7 +249,9 @@ func (p *PPU) Tick(cycles uint8) bool {
 		// 可視スキャンラインを超えた時
 		if p.scanline >= SCANLINE_PRERENDER {
 			p.scanline = 0
-			p.statusRegister.ClearVBlankStatus()
+			p.NMI = nil
+			p.status.ClearVBlankStatus()
+			p.status.SetSpriteZeroHit(false)
 			return true
 		}
 	}
