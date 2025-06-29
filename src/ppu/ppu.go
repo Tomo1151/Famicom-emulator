@@ -206,9 +206,10 @@ func (p *PPU) mirrorVRAMAddress(addr uint16) uint16 {
 	// [ A ] [ a ]
 	// [ B ] [ b ]
 	if p.Mirroring == cartridge.MIRRORING_HORIZONTAL {
-		if nameTable == 2 || nameTable == 1 {
+		switch nameTable {
+		case 2, 1:
 			return vramIndex - 0x400
-		} else if nameTable == 3 {
+		case 3:
 			return vramIndex - 0x800
 		}
 	}
