@@ -96,6 +96,8 @@ func (c *CPU) Step() {
 		// オペランド分プログラムカウンタを進める (オペコードの分 -1)
 		c.Registers.PC += uint16(instruction.Bytes)
 	}
+
+	c.Bus.Tick(instruction.Cycles)
 }
 
 // MARK: ループ実行
