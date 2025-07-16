@@ -103,7 +103,7 @@ func (c *CPU) Run(callback func(c *CPU)) {
 	for {
 		nmi := c.Bus.GetNMIStatus()
 		if nmi != nil {
-			c.interruptNMI()
+			c.interrupt(NMI)
 		}
 		callback(c)
 		c.Step()
@@ -111,18 +111,18 @@ func (c *CPU) Run(callback func(c *CPU)) {
 }
 
 // MARK: NMIのハンドリング
-func (c *CPU) interruptNMI() {
+func (c *CPU) interrupt(interrupt Interrupt) {
 	// 現在のPCを退避
 	c.pushWord(c.Registers.PC)
 
 	status := c.Registers.P
-	status.Break = false
-	status.Reserved = true
+	status.Break = interrupt.BFlagMask & 0b0001_0000 == 1
+	status.Reserved = interrupt.BFlagMask & 0b0010_0000 == 1
 	c.pushByte(status.ToByte())
-
 	c.Registers.P.Interrupt = true
-	c.Bus.Tick(2)
-	c.Registers.PC = c.ReadWordFrom(0xFFFA) // 割り込みベクタ (NMI)
+
+	c.Bus.Tick(interrupt.CPUCycles)
+	c.Registers.PC = c.ReadWordFrom(interrupt.VectorAddress) // 割り込みベク
 }
 
 
