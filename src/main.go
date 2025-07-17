@@ -11,7 +11,7 @@ import (
 	"github.com/veandco/go-sdl2/sdl"
 )
 
-const SCALE_FACTOR = 2
+const SCALE_FACTOR = 3
 
 func main() {
 	filedata, err := os.ReadFile("../rom/SuperMarioBros.nes")
@@ -30,10 +30,10 @@ func main() {
 	frame := ppu.Frame{}
 	frame.Init()
 
-	for i := range 0xFF {
+	for i := range 0x200 {
 			pixels := cart.CharacterROM[i*16:(i+1)*16]
 			tile := ppu.GetTile(pixels)
-			frame.SetTileAt(uint8(i), tile)
+			frame.SetTileAt(uint(i), tile)
 	}
 
 	// ppu.DumpFrame(frame)

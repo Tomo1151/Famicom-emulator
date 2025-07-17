@@ -5,9 +5,9 @@ import (
 )
 
 const (
-	FRAME_WIDTH  uint16 = 256
-	FRAME_HEIGHT uint16 = 240
-	TILE_SIZE     uint8 = 8
+	FRAME_WIDTH  uint = 256
+	FRAME_HEIGHT uint = 240
+	TILE_SIZE    uint = 8
 )
 
 var (
@@ -29,8 +29,8 @@ var (
 )
 
 type Frame struct {
-	Width  uint16
-	Height uint16
+	Width  uint
+	Height uint
 	Buffer [uint(FRAME_WIDTH) * uint(FRAME_HEIGHT)*3]uint8
 }
 
@@ -43,18 +43,18 @@ func (f *Frame) Init() {
 	f.Height = FRAME_HEIGHT
 }
 
-func (f *Frame) SetTileAt(tileIndex uint8, tile Tile) {
-	var ox uint16 = uint16((tileIndex % 32) * TILE_SIZE)
-	var oy uint16 = uint16((tileIndex / 32) * TILE_SIZE)
+func (f *Frame) SetTileAt(tileIndex uint, tile Tile) {
+	var ox uint = (tileIndex % 32) * uint(TILE_SIZE)
+	var oy uint = (tileIndex / 32) * uint(TILE_SIZE)
 
-	// fmt.Printf("set starts at (%d, %d)\n", ox, oy)
+	fmt.Printf("set starts at (%d, %d)\n", ox, oy)
 
-	// DumpTile(tile)
+	DumpTile(tile)
 
 	for y := range TILE_SIZE {
 		for x := range TILE_SIZE {
-			pixelY := oy + uint16(y)
-			pixelX := ox + uint16(x)
+			pixelY := oy + y
+			pixelX := ox + x
 
 			if pixelY >= FRAME_HEIGHT || pixelX >= FRAME_WIDTH { continue }
 			index := pixelY * FRAME_WIDTH + pixelX
@@ -64,10 +64,16 @@ func (f *Frame) SetTileAt(tileIndex uint8, tile Tile) {
 			}
 
 			bufferIndex := (pixelY * FRAME_WIDTH + pixelX) * 3
-			color := uint8(tile.Pixels[y][x] * 85)
-			f.Buffer[bufferIndex+0] = color
-			f.Buffer[bufferIndex+1] = color
-			f.Buffer[bufferIndex+2] = color
+			var colorPallette [4][3]uint8 = [4][3]uint8{
+				PALLETTE[0x01],
+				PALLETTE[0x16],
+				PALLETTE[0x27],
+				PALLETTE[0x18],
+			}
+			color := tile.Pixels[y][x]
+			f.Buffer[bufferIndex+0] = colorPallette[color][0]
+			f.Buffer[bufferIndex+1] = colorPallette[color][1]
+			f.Buffer[bufferIndex+2] = colorPallette[color][2]
 		}
 	}
 }
