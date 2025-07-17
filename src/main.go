@@ -10,7 +10,7 @@ import (
 )
 
 func main() {
-	filedata, err := os.ReadFile("../rom/SuperMarioBros/MAP0.NES")
+	filedata, err := os.ReadFile("../rom/SuperMarioBros.nes")
 
 	if err != nil {
 		log.Fatalf("Error occured in 'os.ReadFile()'")
