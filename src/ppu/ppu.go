@@ -53,6 +53,9 @@ func (p *PPU) Init(chr_rom []uint8, mirroring cartridge.Mirroring){
 	p.status.Init()
 	p.scroll.Init()
 	p.address.Init()
+	
+	// controlレジスタでVBlankNMIを有効にする（Init後に設定）
+	p.control.GenerateNMI = true
 
 	p.scanline = 1
 	p.cycles = 0
@@ -70,6 +73,9 @@ func (p *PPU) WriteToPPUAddrRegister(value uint8) {
 func (p *PPU) WriteToPPUControlRegister(value uint8) {
 	prev := p.control.GenerateVBlankNMI()
 	p.control.update(value)
+	
+	// デバッグ: VBlankNMIを強制的に有効にする
+	p.control.GenerateNMI = true
 
 	// VBlank中にGenerateNMIが立つタイミングでNMIを発生させる
 	if !prev && p.control.GenerateVBlankNMI() && p.status.IsInVBlank() {
@@ -243,12 +249,14 @@ func (p *PPU) Tick(cycles uint8) bool {
 		if p.scanline == SCANLINE_VBLANK {
 			if p.control.GenerateVBlankNMI() {
 				p.status.SetVBlankStatus(true)
-				// @TODO NMIインタラプトを発生させる
+				// NMIを設定
+				nmiValue := uint8(1)
+				p.NMI = &nmiValue
 			}
 		}
 
-		// 可視スキャンラインを超えた時
-		if p.scanline >= SCANLINE_PRERENDER {
+		// プリレンダーラインに到達した時
+		if p.scanline > SCANLINE_PRERENDER {
 			p.scanline = 0
 			p.NMI = nil
 			p.status.ClearVBlankStatus()

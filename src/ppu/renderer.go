@@ -11,7 +11,7 @@ const (
 )
 
 var (
-	PALLETTE = [64][3]uint8{
+	PALETTE = [64][3]uint8{
 		{0x80, 0x80, 0x80}, {0x00, 0x3D, 0xA6}, {0x00, 0x12, 0xB0}, {0x44, 0x00, 0x96}, {0xA1, 0x00, 0x5E},
 		{0xC7, 0x00, 0x28}, {0xBA, 0x06, 0x00}, {0x8C, 0x17, 0x00}, {0x5C, 0x2F, 0x00}, {0x10, 0x45, 0x00},
 		{0x05, 0x4A, 0x00}, {0x00, 0x47, 0x2E}, {0x00, 0x41, 0x66}, {0x00, 0x00, 0x00}, {0x05, 0x05, 0x05},
@@ -31,7 +31,7 @@ var (
 type Frame struct {
 	Width  uint
 	Height uint
-	Buffer [uint(FRAME_WIDTH) * uint(FRAME_HEIGHT)*3]uint8
+	Buffer [uint(FRAME_WIDTH) * uint(FRAME_HEIGHT)*3]byte
 }
 
 type Tile struct {
@@ -41,6 +41,13 @@ type Tile struct {
 func (f *Frame) Init() {
 	f.Width = FRAME_WIDTH
 	f.Height = FRAME_HEIGHT
+}
+
+func (f *Frame) setPixelAt(x uint, y uint, palette [3]uint8) {
+	basePtr := (y * FRAME_WIDTH + x) * 3
+	f.Buffer[basePtr+0] = palette[0]  // R
+	f.Buffer[basePtr+1] = palette[1]  // G
+	f.Buffer[basePtr+2] = palette[2]  // B
 }
 
 func (f *Frame) SetTileAt(tileIndex uint, tile Tile) {
@@ -65,15 +72,15 @@ func (f *Frame) SetTileAt(tileIndex uint, tile Tile) {
 
 			bufferIndex := (pixelY * FRAME_WIDTH + pixelX) * 3
 			var colorPallette [4][3]uint8 = [4][3]uint8{
-				PALLETTE[0x01],
-				PALLETTE[0x16],
-				PALLETTE[0x27],
-				PALLETTE[0x18],
+				PALETTE[0x01],
+				PALETTE[0x16],
+				PALETTE[0x27],
+				PALETTE[0x18],
 			}
 			color := tile.Pixels[y][x]
-			f.Buffer[bufferIndex+0] = colorPallette[color][0]
-			f.Buffer[bufferIndex+1] = colorPallette[color][1]
-			f.Buffer[bufferIndex+2] = colorPallette[color][2]
+			f.Buffer[bufferIndex+0] = colorPallette[color][0] // R
+			f.Buffer[bufferIndex+1] = colorPallette[color][1] // G
+			f.Buffer[bufferIndex+2] = colorPallette[color][2] // B
 		}
 	}
 }
@@ -139,4 +146,40 @@ func DumpTile(tile Tile) {
 		}
 		fmt.Println()
 	}
+}
+
+func Render(ppu PPU, frame *Frame) {
+	var bank uint16
+	if ppu.control.BackgroundPatternAddress {
+		bank = 0x1000
+	} else {
+		bank = 0x0000
+	}
+
+	for i := range 0x03C0 {
+		tileIndex := uint16(ppu.vram[i])
+		tileX := uint(i % 32)
+		tileY := uint(i / 32)
+		tileBasePtr :=(bank+tileIndex*16)
+		tile := ppu.CHR_ROM[tileBasePtr:tileBasePtr+16]
+
+		for y := range TILE_SIZE {
+			upper := tile[y]
+			lower := tile[y+TILE_SIZE]
+
+			for x := range TILE_SIZE {
+				bit0 := (lower >> (7 - x)) & 1
+				bit1 := (upper >> (7 - x)) & 1
+				value := (bit1 << 1) | bit0
+				palette := [4][3]uint8{
+					PALETTE[0x01],
+					PALETTE[0x16],
+					PALETTE[0x27],
+					PALETTE[0x18],
+				}
+				frame.setPixelAt(tileX*TILE_SIZE + x, tileY*TILE_SIZE+y, palette[value])
+			}
+		}
+	}
+
 }

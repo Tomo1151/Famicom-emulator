@@ -1,6 +1,7 @@
 package main
 
 import (
+	"Famicom-emulator/bus"
 	"Famicom-emulator/cartridge"
 	"Famicom-emulator/cpu"
 	"Famicom-emulator/ppu"
@@ -14,7 +15,7 @@ import (
 const SCALE_FACTOR = 3
 
 func main() {
-	filedata, err := os.ReadFile("../rom/SuperMarioBros.nes")
+	filedata, err := os.ReadFile("../rom/helloworld.nes")
 
 	if err != nil {
 		log.Fatalf("Error occured in 'os.ReadFile()'")
@@ -30,11 +31,10 @@ func main() {
 	frame := ppu.Frame{}
 	frame.Init()
 
-	for i := range 0x200 {
-			pixels := cart.CharacterROM[i*16:(i+1)*16]
-			tile := ppu.GetTile(pixels)
-			frame.SetTileAt(uint(i), tile)
-	}
+
+	// デバッグ：フレームバッファの最初の数バイトを確認
+	log.Printf("Frame buffer first 12 bytes: %v", frame.Buffer[:12])
+	log.Printf("Frame buffer size: %d", len(frame.Buffer))
 
 	// ppu.DumpFrame(frame)
 
@@ -56,6 +56,7 @@ func main() {
 	}
 	defer renderer.Destroy()
 
+	// SDL2テクスチャを作成
 	texture, err := renderer.CreateTexture(
 		sdl.PIXELFORMAT_RGB24,
 		sdl.TEXTUREACCESS_STREAMING,
@@ -65,121 +66,51 @@ func main() {
 	}
 	defer texture.Destroy()
 
-	err = texture.Update(nil, unsafe.Pointer(&frame.Buffer[0]), int(frame.Width*3))
-	if err != nil {
-			panic(err)
-	}
+	bus := bus.Bus{}
+	bus.InitWithCartridge(&cart, func(p *ppu.PPU) {
+		// PPUコールバック内でフレームをレンダリング
+		ppu.Render(*p, &frame)
+	})
 
+	c := cpu.CPU{}
+	c.InitWithCartridge(bus, false) // デバッグログを無効化
 
-		// イベントループ
+	// PPUのRender関数がVRAMの初期状態（全て0）でどう動作するかテスト
+	log.Printf("PPU Render function test with initial VRAM state")
+
+	// メインイベントループ
 	running := true
 	for running {
 		// イベント処理
 		for event := sdl.PollEvent(); event != nil; event = sdl.PollEvent() {
-				switch e := event.(type) {
-				case *sdl.QuitEvent:
-						running = false
-				case *sdl.KeyboardEvent:
-						if e.Keysym.Sym == sdl.K_ESCAPE && e.State == sdl.PRESSED {
-								running = false
-						}
+			switch e := event.(type) {
+			case *sdl.QuitEvent:
+				running = false
+			case *sdl.KeyboardEvent:
+				if e.Keysym.Sym == sdl.K_ESCAPE && e.State == sdl.PRESSED {
+					running = false
 				}
+			}
 		}
+
+		// CPUを少しずつ実行（ノンブロッキング）
+		for range 1000 { // 1フレームあたり1000命令実行
+			c.Step()
+		}
+
+		// テクスチャを更新（unsafe.Pointerを使用）
+		err = texture.Update(nil, unsafe.Pointer(&frame.Buffer[0]), int(frame.Width*3))
+		if err != nil {
+			panic(err)
+		}
+
 
 		// 画面を再描画
 		renderer.Clear()
 		renderer.Copy(texture, nil, nil)
 		renderer.Present()
 
-		// CPUを少し休ませる
+		// フレームレート制御
 		sdl.Delay(16) // 約60FPS
 	}
-}
-
-
-func createWindow(c *cpu.CPU) {
-	// // SDL2の初期化
-	// if err := sdl.Init(sdl.INIT_VIDEO); err != nil {
-	// 	log.Fatalf("Failed to initialize SDL: %s", err)
-	// }
-	// defer sdl.Quit()
-
-	// rand.Seed(time.Now().UnixNano())
-	// scaleFactor := 10.0
-
-	// // ウィンドウの作成（中央配置）
-	// window, err := sdl.CreateWindow(
-	// 	"Famicom emulator",
-	// 	sdl.WINDOWPOS_CENTERED,
-	// 	sdl.WINDOWPOS_CENTERED,
-	// 	int32(32 * scaleFactor),
-	// 	int32(32 * scaleFactor),
-	// 	sdl.WINDOW_SHOWN,
-	// )
-	// if err != nil {
-	// 	log.Fatalf("Failed to create window: %s", err)
-	// }
-	// defer window.Destroy()
-
-	// // レンダラーの作成（VSyncあり）
-	// renderer, err := sdl.CreateRenderer(
-	// 	window,
-	// 	-1,
-	// 	sdl.RENDERER_ACCELERATED|sdl.RENDERER_PRESENTVSYNC,
-	// )
-	// if err != nil {
-	// 	log.Fatalf("Failed to create renderer: %s", err)
-	// }
-	// defer renderer.Destroy()
-
-	// // レンダラーのスケール設定
-	// if err := renderer.SetScale(float32(scaleFactor), float32(scaleFactor)); err != nil {
-	// 	log.Fatalf("Failed to set scale: %s", err)
-	// }
-
-	// テクスチャの作成
-	// texture, err := renderer.CreateTexture(
-	// 	sdl.PIXELFORMAT_RGB24,
-	// 	sdl.TEXTUREACCESS_STREAMING,
-	// 	32, 32,
-	// )
-	// if err != nil {
-	// 	log.Fatalf("Failed to create texture: %s", err)
-	// }
-	// defer texture.Destroy()
-
-	// // 画面状態配列を初期化
-	// var screenState [32 * 3 * 32]uint8
-	// for i := range screenState {
-	// 	screenState[i] = 0
-	// }
-
-	// running := true
-
-	// // メインループ
-	// c.Run(func(c *cpu.CPU) {
-	// 	fmt.Println(c.Trace())
-
-	// 	// イベント処理
-	// 	for event := sdl.PollEvent(); event != nil; event = sdl.PollEvent() {
-	// 		switch e := event.(type) {
-	// 		case *sdl.QuitEvent:
-	// 			running = false
-	// 		case *sdl.KeyboardEvent:
-	// 			if e.Keysym.Sym == sdl.K_ESCAPE && e.State == sdl.PRESSED {
-	// 				running = false
-	// 			}
-	// 		}
-	// 	}
-
-
-	// 	// CPUのフレームレート調整
-	// 	time.Sleep(70 * time.Microsecond)
-
-	// 	// 終了条件をチェック
-	// 	if !running {
-	// 		sdl.Quit()
-	// 		os.Exit(0)
-	// 	}
-	// })
 }

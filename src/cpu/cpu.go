@@ -6,7 +6,6 @@ import (
 	"strings"
 
 	"Famicom-emulator/bus"
-	"Famicom-emulator/cartridge"
 )
 
 // MARK: CPUの定義
@@ -53,9 +52,9 @@ func (c *CPU) Init(debug bool) {
 }
 
 // MARK: CPUの初期化メソッド (カートリッジ有り)
-func (c *CPU) InitWithCartridge(cartridge *cartridge.Cartridge, debug bool) {
-	c.Bus = bus.Bus{}
-	c.Bus.InitWithCartridge(cartridge)
+func (c *CPU) InitWithCartridge(bus bus.Bus, debug bool) {
+	c.Bus = bus
+	// c.Bus.InitWithCartridge(cartridge)
 	c.Registers = registers{
 		A: 0x00,
 		X: 0x00,
@@ -101,7 +100,17 @@ func (c *CPU) Step() {
 }
 
 // MARK: ループ実行
-func (c *CPU) Run(callback func(c *CPU)) {
+func (c *CPU) Run() {
+	for {
+		nmi := c.Bus.GetNMIStatus()
+		if nmi != nil {
+			c.interrupt(NMI)
+		}
+		c.Step()
+	}
+}
+
+func (c *CPU) RunWithCallback(callback func(c *CPU)) {
 	for {
 		nmi := c.Bus.GetNMIStatus()
 		if nmi != nil {

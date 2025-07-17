@@ -21,6 +21,7 @@ type Bus struct {
 	cartridge cartridge.Cartridge // カートリッジ
 	ppu ppu.PPU // PPU
 	cycles uint16 // CPUサイクル
+	gameroutine func(*ppu.PPU)
 }
 
 
@@ -32,13 +33,14 @@ func (b *Bus) Init() {
 }
 
 // MARK: Busの初期化メソッド (カートリッジ有り)
-func (b *Bus) InitWithCartridge(cartridge *cartridge.Cartridge) {
+func (b *Bus) InitWithCartridge(cartridge *cartridge.Cartridge, gameroutine func(*ppu.PPU)) {
 	for addr := range b.wram {
 		b.wram[addr] = 0x00
 	}
 	b.cartridge = *cartridge
 	b.ppu = ppu.PPU{}
 	b.ppu.Init(b.cartridge.CharacterROM, b.cartridge.ScreenMirroring)
+	b.gameroutine = gameroutine
 }
 
 // MARK: NMIを取得
@@ -50,9 +52,16 @@ func (b *Bus) GetNMIStatus() *uint8 {
 func (b *Bus) Tick(cycles uint8) {
 	b.cycles += uint16(cycles)
 
+	nmiBefore := b.ppu.NMI
+
 	// PPUはCPUの3倍のクロック周波数
 	for range [3]int{} {
 		b.ppu.Tick(cycles)
+	}
+
+	nmiAfter := b.ppu.NMI
+	if nmiBefore == nil && nmiAfter != nil {
+		b.gameroutine(&b.ppu)
 	}
 }
 
@@ -159,7 +168,7 @@ func (b *Bus) WriteByteAt(address uint16, data uint8) {
 	case address == 0x2001: // PPU_MASK
 		b.ppu.WriteToPPUMaskRegister(data)
 	case address == 0x2002: // PPU_STATUS
-		panic(fmt.Sprintf("Error: attempt to write to PPU Status register"))
+		panic("Error: attempt to write to PPU Status register")
 	case address == 0x2003: // OAM_ADDR
 		b.ppu.WriteToOAMAddressRegister(data)
 	case address == 0x2004: // OAM_DATA
