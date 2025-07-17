@@ -5,9 +5,9 @@ import (
 )
 
 const (
-	FRAME_WIDTH  = 256
-	FRAME_HEIGHT = 240
-	TILE_SIZE    = 8
+	FRAME_WIDTH  uint16 = 256
+	FRAME_HEIGHT uint16 = 240
+	TILE_SIZE     uint8 = 8
 )
 
 var (
@@ -31,27 +31,47 @@ var (
 type Frame struct {
 	Width  uint16
 	Height uint16
-	Buffer [FRAME_WIDTH * FRAME_HEIGHT * 3]uint8
+	Buffer [uint(FRAME_WIDTH) * uint(FRAME_HEIGHT)*3]uint8
 }
 
 type Tile struct {
 	Pixels [TILE_SIZE][TILE_SIZE]uint8
 }
 
-// func GetTile(pixelData [TILE_SIZE * 2]uint8) Tile {
-// 	tile := Tile{}
+func (f *Frame) Init() {
+	f.Width = FRAME_WIDTH
+	f.Height = FRAME_HEIGHT
+}
 
-// 	// fmt.Print(pixelData)
+func (f *Frame) SetTileAt(tileIndex uint8, tile Tile) {
+	var ox uint16 = uint16((tileIndex % 32) * TILE_SIZE)
+	var oy uint16 = uint16((tileIndex / 32) * TILE_SIZE)
 
-// 	for i := range TILE_SIZE {
-// 		lower := pixelData[i]
-// 		upper := pixelData[i+TILE_SIZE]
-// 		value := upper<<1 | lower
-// 		tile.Pixels[i] = value
-// 	}
+	// fmt.Printf("set starts at (%d, %d)\n", ox, oy)
 
-// 	return tile
-// }
+	// DumpTile(tile)
+
+	for y := range TILE_SIZE {
+		for x := range TILE_SIZE {
+			pixelY := oy + uint16(y)
+			pixelX := ox + uint16(x)
+
+			if pixelY >= FRAME_HEIGHT || pixelX >= FRAME_WIDTH { continue }
+			index := pixelY * FRAME_WIDTH + pixelX
+			if uint(index) >= uint(len(f.Buffer)) {
+					fmt.Printf("Warning: index %d exceeds buffer size %d\n", index, len(f.Buffer))
+					continue
+			}
+
+			bufferIndex := (pixelY * FRAME_WIDTH + pixelX) * 3
+			color := uint8(tile.Pixels[y][x] * 85)
+			f.Buffer[bufferIndex+0] = color
+			f.Buffer[bufferIndex+1] = color
+			f.Buffer[bufferIndex+2] = color
+		}
+	}
+}
+
 
 func GetTile(tileData []byte) Tile {
 	if len(tileData) != 16 {
@@ -73,6 +93,26 @@ func GetTile(tileData []byte) Tile {
 	}
 
 	return tile
+}
+
+func DumpFrame(frame Frame) {
+	for y := range FRAME_HEIGHT-1 {
+		for x := range FRAME_WIDTH-1 {
+			color := frame.Buffer[y*FRAME_WIDTH+x]
+
+			switch color {
+			case 0:
+				fmt.Print(". ")
+			case 1:
+				fmt.Print(": ")
+			case 2:
+				fmt.Print("* ")
+			case 3:
+				fmt.Print("# ")
+			}
+		}
+		fmt.Println()
+	}
 }
 
 func DumpTile(tile Tile) {

@@ -4,10 +4,14 @@ import (
 	"Famicom-emulator/cartridge"
 	"Famicom-emulator/cpu"
 	"Famicom-emulator/ppu"
-	"fmt"
 	"log"
 	"os"
+	"unsafe"
+
+	"github.com/veandco/go-sdl2/sdl"
 )
+
+const SCALE_FACTOR = 2
 
 func main() {
 	filedata, err := os.ReadFile("../rom/SuperMarioBros.nes")
@@ -23,53 +27,73 @@ func main() {
 		log.Fatalf("Cartridge loading error: %v", err)
 	}
 
+	frame := ppu.Frame{}
+	frame.Init()
+
 	for i := range 0xFF {
-		pixels := cart.CharacterROM[i*16:(i+1)*16]
-		tile := ppu.GetTile(pixels)
-		ppu.DumpTile(tile)
-		fmt.Println()
+			pixels := cart.CharacterROM[i*16:(i+1)*16]
+			tile := ppu.GetTile(pixels)
+			frame.SetTileAt(uint8(i), tile)
 	}
 
-	// tileFrame := ppu.ShowTile(cart.CharacterROM, 1, 0)
+	// ppu.DumpFrame(frame)
 
-	// if err := sdl.Init(sdl.INIT_VIDEO); err != nil {
-	// 	panic(err)
-	// }
-	// defer sdl.Quit()
+	if err := sdl.Init(sdl.INIT_VIDEO); err != nil {
+		panic(err)
+	}
+	defer sdl.Quit()
 
-	// window, err := sdl.CreateWindow("Frame Buffer", sdl.WINDOWPOS_UNDEFINED, sdl.WINDOWPOS_UNDEFINED,
-	// 	int32(tileFrame.Width), int32(tileFrame.Height), sdl.WINDOW_SHOWN)
-	// if err != nil {
-	// 	panic(err)
-	// }
-	// defer window.Destroy()
+	window, err := sdl.CreateWindow("Famicom", sdl.WINDOWPOS_UNDEFINED, sdl.WINDOWPOS_UNDEFINED,
+		int32(frame.Width) * SCALE_FACTOR, int32(frame.Height) * SCALE_FACTOR, sdl.WINDOW_SHOWN)
+	if err != nil {
+		panic(err)
+	}
+	defer window.Destroy()
 
-	// renderer, err := sdl.CreateRenderer(window, -1, sdl.RENDERER_ACCELERATED)
-	// if err != nil {
-	// 	panic(err)
-	// }
-	// defer renderer.Destroy()
+	renderer, err := sdl.CreateRenderer(window, -1, sdl.RENDERER_ACCELERATED)
+	if err != nil {
+		panic(err)
+	}
+	defer renderer.Destroy()
 
-	// texture, err := renderer.CreateTexture(
-	// 	sdl.PIXELFORMAT_RGB24,
-	// 	sdl.TEXTUREACCESS_STREAMING,
-	// 	int32(tileFrame.Width), int32(tileFrame.Height))
-	// if err != nil {
-	// 	panic(err)
-	// }
-	// defer texture.Destroy()
-	// // テクスチャにピクセルデータをアップロード
-	// err = texture.Update(nil, unsafe.Pointer(&tileFrame.Buffer[0]), int(tileFrame.Width)*3)
-	// if err != nil {
-	// 	panic(err)
-	// }
+	texture, err := renderer.CreateTexture(
+		sdl.PIXELFORMAT_RGB24,
+		sdl.TEXTUREACCESS_STREAMING,
+		int32(frame.Width), int32(frame.Height))
+	if err != nil {
+		panic(err)
+	}
+	defer texture.Destroy()
 
-	// // 描画
-	// renderer.Clear()
-	// renderer.Copy(texture, nil, nil)
-	// renderer.Present()
+	err = texture.Update(nil, unsafe.Pointer(&frame.Buffer[0]), int(frame.Width*3))
+	if err != nil {
+			panic(err)
+	}
 
-	// sdl.Delay(100000)
+
+		// イベントループ
+	running := true
+	for running {
+		// イベント処理
+		for event := sdl.PollEvent(); event != nil; event = sdl.PollEvent() {
+				switch e := event.(type) {
+				case *sdl.QuitEvent:
+						running = false
+				case *sdl.KeyboardEvent:
+						if e.Keysym.Sym == sdl.K_ESCAPE && e.State == sdl.PRESSED {
+								running = false
+						}
+				}
+		}
+
+		// 画面を再描画
+		renderer.Clear()
+		renderer.Copy(texture, nil, nil)
+		renderer.Present()
+
+		// CPUを少し休ませる
+		sdl.Delay(16) // 約60FPS
+	}
 }
 
 
