@@ -439,6 +439,8 @@ func (ar *AddrRegister) increment(step uint8) {
 	// アドレスのミラーリング
 	if result > PPU_REG_END {
 		ar.set(result & PPU_ADDR_MIRROR_MASK)
+	} else {
+		ar.set(result)
 	}
 }
 
