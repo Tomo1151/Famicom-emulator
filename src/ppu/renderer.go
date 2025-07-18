@@ -148,7 +148,7 @@ func DumpTile(tile Tile) {
 	}
 }
 
-func getColorFromPalette(ppu PPU, tileColumn uint, tileRow uint) [4]uint8 {
+func getBGPalette(ppu PPU, tileColumn uint, tileRow uint) [4]uint8 {
 	attrTableIdx := tileRow / 4 * TILE_SIZE + tileColumn / 4
 	attrByte := ppu.vram[0x3C0 + attrTableIdx]
 
@@ -176,7 +176,17 @@ func getColorFromPalette(ppu PPU, tileColumn uint, tileRow uint) [4]uint8 {
 	return color
 }
 
-func Render(ppu PPU, frame *Frame) {
+func getSpritePalette(ppu PPU, paletteIndex uint8) [4]uint8 {
+	start := 0x11 + (paletteIndex * 4)
+	return [4]uint8{
+		0,
+		ppu.PaletteTable[start + 0],
+		ppu.PaletteTable[start + 1],
+		ppu.PaletteTable[start + 2],
+	}
+}
+
+func RenderBackground(ppu PPU, frame *Frame) {
 	var bank uint16
 	if ppu.control.BackgroundPatternAddress {
 		bank = 0x1000
@@ -190,7 +200,7 @@ func Render(ppu PPU, frame *Frame) {
 		tileY := uint(i / 32)
 		tileBasePtr :=(bank+tileIndex*16)
 		tile := ppu.CHR_ROM[tileBasePtr:tileBasePtr+16]
-		palette := getColorFromPalette(ppu, tileX, tileY)
+		palette := getBGPalette(ppu, tileX, tileY)
 
 		for y := range TILE_SIZE {
 			upper := tile[y]
@@ -204,5 +214,61 @@ func Render(ppu PPU, frame *Frame) {
 			}
 		}
 	}
+}
 
+func RenderSprite(ppu PPU, frame *Frame) {
+	// fmt.Println(ppu.oam)
+	for i := len(ppu.oam) - 4; i >= 0; i -= 4 {
+		// fmt.Println("Sprite: ", i, "rendered.")
+		tileIndex := uint16(ppu.oam[i + 1])
+		tileX := uint(ppu.oam[i + 3])
+		tileY := uint(ppu.oam[i])
+		flipV := (ppu.oam[i + 2] >> 7) & 1 == 1
+		flipH := (ppu.oam[i + 2] >> 6) & 1 == 1
+		palleteIndex := ppu.oam[i + 2] & 0b11
+		spritePalette := getSpritePalette(ppu, palleteIndex)
+
+		var bank uint16
+		if ppu.control.SpritePatternAddress {
+			bank = 0x1000
+		} else {
+			bank = 0x0000
+		}
+
+		tileBasePtr :=(bank+tileIndex*16)
+		tile := ppu.CHR_ROM[tileBasePtr:tileBasePtr+16]
+
+		for y := range TILE_SIZE {
+			upper := tile[y]
+			lower := tile[y+TILE_SIZE]
+
+			for x := range TILE_SIZE {
+				bit0 := (lower >> (7 - x)) & 1
+				bit1 := (upper >> (7 - x)) & 1
+				value := (bit1 << 1) | bit0
+				if value == 0 { continue }
+
+				rgb := PALETTE[spritePalette[value]]
+				// if y == 0 && x == 0 {
+				// 	fmt.Printf("rgb: %02X", spritePalette[value])
+				// }
+
+				if !flipH && !flipV {
+					frame.setPixelAt(tileX + x, tileY + y, rgb)
+				} else if flipH && !flipV {
+					frame.setPixelAt(tileX + TILE_SIZE-1 - x, tileY + y, rgb)
+				} else if !flipH && flipV {
+					frame.setPixelAt(tileX + x, tileY + TILE_SIZE-1 - y, rgb)
+				} else if flipH && flipV {
+					frame.setPixelAt(tileX + TILE_SIZE-1 - x, tileY + TILE_SIZE-1 - y, rgb)
+				}
+			}
+		}
+
+	}
+}
+
+func Render(ppu PPU, frame *Frame) {
+	RenderBackground(ppu, frame)
+	RenderSprite(ppu, frame)
 }
