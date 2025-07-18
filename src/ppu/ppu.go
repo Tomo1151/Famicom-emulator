@@ -23,8 +23,8 @@ const (
 type PPU struct {
 	CHR_ROM []uint8
 	PaletteTable [PALETTE_TABLE_SIZE+1]uint8
-	vram [VRAM_SIZE+1]uint8
-	oam [OAM_DATA_SIZE+1]uint8
+	vram [VRAM_SIZE]uint8
+	oam [OAM_DATA_SIZE]uint8
 	Mirroring cartridge.Mirroring
 
 	control   ControlRegister // $2000
