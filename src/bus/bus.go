@@ -183,6 +183,13 @@ func (b *Bus) WriteByteAt(address uint16, data uint8) {
 		// $2008 ~ $3FFF は $2000 ~ $2007 (8bytesを繰り返すようにマスク) へミラーリング
 		ptr := address & 0b00100000_00000111
 		b.WriteByteAt(ptr, data)
+	case address == 0x4014: // DMA転送
+		var buffer [256]uint8
+		upper := uint16(data) << 8
+		for i := range 256 {
+			buffer[i] = b.ReadByteFrom(upper + uint16(i))
+		}
+		b.ppu.DMATransfer(&buffer)
 	case 0x8000 <= address: // プログラムROM
 		panic(fmt.Sprintf("Error: attempt to write to cartridge ROM space $%04X, 0x%02X\n", address, data))
 	default:

@@ -105,7 +105,7 @@ func (p *PPU) WriteToOAMDataRegister(data uint8) {
 }
 
 // MARK: DMA転送を行う ([256]u8 の配列のアドレスを受け取る)
-func (p *PPU) DMATransfer(bytes *[0xFF]uint8) {
+func (p *PPU) DMATransfer(bytes *[256]uint8) {
 	for _, byte := range *bytes {
 		p.oam[uint16(p.oamAddress)] = byte
 		p.oamAddress++
