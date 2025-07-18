@@ -148,6 +148,34 @@ func DumpTile(tile Tile) {
 	}
 }
 
+func getColorFromPalette(ppu PPU, tileColumn uint, tileRow uint) [4]uint8 {
+	attrTableIdx := tileRow / 4 * TILE_SIZE + tileColumn / 4
+	attrByte := ppu.vram[0x3C0 + attrTableIdx]
+
+	var paletteIdx uint8
+	if tileColumn % 4 / 2 == 0 && tileRow % 4 / 2 == 0 {
+		paletteIdx = (attrByte >> 0) & 0b11
+	} else if tileColumn % 4 / 2 == 1 && tileRow % 4 / 2 == 0 {
+		paletteIdx = (attrByte >> 2) & 0b11
+	} else if tileColumn % 4 / 2 == 0 && tileRow % 4 / 2 == 1 {
+		paletteIdx = (attrByte >> 4) & 0b11
+	} else if tileColumn % 4 / 2 == 1 && tileRow % 4 / 2 == 1 {
+		paletteIdx = (attrByte >> 6) & 0b11
+	} else {
+		panic("Error: unexpected palette value")
+	}
+
+	paletteStart := 1 + paletteIdx * 4
+	color := [4]uint8{
+		ppu.PaletteTable[0],
+		ppu.PaletteTable[paletteStart+0],
+		ppu.PaletteTable[paletteStart+1],
+		ppu.PaletteTable[paletteStart+2],
+	}
+
+	return color
+}
+
 func Render(ppu PPU, frame *Frame) {
 	var bank uint16
 	if ppu.control.BackgroundPatternAddress {
@@ -162,6 +190,7 @@ func Render(ppu PPU, frame *Frame) {
 		tileY := uint(i / 32)
 		tileBasePtr :=(bank+tileIndex*16)
 		tile := ppu.CHR_ROM[tileBasePtr:tileBasePtr+16]
+		palette := getColorFromPalette(ppu, tileX, tileY)
 
 		for y := range TILE_SIZE {
 			upper := tile[y]
@@ -171,13 +200,7 @@ func Render(ppu PPU, frame *Frame) {
 				bit0 := (lower >> (7 - x)) & 1
 				bit1 := (upper >> (7 - x)) & 1
 				value := (bit1 << 1) | bit0
-				palette := [4][3]uint8{
-					PALETTE[0x01],
-					PALETTE[0x16],
-					PALETTE[0x27],
-					PALETTE[0x18],
-				}
-				frame.setPixelAt(tileX*TILE_SIZE + x, tileY*TILE_SIZE+y, palette[value])
+				frame.setPixelAt(tileX*TILE_SIZE + x, tileY*TILE_SIZE+y, PALETTE[palette[value]])
 			}
 		}
 	}
