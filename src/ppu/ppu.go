@@ -55,8 +55,8 @@ func (p *PPU) Init(chr_rom []uint8, mirroring cartridge.Mirroring){
 	p.address.Init()
 	
 	// controlレジスタでVBlankNMIを有効にする（Init後に設定）
-	p.control.GenerateNMI = true
-
+	// p.control.GenerateNMI = true
+	p.scanline = SCANLINE_VBLANK
 	p.scanline = 1
 	p.cycles = 0
 	p.internalDataBuffer = 0x00
@@ -134,7 +134,8 @@ func (p *PPU) WriteVRAM(value uint8) {
 
 	switch {
 	case addr <= 0x1FFF:
-		panic(fmt.Sprintf("addr space 0x0000..0x1FFF is not expected to write, requested: %04X", addr))
+		// panic(fmt.Sprintf("addr space 0x0000..0x1FFF is not expected to write, requested: %04X", addr))
+		return
 	case 0x2000 <= addr && addr <= 0x3EFF:
 		p.vram[p.mirrorVRAMAddress(addr)] = value
 	case 0x3F00 <= addr && addr <= 0x3FFF:
@@ -146,7 +147,11 @@ func (p *PPU) WriteVRAM(value uint8) {
 
 // MARK: PPUステータスレジスタの読み取り
 func (p *PPU) ReadPPUStatus() uint8 {
-	return p.status.ToByte()
+	status := p.status.ToByte()
+	p.status.ClearVBlankStatus()
+	p.scroll.ResetLatch()
+	p.address.ResetLatch()
+	return status
 }
 
 // MARK: OAM DATAの読み取り
@@ -247,8 +252,9 @@ func (p *PPU) Tick(cycles uint8) bool {
 
 		// VBlankに突入
 		if p.scanline == SCANLINE_VBLANK {
+			p.status.SetVBlankStatus(true)
 			if p.control.GenerateVBlankNMI() {
-				p.status.SetVBlankStatus(true)
+				// p.status.SetVBlankStatus(true)
 				// NMIを設定
 				nmiValue := uint8(1)
 				p.NMI = &nmiValue

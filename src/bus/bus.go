@@ -2,6 +2,7 @@ package bus
 
 import (
 	"Famicom-emulator/cartridge"
+	"Famicom-emulator/joypad"
 	"Famicom-emulator/ppu"
 	"fmt"
 )
@@ -20,8 +21,10 @@ type Bus struct {
 	wram [CPU_WRAM_SIZE+1]uint8 // CPUのWRAM (2kB)
 	cartridge cartridge.Cartridge // カートリッジ
 	ppu ppu.PPU // PPU
+	joypad1 *joypad.JoyPad // ポインタに変更
+	joypad2 joypad.JoyPad // コントローラ (2P)
 	cycles uint16 // CPUサイクル
-	gameroutine func(*ppu.PPU)
+	gameroutine func(*ppu.PPU, *joypad.JoyPad)
 }
 
 
@@ -33,13 +36,17 @@ func (b *Bus) Init() {
 }
 
 // MARK: Busの初期化メソッド (カートリッジ有り)
-func (b *Bus) InitWithCartridge(cartridge *cartridge.Cartridge, gameroutine func(*ppu.PPU)) {
+func (b *Bus) InitWithCartridge(cartridge *cartridge.Cartridge, j *joypad.JoyPad, gameroutine func(*ppu.PPU, *joypad.JoyPad)) {
 	for addr := range b.wram {
 		b.wram[addr] = 0x00
 	}
 	b.cartridge = *cartridge
 	b.ppu = ppu.PPU{}
 	b.ppu.Init(b.cartridge.CharacterROM, b.cartridge.ScreenMirroring)
+	
+	// 参照を保持するように変更
+	b.joypad1 = j
+	
 	b.gameroutine = gameroutine
 }
 
@@ -61,7 +68,7 @@ func (b *Bus) Tick(cycles uint8) {
 
 	nmiAfter := b.ppu.NMI
 	if nmiBefore == nil && nmiAfter != nil {
-		b.gameroutine(&b.ppu)
+		b.gameroutine(&b.ppu, b.joypad1)
 	}
 }
 
@@ -107,16 +114,23 @@ func (b *Bus) ReadByteFrom(address uint16) uint8 {
 		panic("Error: attempt to read from PPU Address register")
 	case address == 0x2007: // PPU_DATA
 		return b.ppu.ReadVRAM()
-	case address == 0x4014: // OAM_DATA (DMA)
-		panic("Error: attempt to read from OAM Data register")
 	case 0x2008 <= address && address <= PPU_REG_END: // PPUレジスタのミラーリング
 		// $2000 ~ $2007 (8bytesを繰り返すようにマスク)
 		ptr := address & 0b00100000_00000111
 		return b.ReadByteFrom(ptr)
+	case address == 0x4014: // OAM_DATA (DMA)
+		panic("Error: attempt to read from OAM Data register")
+	case address == 0x4016: // JOYPAD (1P)
+		result := b.joypad1.Read()
+		// fmt.Printf("JOYPAD Read: state=0x%02X, index=%d, result=0x%02X\n", 
+			// b.joypad1.State, b.joypad1.ButtonIndex, result)
+		return result
+	case address == 0x4017: // JOYPAD (2P)
+		return b.joypad2.Read()
 	case 0x8000 <= address: // プログラムROM
 		return b.ReadProgramROM(address)
 	default:
-		fmt.Printf("Ignoring memory access at $%04X\n", address)
+		// fmt.Printf("Ignoring memory access at $%04X\n", address)
 		return 0x00
 	}
 }
@@ -190,10 +204,15 @@ func (b *Bus) WriteByteAt(address uint16, data uint8) {
 			buffer[i] = b.ReadByteFrom(upper + uint16(i))
 		}
 		b.ppu.DMATransfer(&buffer)
+	case address == 0x4016: // コントローラ (1P)
+		// fmt.Printf("JOYPAD Write: data=0x%02X\n", data)
+		b.joypad1.Write(data)
+	case address == 0x4017: // コントローラ (2P)
+		b.joypad2.Write(data)
 	case 0x8000 <= address: // プログラムROM
 		panic(fmt.Sprintf("Error: attempt to write to cartridge ROM space $%04X, 0x%02X\n", address, data))
 	default:
-		fmt.Printf("Ignoring memory write to $%04X\n", address)
+		// fmt.Printf("Ignoring memory write to $%04X\n", address)
 	}
 }
 
@@ -215,4 +234,10 @@ func (b *Bus) ReadProgramROM(address uint16) uint8 {
 		addr %= 0x4000
 	}
 	return b.cartridge.ProgramROM[addr]
+}
+
+func (b *Bus) SetJoypad1ButtonPressed(button joypad.JoyPadButton, pressed bool) {
+    // fmt.Printf("Setting button %d to %v, state before: 0x%02X\n", button, pressed, b.joypad1.State)
+	b.joypad1.SetButtonPressed(button, pressed)
+	// fmt.Printf("State after: 0x%02X\n", b.joypad1.State)
 }
