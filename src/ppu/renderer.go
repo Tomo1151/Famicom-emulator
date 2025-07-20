@@ -44,6 +44,8 @@ func (f *Frame) Init() {
 }
 
 func (f *Frame) setPixelAt(x uint, y uint, palette [3]uint8) {
+	if x >= f.Width || y >= f.Height { return }
+
 	basePtr := (y * FRAME_WIDTH + x) * 3
 	f.Buffer[basePtr+0] = palette[0]  // R
 	f.Buffer[basePtr+1] = palette[1]  // G
