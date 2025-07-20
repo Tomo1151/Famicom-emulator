@@ -98,7 +98,7 @@ func main() {
 			}
 
 			// フレームレート制御（CPUを少し休ませる）
-			time.Sleep(time.Microsecond * 16) // 約60kHz
+			time.Sleep(time.Microsecond * 1) // 約60kHz
 		})
 	}()
 
