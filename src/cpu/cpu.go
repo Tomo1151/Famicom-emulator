@@ -96,7 +96,7 @@ func (c *CPU) Step() {
 		c.Registers.PC += uint16(instruction.Bytes)
 	}
 
-	c.Bus.Tick(instruction.Cycles)
+	c.Bus.Tick(uint(instruction.Cycles))
 }
 
 // MARK: ループ実行
@@ -132,7 +132,7 @@ func (c *CPU) interrupt(interrupt Interrupt) {
 	c.pushByte(status.ToByte())
 	c.Registers.P.Interrupt = true
 
-	c.Bus.Tick(interrupt.CPUCycles)
+	c.Bus.Tick(uint(interrupt.CPUCycles))
 	c.Registers.PC = c.ReadWordFrom(interrupt.VectorAddress) // 割り込みベク
 }
 

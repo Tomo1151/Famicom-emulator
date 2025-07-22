@@ -28,13 +28,13 @@ type PPU struct {
 	Mirroring cartridge.Mirroring
 
 	control   ControlRegister // $2000
-	maskl   MaskRegister    // $2001
+	mask   MaskRegister    // $2001
 	status StatusRegister  // $2002
 	scroll ScrollRegister  // $2005
 	address   AddrRegister    // $2006
 
 	scanline uint16 // 現在描画中のスキャンライン
-	cycles uint16 // PPUサイクル
+	cycles uint // PPUサイクル
 	internalDataBuffer uint8
 	oamAddress uint8 // OAM書き込みのポインタ
 
@@ -48,16 +48,15 @@ func (p *PPU) Init(chr_rom []uint8, mirroring cartridge.Mirroring){
 	for addr := range p.vram { p.vram[addr] = 0x00 }
 	for addr := range p.oam { p.oam[addr] = 0x00 }
 	for addr := range p.PaletteTable { p.PaletteTable[addr] = 0x00 }
+	
 	p.control.Init()
-	p.maskl.Init()
+	p.mask.Init()
 	p.status.Init()
 	p.scroll.Init()
 	p.address.Init()
-	
-	// controlレジスタでVBlankNMIを有効にする（Init後に設定）
-	// p.control.GenerateNMI = true
-	p.scanline = SCANLINE_VBLANK
-	p.scanline = 1
+
+	p.oamAddress = 0
+	p.scanline = 0
 	p.cycles = 0
 	p.internalDataBuffer = 0x00
 
@@ -73,9 +72,6 @@ func (p *PPU) WriteToPPUAddrRegister(value uint8) {
 func (p *PPU) WriteToPPUControlRegister(value uint8) {
 	prev := p.control.GenerateVBlankNMI()
 	p.control.update(value)
-	
-	// デバッグ: VBlankNMIを強制的に有効にする
-	p.control.GenerateNMI = true
 
 	// VBlank中にGenerateNMIが立つタイミングでNMIを発生させる
 	if !prev && p.control.GenerateVBlankNMI() && p.status.IsInVBlank() {
@@ -85,7 +81,7 @@ func (p *PPU) WriteToPPUControlRegister(value uint8) {
 
 // MARK: PPUマスクレジスタ($2001)への書き込み
 func (p *PPU) WriteToPPUMaskRegister(value uint8) {
-	p.maskl.update(value)
+	p.mask.update(value)
 }
 
 // MARK: OAM ADDR($2003) への書き込み
@@ -107,7 +103,7 @@ func (p *PPU) WriteToOAMDataRegister(data uint8) {
 // MARK: DMA転送を行う ([256]u8 の配列のアドレスを受け取る)
 func (p *PPU) DMATransfer(bytes *[256]uint8) {
 	for _, byte := range *bytes {
-		p.oam[uint16(p.oamAddress)] = byte
+		p.oam[p.oamAddress] = byte
 		p.oamAddress++
 	}
 }
@@ -136,10 +132,22 @@ func (p *PPU) WriteVRAM(value uint8) {
 	case addr <= 0x1FFF:
 		// panic(fmt.Sprintf("addr space 0x0000..0x1FFF is not expected to write, requested: %04X", addr))
 		return
-	case 0x2000 <= addr && addr <= 0x3EFF:
+	case 0x2000 <= addr && addr <= 0x2FFF:
 		p.vram[p.mirrorVRAMAddress(addr)] = value
-	case 0x3F00 <= addr && addr <= 0x3FFF:
+	case 0x3000 <= addr && addr <= 0x3EFF:
+		// fmt.Printf("Error: unexpected vram write to $%04X\n", addr)
+		return
+	case 0x3F00 <= addr && addr <= 0x3F1F:
+		// アドレスのミラーリング
+		if addr == 0x3F10 ||
+			 addr == 0x3F14 ||
+			 addr == 0x3F18 ||
+			 addr == 0x3FC {
+			addr -= 0x10
+		}
 		p.PaletteTable[addr - 0x3F00] = value
+	case 0x3F20 <= addr && addr <= 0x3FFF:
+		p.PaletteTable[(addr - 0x3F00)%32] = value
 	default:
 		panic(fmt.Sprintf("Unexpected write to mirrored space: %04X", addr))
 	}
@@ -179,15 +187,24 @@ func (p *PPU) ReadVRAM() uint8 {
 		p.internalDataBuffer = p.CHR_ROM[addr]
 		return value
 	case 0x2000 <= addr && addr <= 0x2FFF:
-		// 一回遅れで価は反映されるため，内部バッファを更新し，元のバッファ値を返す
+		// 一回遅れで値は反映されるため，内部バッファを更新し，元のバッファ値を返す
 		value := p.internalDataBuffer
 		p.internalDataBuffer = p.vram[p.mirrorVRAMAddress(addr)]
 		return value
 		// fmt.Println("@TODO read from VRAM")
 	case 0x3000 <= addr && addr <= 0x3EFF:
 		panic(fmt.Sprintf("addr space 0x3000..0x3eff is not expected to read, requested: %04X", addr))
-	case 0x3F00 <= addr && addr <= 0x3FFF:
+	case 0x3F00 <= addr && addr <= 0x3F1F:
+		// アドレスのミラーリング
+		if addr == 0x3F10 ||
+			 addr == 0x3F14 ||
+			 addr == 0x3F18 ||
+			 addr == 0x3FC {
+			addr -= 0x10
+		}
 		return p.PaletteTable[addr - 0x3F00]
+	case 0x3F20 <= addr && addr <= 0x3FFF:
+		return p.PaletteTable[(addr - 0x3F00)%32]
 	default:
 		panic(fmt.Sprintf("Unexpected read to mirrored space: %04X", addr))
 	}
@@ -196,7 +213,7 @@ func (p *PPU) ReadVRAM() uint8 {
 // MARK: VRAMアドレスのミラーリング
 func (p *PPU) mirrorVRAMAddress(addr uint16) uint16 {
 	// 0x3000-0x3eff から 0x2000 - 0x2eff へミラーリング
-	mirroredVRAMAddr := addr & PPU_ADDR_MIRROR_MASK
+	mirroredVRAMAddr := addr & PPU_VRAM_MIRROR_MASK
 
 	// メモリアドレスをVRAMの配列用に補正 (VRAMの先頭アドレスを引く)
 	vramIndex := mirroredVRAMAddr - 0x2000
@@ -231,21 +248,31 @@ func (p *PPU) mirrorVRAMAddress(addr uint16) uint16 {
 // MARK: 待機しているNMIを取得
 func (p *PPU) GetNMI() *uint8 {
 	if p.NMI != nil {
-		value := p.NMI
+		value := *p.NMI
 		p.NMI = nil
-		return value
+		return &value
 	} else {
 		return nil
 	}
 }
 
+func (p *PPU) isSprite0Hit(cycles uint) bool {
+	x := uint(p.oam[0])
+	y := uint(p.oam[3])
+	return y == uint(p.scanline) && x <= cycles && p.mask.SpriteEnable
+}
+
 // MARK: サイクルを進める
-func (p *PPU) Tick(cycles uint8) bool {
-	p.cycles += uint16(cycles)
+func (p *PPU) Tick(cycles uint) bool {
+	p.cycles += cycles
 
 	if p.cycles >= SCANLINE_END {
+		if p.isSprite0Hit(cycles) {
+			p.status.SetSpriteZeroHit(true)
+		}
+
 		// サイクル数を0に戻す
-		p.cycles %= SCANLINE_END
+		p.cycles -= SCANLINE_END
 
 		// スキャンラインを進める
 		p.scanline++
@@ -253,6 +280,7 @@ func (p *PPU) Tick(cycles uint8) bool {
 		// VBlankに突入
 		if p.scanline == SCANLINE_VBLANK {
 			p.status.SetVBlankStatus(true)
+			p.status.SetSpriteZeroHit(false)
 			if p.control.GenerateVBlankNMI() {
 				// p.status.SetVBlankStatus(true)
 				// NMIを設定

@@ -1,13 +1,16 @@
 package ppu
 
 import (
+	"Famicom-emulator/cartridge"
 	"fmt"
 )
 
 const (
-	FRAME_WIDTH  uint = 256
-	FRAME_HEIGHT uint = 240
-	TILE_SIZE    uint = 8
+	SCREEN_WIDTH  uint = 256
+	SCREEN_HEIGHT uint = 240
+	FRAME_WIDTH   uint = SCREEN_WIDTH * 2
+	FRAME_HEIGHT  uint = 240
+	TILE_SIZE     uint = 8
 )
 
 var (
@@ -34,8 +37,11 @@ type Frame struct {
 	Buffer [uint(FRAME_WIDTH) * uint(FRAME_HEIGHT)*3]byte
 }
 
-type Tile struct {
-	Pixels [TILE_SIZE][TILE_SIZE]uint8
+type Rect struct {
+	x1 uint
+	y1 uint
+	x2 uint
+	y2 uint
 }
 
 func (f *Frame) Init() {
@@ -52,107 +58,9 @@ func (f *Frame) setPixelAt(x uint, y uint, palette [3]uint8) {
 	f.Buffer[basePtr+2] = palette[2]  // B
 }
 
-func (f *Frame) SetTileAt(tileIndex uint, tile Tile) {
-	var ox uint = (tileIndex % 32) * uint(TILE_SIZE)
-	var oy uint = (tileIndex / 32) * uint(TILE_SIZE)
-
-	fmt.Printf("set starts at (%d, %d)\n", ox, oy)
-
-	DumpTile(tile)
-
-	for y := range TILE_SIZE {
-		for x := range TILE_SIZE {
-			pixelY := oy + y
-			pixelX := ox + x
-
-			if pixelY >= FRAME_HEIGHT || pixelX >= FRAME_WIDTH { continue }
-			index := pixelY * FRAME_WIDTH + pixelX
-			if uint(index) >= uint(len(f.Buffer)) {
-					fmt.Printf("Warning: index %d exceeds buffer size %d\n", index, len(f.Buffer))
-					continue
-			}
-
-			bufferIndex := (pixelY * FRAME_WIDTH + pixelX) * 3
-			var colorPallette [4][3]uint8 = [4][3]uint8{
-				PALETTE[0x01],
-				PALETTE[0x16],
-				PALETTE[0x27],
-				PALETTE[0x18],
-			}
-			color := tile.Pixels[y][x]
-			f.Buffer[bufferIndex+0] = colorPallette[color][0] // R
-			f.Buffer[bufferIndex+1] = colorPallette[color][1] // G
-			f.Buffer[bufferIndex+2] = colorPallette[color][2] // B
-		}
-	}
-}
-
-
-func GetTile(tileData []byte) Tile {
-	if len(tileData) != 16 {
-		panic("Error: invalid tile data size")
-	}
-
-	tile := Tile{}
-
-	for y := range TILE_SIZE {
-		lower := tileData[y]
-		upper := tileData[y+8]
-
-		for x := range TILE_SIZE {
-			bit0 := (lower >> (7 - x)) & 1
-			bit1 := (upper >> (7 - x)) & 1
-			color := (bit1 << 1) | bit0
-			tile.Pixels[y][x] = color
-		}
-	}
-
-	return tile
-}
-
-func DumpFrame(frame Frame) {
-	for y := range FRAME_HEIGHT-1 {
-		for x := range FRAME_WIDTH-1 {
-			color := frame.Buffer[y*FRAME_WIDTH+x]
-
-			switch color {
-			case 0:
-				fmt.Print(". ")
-			case 1:
-				fmt.Print(": ")
-			case 2:
-				fmt.Print("* ")
-			case 3:
-				fmt.Print("# ")
-			}
-		}
-		fmt.Println()
-	}
-}
-
-func DumpTile(tile Tile) {
-	for y := range TILE_SIZE {
-		for x := range TILE_SIZE {
-			color := tile.Pixels[y][x]
-
-			switch color {
-			case 0:
-				fmt.Print(". ")
-			case 1:
-				fmt.Print(": ")
-			case 2:
-				fmt.Print("* ")
-			case 3:
-				fmt.Print("# ")
-			}
-		}
-		fmt.Println()
-	}
-}
-
-func getBGPalette(ppu PPU, tileColumn uint, tileRow uint) [4]uint8 {
+func getBGPalette(ppu *PPU, attrributeTable *[]uint8, tileColumn uint, tileRow uint) [4]uint8 {
 	attrTableIdx := tileRow / 4 * TILE_SIZE + tileColumn / 4
-	attrByte := ppu.vram[0x3C0 + attrTableIdx]
+	attrByte := (*attrributeTable)[attrTableIdx]
 
 	var paletteIdx uint8
 	if tileColumn % 4 / 2 == 0 && tileRow % 4 / 2 == 0 {
@@ -178,7 +86,7 @@ func getBGPalette(ppu PPU, tileColumn uint, tileRow uint) [4]uint8 {
 	return color
 }
 
-func getSpritePalette(ppu PPU, paletteIndex uint8) [4]uint8 {
+func getSpritePalette(ppu *PPU, paletteIndex uint8) [4]uint8 {
 	start := 0x11 + (paletteIndex * 4)
 	return [4]uint8{
 		0,
@@ -188,13 +96,8 @@ func getSpritePalette(ppu PPU, paletteIndex uint8) [4]uint8 {
 	}
 }
 
-func RenderBackground(ppu PPU, frame *Frame) {
-	var bank uint16
-	if ppu.control.BackgroundPatternAddress {
-		bank = 0x1000
-	} else {
-		bank = 0x0000
-	}
+func RenderBackground(ppu *PPU, frame *Frame) {
+	bank := ppu.control.GetBackgroundPatternTableAddress()
 
 	for i := range 0x03C0 {
 		tileIndex := uint16(ppu.vram[i])
@@ -202,7 +105,8 @@ func RenderBackground(ppu PPU, frame *Frame) {
 		tileY := uint(i / 32)
 		tileBasePtr :=(bank+tileIndex*16)
 		tile := ppu.CHR_ROM[tileBasePtr:tileBasePtr+16]
-		palette := getBGPalette(ppu, tileX, tileY)
+		attrTable := ppu.vram[0x3C0:0x400]
+		palette := getBGPalette(ppu, &attrTable, tileX, tileY)
 
 		for y := range TILE_SIZE {
 			upper := tile[y]
@@ -218,7 +122,7 @@ func RenderBackground(ppu PPU, frame *Frame) {
 	}
 }
 
-func RenderSprite(ppu PPU, frame *Frame) {
+func RenderSprite(ppu *PPU, frame *Frame) {
 	// fmt.Println(ppu.oam)
 	for i := len(ppu.oam) - 4; i >= 0; i -= 4 {
 		// fmt.Println("Sprite: ", i, "rendered.")
@@ -230,13 +134,7 @@ func RenderSprite(ppu PPU, frame *Frame) {
 		palleteIndex := ppu.oam[i + 2] & 0b11
 		spritePalette := getSpritePalette(ppu, palleteIndex)
 
-		var bank uint16
-		if ppu.control.SpritePatternAddress {
-			bank = 0x1000
-		} else {
-			bank = 0x0000
-		}
-
+		bank := ppu.control.GetSpritePatternTableAddress()
 		tileBasePtr :=(bank+tileIndex*16)
 		tile := ppu.CHR_ROM[tileBasePtr:tileBasePtr+16]
 
@@ -270,7 +168,125 @@ func RenderSprite(ppu PPU, frame *Frame) {
 	}
 }
 
-func Render(ppu PPU, frame *Frame) {
-	RenderBackground(ppu, frame)
+func RenderNameTable(ppu *PPU, frame *Frame, nameTable *[]uint8, viewport Rect, shiftX int, shiftY int) {
+	bank := ppu.control.GetBackgroundPatternTableAddress()
+	attrributeTable := (*nameTable)[0x3C0:0x400]
+
+	for i := range 0x3C0 {
+		tileIndex := uint16((*nameTable)[i])
+		tileX := uint(i % 32)
+		tileY := uint(i / 32)
+		tileBasePtr :=(bank+tileIndex*16)
+		tile := ppu.CHR_ROM[tileBasePtr:tileBasePtr+16]
+		palette := getBGPalette(ppu, &attrributeTable, tileX, tileY)
+
+		for y := range TILE_SIZE {
+			upper := tile[y]
+			lower := tile[y+TILE_SIZE]
+
+			for x := range TILE_SIZE {
+				bit0 := (lower >> (7 - x)) & 1
+				bit1 := (upper >> (7 - x)) & 1
+				value := (bit1 << 1) | bit0
+
+				pixelX := tileX * TILE_SIZE + x
+				pixelY := tileY * TILE_SIZE + y
+
+				if pixelX >= uint(viewport.x1) && pixelX < uint(viewport.x2) && pixelY >= uint(viewport.y1) && pixelY < uint(viewport.y2) {
+					frame.setPixelAt(uint(shiftX + int(pixelX)), uint(shiftY + int(pixelY)), PALETTE[palette[value]])
+				}
+			}
+		}
+	}
+}
+
+func Render(ppu *PPU, frame *Frame) {
+	scrollX := uint(ppu.scroll.ScrollX)
+	scrollY := uint(ppu.scroll.ScrollY)
+
+	var primary, secondary = getNameTables(ppu)
+
+	RenderNameTable(
+		ppu,
+		frame,
+		primary,
+		Rect{scrollX, scrollY, SCREEN_WIDTH, SCREEN_HEIGHT},
+		-int(scrollX),
+		-int(scrollY),
+	)
+
+	if scrollX > 0 {
+		RenderNameTable(
+			ppu,
+			frame,
+			secondary,
+			Rect{0, 0, scrollX, SCREEN_HEIGHT},
+			int(SCREEN_WIDTH - scrollX),
+			0,
+		)
+	} else if scrollY > 0 {
+		RenderNameTable(
+			ppu,
+			frame,
+			secondary,
+			Rect{0, 0, SCREEN_WIDTH, scrollY},
+			0,
+			int(SCREEN_HEIGHT - scrollY),
+		)
+	}
+
+	// RenderBackground(ppu, frame)
 	RenderSprite(ppu, frame)
+}
+
+func getNameTables(ppu *PPU) (*[]uint8, *[]uint8) {
+	var primaryNameTable []uint8
+	var secondaryNameTable []uint8
+	if (ppu.Mirroring == cartridge.MIRRORING_VERTICAL &&
+		(ppu.control.GetBaseNameTableAddress() == 0x2000 ||
+		ppu.control.GetBaseNameTableAddress() == 0x2800)) {
+		primaryNameTable = ppu.vram[0x000:0x400]
+		secondaryNameTable = ppu.vram[0x400:0x800]
+	} else if (ppu.Mirroring == cartridge.MIRRORING_HORIZONTAL &&
+		(ppu.control.GetBackgroundPatternTableAddress() == 0x2000 ||
+		ppu.control.GetBaseNameTableAddress() == 0x2400)) {
+		primaryNameTable = ppu.vram[0x000:0x400]
+		secondaryNameTable = ppu.vram[0x400:0x800]
+	} else if (ppu.Mirroring == cartridge.MIRRORING_VERTICAL &&
+		(ppu.control.GetBaseNameTableAddress() == 0x2400 ||
+		ppu.control.GetBaseNameTableAddress() == 0x2C00)) {
+		primaryNameTable = ppu.vram[0x400:0x800]
+		secondaryNameTable = ppu.vram[0x000:0x400]
+	} else if (ppu.Mirroring == cartridge.MIRRORING_HORIZONTAL &&
+		(ppu.control.GetBackgroundPatternTableAddress() == 0x2800 ||
+		ppu.control.GetBaseNameTableAddress() == 0x2C00)) {
+		primaryNameTable = ppu.vram[0x400:0x800]
+		secondaryNameTable = ppu.vram[0x000:0x400]
+	} else {
+		primaryNameTable = ppu.vram[0x000:0x400]
+		secondaryNameTable = ppu.vram[0x400:0x800]
+	}
+	return &primaryNameTable, &secondaryNameTable
+}
+
+
+
+func DumpFrame(frame Frame) {
+	for y := range FRAME_HEIGHT-1 {
+		for x := range FRAME_WIDTH-1 {
+			color := frame.Buffer[y*FRAME_WIDTH+x]
+
+			switch color {
+			case 0:
+				fmt.Print(". ")
+			case 1:
+				fmt.Print(": ")
+			case 2:
+				fmt.Print("* ")
+			case 3:
+				fmt.Print("# ")
+			}
+		}
+		fmt.Println()
+	}
 }

@@ -46,7 +46,7 @@ func main() {
 	defer sdl.Quit()
 
 	window, err := sdl.CreateWindow("Famicom", sdl.WINDOWPOS_UNDEFINED, sdl.WINDOWPOS_UNDEFINED,
-		int32(frame.Width)*SCALE_FACTOR, int32(frame.Height)*SCALE_FACTOR, sdl.WINDOW_SHOWN)
+		int32(ppu.SCREEN_WIDTH)*SCALE_FACTOR, int32(ppu.SCREEN_HEIGHT)*SCALE_FACTOR, sdl.WINDOW_SHOWN)
 	if err != nil {
 		panic(err)
 	}
@@ -62,7 +62,7 @@ func main() {
 	texture, err := renderer.CreateTexture(
 		sdl.PIXELFORMAT_RGB24,
 		sdl.TEXTUREACCESS_STREAMING,
-		int32(frame.Width), int32(frame.Height))
+		int32(ppu.SCREEN_WIDTH), int32(ppu.SCREEN_HEIGHT))
 	if err != nil {
 		panic(err)
 	}
@@ -71,7 +71,7 @@ func main() {
 	bus := bus.Bus{}
 	bus.InitWithCartridge(&cart, &pad, func(p *ppu.PPU, j *joypad.JoyPad) {
 		// PPUコールバック内でフレームをレンダリング
-		ppu.Render(*p, &frame)
+		ppu.Render(p, &frame)
 	})
 
 	c := cpu.CPU{}
@@ -87,6 +87,7 @@ func main() {
 	// CPU実行をゴルーチンで別スレッドで実行
 	go func() {
 		c.RunWithCallback(func(cpu *cpu.CPU) {
+			// c.Trace()
 			mu.Lock()
 			isRunning := running
 			mu.Unlock()

@@ -18,8 +18,9 @@ const (
 	PPU_REG_START  = 0x2000
 	PPU_REG_END    = 0x3FFF
 
-	// VRAMのアドレスマスク
-	PPU_ADDR_MIRROR_MASK = 0b111111_11111111 // 14ビット
+	// PPU_ADDRのアドレスマスク
+	PPU_ADDR_MIRROR_MASK = 0b111111_11111111
+	PPU_VRAM_MIRROR_MASK = 0b101111_11111111
 )
 
 const (
@@ -369,12 +370,12 @@ type ScrollRegister struct {
 func (sr *ScrollRegister) Init() {
 	sr.ScrollX = 0x00
 	sr.ScrollY = 0x00
-	sr.writeLatch = true
+	sr.writeLatch = false
 }
 
 // スクロールレジスタの書き込みメソッド (1度目はX, 2度目はYの値として書き込む)
 func (sr *ScrollRegister) Write(data uint8) {
-	if sr.writeLatch {
+	if !sr.writeLatch {
 		sr.ScrollX = data
 	} else {
 		sr.ScrollY = data
@@ -383,7 +384,7 @@ func (sr *ScrollRegister) Write(data uint8) {
 
 // 書き込みラッチのリセットメソッド
 func (sr *ScrollRegister) ResetLatch() {
-	sr.writeLatch = true
+	sr.writeLatch = false
 }
 
 

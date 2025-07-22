@@ -23,7 +23,7 @@ type Bus struct {
 	ppu ppu.PPU // PPU
 	joypad1 *joypad.JoyPad // ポインタに変更
 	joypad2 joypad.JoyPad // コントローラ (2P)
-	cycles uint16 // CPUサイクル
+	cycles uint // CPUサイクル
 	gameroutine func(*ppu.PPU, *joypad.JoyPad)
 }
 
@@ -56,8 +56,8 @@ func (b *Bus) GetNMIStatus() *uint8 {
 }
 
 // MARK: サイクルを進める
-func (b *Bus) Tick(cycles uint8) {
-	b.cycles += uint16(cycles)
+func (b *Bus) Tick(cycles uint) {
+	b.cycles += cycles
 
 	nmiBefore := b.ppu.NMI
 
