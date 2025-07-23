@@ -13,24 +13,6 @@ const (
 	TILE_SIZE     uint = 8
 )
 
-var (
-	PALETTE = [64][3]uint8{
-		{0x80, 0x80, 0x80}, {0x00, 0x3D, 0xA6}, {0x00, 0x12, 0xB0}, {0x44, 0x00, 0x96}, {0xA1, 0x00, 0x5E},
-		{0xC7, 0x00, 0x28}, {0xBA, 0x06, 0x00}, {0x8C, 0x17, 0x00}, {0x5C, 0x2F, 0x00}, {0x10, 0x45, 0x00},
-		{0x05, 0x4A, 0x00}, {0x00, 0x47, 0x2E}, {0x00, 0x41, 0x66}, {0x00, 0x00, 0x00}, {0x05, 0x05, 0x05},
-		{0x05, 0x05, 0x05}, {0xC7, 0xC7, 0xC7}, {0x00, 0x77, 0xFF}, {0x21, 0x55, 0xFF}, {0x82, 0x37, 0xFA},
-		{0xEB, 0x2F, 0xB5}, {0xFF, 0x29, 0x50}, {0xFF, 0x22, 0x00}, {0xD6, 0x32, 0x00}, {0xC4, 0x62, 0x00},
-		{0x35, 0x80, 0x00}, {0x05, 0x8F, 0x00}, {0x00, 0x8A, 0x55}, {0x00, 0x99, 0xCC}, {0x21, 0x21, 0x21},
-		{0x09, 0x09, 0x09}, {0x09, 0x09, 0x09}, {0xFF, 0xFF, 0xFF}, {0x0F, 0xD7, 0xFF}, {0x69, 0xA2, 0xFF},
-		{0xD4, 0x80, 0xFF}, {0xFF, 0x45, 0xF3}, {0xFF, 0x61, 0x8B}, {0xFF, 0x88, 0x33}, {0xFF, 0x9C, 0x12},
-		{0xFA, 0xBC, 0x20}, {0x9F, 0xE3, 0x0E}, {0x2B, 0xF0, 0x35}, {0x0C, 0xF0, 0xA4}, {0x05, 0xFB, 0xFF},
-		{0x5E, 0x5E, 0x5E}, {0x0D, 0x0D, 0x0D}, {0x0D, 0x0D, 0x0D}, {0xFF, 0xFF, 0xFF}, {0xA6, 0xFC, 0xFF},
-		{0xB3, 0xEC, 0xFF}, {0xDA, 0xAB, 0xEB}, {0xFF, 0xA8, 0xF9}, {0xFF, 0xAB, 0xB3}, {0xFF, 0xD2, 0xB0},
-		{0xFF, 0xEF, 0xA6}, {0xFF, 0xF7, 0x9C}, {0xD7, 0xE8, 0x95}, {0xA6, 0xED, 0xAF}, {0xA2, 0xF2, 0xDA},
-		{0x99, 0xFF, 0xFC}, {0xDD, 0xDD, 0xDD}, {0x11, 0x11, 0x11}, {0x11, 0x11, 0x11},
-	}
-)
-
 type Frame struct {
 	Width  uint
 	Height uint
@@ -64,7 +46,7 @@ func getBGPalette(ppu *PPU, attrributeTable *[]uint8, tileColumn uint, tileRow u
 
 	var paletteIdx uint8
 	if tileColumn % 4 / 2 == 0 && tileRow % 4 / 2 == 0 {
-		paletteIdx = (attrByte >> 0) & 0b11
+		paletteIdx = (attrByte) & 0b11
 	} else if tileColumn % 4 / 2 == 1 && tileRow % 4 / 2 == 0 {
 		paletteIdx = (attrByte >> 2) & 0b11
 	} else if tileColumn % 4 / 2 == 0 && tileRow % 4 / 2 == 1 {
@@ -75,7 +57,7 @@ func getBGPalette(ppu *PPU, attrributeTable *[]uint8, tileColumn uint, tileRow u
 		panic("Error: unexpected palette value")
 	}
 
-	paletteStart := 1 + paletteIdx * 4
+	var paletteStart uint = 1 + uint(paletteIdx) * 4
 	color := [4]uint8{
 		ppu.PaletteTable[0],
 		ppu.PaletteTable[paletteStart+0],
@@ -87,7 +69,7 @@ func getBGPalette(ppu *PPU, attrributeTable *[]uint8, tileColumn uint, tileRow u
 }
 
 func getSpritePalette(ppu *PPU, paletteIndex uint8) [4]uint8 {
-	start := 0x11 + (paletteIndex * 4)
+	var start uint = 0x11 + uint(paletteIndex * 4)
 	return [4]uint8{
 		0,
 		ppu.PaletteTable[start + 0],
@@ -96,36 +78,9 @@ func getSpritePalette(ppu *PPU, paletteIndex uint8) [4]uint8 {
 	}
 }
 
-func RenderBackground(ppu *PPU, frame *Frame) {
-	bank := ppu.control.GetBackgroundPatternTableAddress()
-
-	for i := range 0x03C0 {
-		tileIndex := uint16(ppu.vram[i])
-		tileX := uint(i % 32)
-		tileY := uint(i / 32)
-		tileBasePtr :=(bank+tileIndex*16)
-		tile := ppu.CHR_ROM[tileBasePtr:tileBasePtr+16]
-		attrTable := ppu.vram[0x3C0:0x400]
-		palette := getBGPalette(ppu, &attrTable, tileX, tileY)
-
-		for y := range TILE_SIZE {
-			upper := tile[y]
-			lower := tile[y+TILE_SIZE]
-
-			for x := range TILE_SIZE {
-				bit0 := (lower >> (7 - x)) & 1
-				bit1 := (upper >> (7 - x)) & 1
-				value := (bit1 << 1) | bit0
-				frame.setPixelAt(tileX*TILE_SIZE + x, tileY*TILE_SIZE+y, PALETTE[palette[value]])
-			}
-		}
-	}
-}
 
 func RenderSprite(ppu *PPU, frame *Frame) {
-	// fmt.Println(ppu.oam)
 	for i := len(ppu.oam) - 4; i >= 0; i -= 4 {
-		// fmt.Println("Sprite: ", i, "rendered.")
 		tileIndex := uint16(ppu.oam[i + 1])
 		tileX := uint(ppu.oam[i + 3])
 		tileY := uint(ppu.oam[i])
@@ -142,25 +97,23 @@ func RenderSprite(ppu *PPU, frame *Frame) {
 			upper := tile[y]
 			lower := tile[y+TILE_SIZE]
 
-			for x := range TILE_SIZE {
-				bit0 := (lower >> (7 - x)) & 1
-				bit1 := (upper >> (7 - x)) & 1
-				value := (bit1 << 1) | bit0
+			for x := int(TILE_SIZE)-1; x >= 0; x-- {
+				value := (1 & lower) << 1 | (1 & upper)
+				upper >>= 1
+				lower >>= 1
+
 				if value == 0 { continue }
 
 				rgb := PALETTE[spritePalette[value]]
-				// if y == 0 && x == 0 {
-				// 	fmt.Printf("rgb: %02X", spritePalette[value])
-				// }
 
 				if !flipH && !flipV {
-					frame.setPixelAt(tileX + x, tileY + y, rgb)
+					frame.setPixelAt(tileX + uint(x), tileY + y, rgb)
 				} else if flipH && !flipV {
-					frame.setPixelAt(tileX + TILE_SIZE-1 - x, tileY + y, rgb)
+					frame.setPixelAt(tileX + TILE_SIZE-1 - uint(x), tileY + y, rgb)
 				} else if !flipH && flipV {
-					frame.setPixelAt(tileX + x, tileY + TILE_SIZE-1 - y, rgb)
+					frame.setPixelAt(tileX + uint(x), tileY + TILE_SIZE-1 - y, rgb)
 				} else if flipH && flipV {
-					frame.setPixelAt(tileX + TILE_SIZE-1 - x, tileY + TILE_SIZE-1 - y, rgb)
+					frame.setPixelAt(tileX + TILE_SIZE-1 - uint(x), tileY + TILE_SIZE-1 - y, rgb)
 				}
 			}
 		}
@@ -184,10 +137,10 @@ func RenderNameTable(ppu *PPU, frame *Frame, nameTable *[]uint8, viewport Rect, 
 			upper := tile[y]
 			lower := tile[y+TILE_SIZE]
 
-			for x := range TILE_SIZE {
-				bit0 := (lower >> (7 - x)) & 1
-				bit1 := (upper >> (7 - x)) & 1
-				value := (bit1 << 1) | bit0
+			for x := TILE_SIZE; x > 0; x-- {
+				value := (1 & lower) << 1 | (1 & upper)
+				upper >>= 1
+				lower >>= 1
 
 				pixelX := tileX * TILE_SIZE + x
 				pixelY := tileY * TILE_SIZE + y

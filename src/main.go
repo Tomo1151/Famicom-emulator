@@ -17,7 +17,7 @@ import (
 const SCALE_FACTOR = 3
 
 func main() {
-	filedata, err := os.ReadFile("../rom/Alter_Ego.nes")
+	filedata, err := os.ReadFile("../rom/SuperMarioBros.nes")
 	if err != nil {
 		log.Fatalf("Error occured in 'os.ReadFile()'")
 	}
