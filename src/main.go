@@ -107,7 +107,7 @@ func main() {
 					bus.SetJoypad1ButtonPressed(joypad.JOYPAD_BUTTON_LEFT_POSITION, e.State == sdl.PRESSED)
 				case sdl.K_d:
 					bus.SetJoypad1ButtonPressed(joypad.JOYPAD_BUTTON_RIGHT_POSITION, e.State == sdl.PRESSED)
-				case sdl.K_RETURN:
+				case sdl.K_RETURN, sdl.K_KP_ENTER:
 					bus.SetJoypad1ButtonPressed(joypad.JOYPAD_BUTTON_START_POSITION, e.State == sdl.PRESSED)
 				case sdl.K_BACKSPACE:
 					bus.SetJoypad1ButtonPressed(joypad.JOYPAD_BUTTON_SELECT_POSITION, e.State == sdl.PRESSED)
