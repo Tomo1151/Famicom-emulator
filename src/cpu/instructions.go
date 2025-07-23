@@ -430,7 +430,7 @@ func generateInstructionSet(c *CPU) instructionSet {
 		Bytes: 2,
 		Cycles: 2,
 		PageCycles: 0,
-		Handler: c.aax,
+		Handler: c.asr,
 	}
 
 
