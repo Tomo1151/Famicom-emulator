@@ -137,15 +137,15 @@ func RenderNameTable(ppu *PPU, frame *Frame, nameTable *[]uint8, viewport Rect, 
 			upper := tile[y]
 			lower := tile[y+TILE_SIZE]
 
-			for x := TILE_SIZE; x > 0; x-- {
+			for x := int(TILE_SIZE-1); x >= 0; x-- {
 				value := (1 & lower) << 1 | (1 & upper)
 				upper >>= 1
 				lower >>= 1
 
-				pixelX := tileX * TILE_SIZE + x
-				pixelY := tileY * TILE_SIZE + y
+				pixelX := tileX * TILE_SIZE + uint(x)
+				pixelY := tileY * TILE_SIZE + uint(y)
 
-				if pixelX >= uint(viewport.x1) && pixelX < uint(viewport.x2) && pixelY >= uint(viewport.y1) && pixelY < uint(viewport.y2) {
+				if pixelX >= viewport.x1 && pixelX < viewport.x2 && pixelY >= viewport.y1 && pixelY < viewport.y2 {
 					frame.setPixelAt(uint(shiftX + int(pixelX)), uint(shiftY + int(pixelY)), PALETTE[palette[value]])
 				}
 			}
