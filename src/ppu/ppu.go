@@ -256,7 +256,7 @@ func (p *PPU) GetNMI() *uint8 {
 	}
 }
 
-func (p *PPU) isSprite0Hit(cycles uint) bool {
+func (p *PPU) isSpriteZeroHit(cycles uint) bool {
 	x := uint(p.oam[0])
 	y := uint(p.oam[3])
 	return y == uint(p.scanline) && x <= cycles && p.mask.SpriteEnable
@@ -264,10 +264,11 @@ func (p *PPU) isSprite0Hit(cycles uint) bool {
 
 // MARK: サイクルを進める
 func (p *PPU) Tick(cycles uint) bool {
+	// fmt.Printf("line: %d, cycle: %d, status: %b\n", p.scanline, cycles, p.status.ToByte())
 	p.cycles += cycles
 
 	if p.cycles >= SCANLINE_END {
-		if p.isSprite0Hit(cycles) {
+		if p.isSpriteZeroHit(p.cycles) {
 			p.status.SetSpriteZeroHit(true)
 		}
 
@@ -282,7 +283,6 @@ func (p *PPU) Tick(cycles uint) bool {
 			p.status.SetVBlankStatus(true)
 			p.status.SetSpriteZeroHit(false)
 			if p.control.GenerateVBlankNMI() {
-				// p.status.SetVBlankStatus(true)
 				// NMIを設定
 				nmiValue := uint8(1)
 				p.NMI = &nmiValue
@@ -290,11 +290,11 @@ func (p *PPU) Tick(cycles uint) bool {
 		}
 
 		// プリレンダーラインに到達した時
-		if p.scanline > SCANLINE_PRERENDER {
+		if p.scanline >= SCANLINE_PRERENDER+1 {
 			p.scanline = 0
 			p.NMI = nil
-			p.status.ClearVBlankStatus()
 			p.status.SetSpriteZeroHit(false)
+			p.status.ClearVBlankStatus()
 			return true
 		}
 	}
