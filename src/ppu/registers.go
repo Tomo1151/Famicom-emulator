@@ -380,6 +380,7 @@ func (sr *ScrollRegister) Write(data uint8) {
 	} else {
 		sr.ScrollY = data
 	}
+	sr.writeLatch = !sr.writeLatch
 }
 
 // 書き込みラッチのリセットメソッド
