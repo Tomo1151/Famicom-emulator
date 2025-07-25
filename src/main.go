@@ -31,9 +31,6 @@ func main() {
 	frame := ppu.Frame{}
 	frame.Init()
 
-	pad := joypad.JoyPad{}
-	pad.Init()
-
 	if err := sdl.Init(sdl.INIT_VIDEO); err != nil {
 		panic(err)
 	}
@@ -68,7 +65,7 @@ func main() {
 
 	// BusのNMIコールバックで描画とイベント処理
 	bus := bus.Bus{}
-	bus.InitWithCartridge(&cart, &pad, func(p *ppu.PPU, j *joypad.JoyPad) {
+	bus.InitWithCartridge(&cart, func(p *ppu.PPU, j *joypad.JoyPad) {
 
 		now := time.Now()
 		elapsed := now.Sub(lastFrameTime)
@@ -96,21 +93,21 @@ func main() {
 				// キー入力をJoypadに反映
 				switch e.Keysym.Sym {
 				case sdl.K_k:
-					bus.SetJoypad1ButtonPressed(joypad.JOYPAD_BUTTON_A_POSITION, e.State == sdl.PRESSED)
+					j.SetButtonPressed(joypad.JOYPAD_BUTTON_A_POSITION, e.State == sdl.PRESSED)
 				case sdl.K_j:
-					bus.SetJoypad1ButtonPressed(joypad.JOYPAD_BUTTON_B_POSITION, e.State == sdl.PRESSED)
+					j.SetButtonPressed(joypad.JOYPAD_BUTTON_B_POSITION, e.State == sdl.PRESSED)
 				case sdl.K_w:
-					bus.SetJoypad1ButtonPressed(joypad.JOYPAD_BUTTON_UP_POSITION, e.State == sdl.PRESSED)
+					j.SetButtonPressed(joypad.JOYPAD_BUTTON_UP_POSITION, e.State == sdl.PRESSED)
 				case sdl.K_s:
-					bus.SetJoypad1ButtonPressed(joypad.JOYPAD_BUTTON_DOWN_POSITION, e.State == sdl.PRESSED)
+					j.SetButtonPressed(joypad.JOYPAD_BUTTON_DOWN_POSITION, e.State == sdl.PRESSED)
 				case sdl.K_a:
-					bus.SetJoypad1ButtonPressed(joypad.JOYPAD_BUTTON_LEFT_POSITION, e.State == sdl.PRESSED)
+					j.SetButtonPressed(joypad.JOYPAD_BUTTON_LEFT_POSITION, e.State == sdl.PRESSED)
 				case sdl.K_d:
-					bus.SetJoypad1ButtonPressed(joypad.JOYPAD_BUTTON_RIGHT_POSITION, e.State == sdl.PRESSED)
-				case sdl.K_RETURN:
-					bus.SetJoypad1ButtonPressed(joypad.JOYPAD_BUTTON_START_POSITION, e.State == sdl.PRESSED)
+					j.SetButtonPressed(joypad.JOYPAD_BUTTON_RIGHT_POSITION, e.State == sdl.PRESSED)
+				case sdl.K_RETURN, sdl.K_KP_ENTER:
+					j.SetButtonPressed(joypad.JOYPAD_BUTTON_START_POSITION, e.State == sdl.PRESSED)
 				case sdl.K_BACKSPACE:
-					bus.SetJoypad1ButtonPressed(joypad.JOYPAD_BUTTON_SELECT_POSITION, e.State == sdl.PRESSED)
+					j.SetButtonPressed(joypad.JOYPAD_BUTTON_SELECT_POSITION, e.State == sdl.PRESSED)
 				}
 			}
 		}

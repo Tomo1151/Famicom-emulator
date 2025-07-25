@@ -36,17 +36,15 @@ func (b *Bus) Init() {
 }
 
 // MARK: Busの初期化メソッド (カートリッジ有り)
-func (b *Bus) InitWithCartridge(cartridge *cartridge.Cartridge, j *joypad.JoyPad, gameroutine func(*ppu.PPU, *joypad.JoyPad)) {
+func (b *Bus) InitWithCartridge(cartridge *cartridge.Cartridge, gameroutine func(*ppu.PPU, *joypad.JoyPad)) {
 	for addr := range b.wram {
 		b.wram[addr] = 0x00
 	}
 	b.cartridge = *cartridge
 	b.ppu = ppu.PPU{}
 	b.ppu.Init(b.cartridge.CharacterROM, b.cartridge.ScreenMirroring)
-	
-	// 参照を保持するように変更
-	b.joypad1 = j
-	
+	b.joypad1 = &joypad.JoyPad{}
+	b.joypad1.Init()
 	b.gameroutine = gameroutine
 }
 
@@ -126,7 +124,7 @@ func (b *Bus) ReadByteFrom(address uint16) uint8 {
 			// b.joypad1.State, b.joypad1.ButtonIndex, result)
 		return result
 	case address == 0x4017: // JOYPAD (2P)
-		return b.joypad2.Read()
+		return 0x00
 	case 0x8000 <= address: // プログラムROM
 		return b.ReadProgramROM(address)
 	default:
@@ -208,7 +206,7 @@ func (b *Bus) WriteByteAt(address uint16, data uint8) {
 		// fmt.Printf("JOYPAD Write: data=0x%02X\n", data)
 		b.joypad1.Write(data)
 	case address == 0x4017: // コントローラ (2P)
-		b.joypad2.Write(data)
+		// b.joypad2.Write(data)
 	case 0x8000 <= address: // プログラムROM
 		panic(fmt.Sprintf("Error: attempt to write to cartridge ROM space $%04X, 0x%02X\n", address, data))
 	default:
@@ -236,8 +234,3 @@ func (b *Bus) ReadProgramROM(address uint16) uint8 {
 	return b.cartridge.ProgramROM[addr]
 }
 
-func (b *Bus) SetJoypad1ButtonPressed(button joypad.JoyPadButton, pressed bool) {
-    // fmt.Printf("Setting button %d to %v, state before: 0x%02X\n", button, pressed, b.joypad1.State)
-	b.joypad1.SetButtonPressed(button, pressed)
-	// fmt.Printf("State after: 0x%02X\n", b.joypad1.State)
-}

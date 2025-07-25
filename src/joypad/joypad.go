@@ -27,35 +27,28 @@ func (j *JoyPad) Init() {
 
 func (j *JoyPad) Write(data uint8) {
 	j.strobe = data & 1 == 1
-	
-	// Reset index when strobe is enabled (NES behavior)
 	if j.strobe {
 		j.ButtonIndex = 0
 	}
 }
 
 func (j *JoyPad) Read() uint8 {
-	var response uint8
-	
-	if j.ButtonIndex >= 8 {
-		return 0x01 // 8番目以降は常に1を返す
+	if j.ButtonIndex > 7 {
+		return 0x01
 	}
-	
-	// 現在のボタンの状態を取得
-	response = (j.State >> j.ButtonIndex) & 1
-	
-	// ストローブが無効の場合のみインデックスを進める
-	if !j.strobe {
+	response := (j.State & (1 << j.ButtonIndex)) >> j.ButtonIndex
+
+	if !j.strobe && j.ButtonIndex <= 7 {
 		j.ButtonIndex++
 	}
-	
+
 	return response
 }
 
-func (j *JoyPad) SetButtonPressed(button JoyPadButton, pressed bool) {
+func (j *JoyPad) SetButtonPressed(buttonIndex JoyPadButton, pressed bool) {
 	if pressed {
-		j.State |= (1 << button)
+		j.State |= (1 << buttonIndex)
 	} else {
-		j.State &^= (1 << button)
+		j.State &^= (1 << buttonIndex)
 	}
 }
