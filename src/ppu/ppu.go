@@ -159,6 +159,7 @@ func (p *PPU) ReadPPUStatus() uint8 {
 	p.status.ClearVBlankStatus()
 	p.scroll.ResetLatch()
 	p.address.ResetLatch()
+	// @FIXME READ PPU STATUSした次のフレームはNMIを発生させない
 	return status
 }
 
