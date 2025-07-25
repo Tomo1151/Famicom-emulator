@@ -496,6 +496,10 @@ func (c *CPU) bpl(mode AddressingMode) {
 
 // MARK: BRK命令の実装
 func (c *CPU) brk(mode AddressingMode) {
+	if c.Registers.P.Interrupt {
+		return
+	}
+
 	c.pushWord(c.Registers.PC + 1)
 	c.Registers.P.Break = true
 	c.pushByte(c.Registers.P.ToByte())
