@@ -201,6 +201,10 @@ func (b *Bus) WriteByteAt(address uint16, data uint8) {
 		for i := range 256 {
 			buffer[i] = b.ReadByteFrom(upper + uint16(i))
 		}
+		// DMA転送には513PPU tick掛かる
+		for range 513 {
+			b.Tick(1)
+		}
 		b.ppu.DMATransfer(&buffer)
 	case address == 0x4016: // コントローラ (1P)
 		// fmt.Printf("JOYPAD Write: data=0x%02X\n", data)
