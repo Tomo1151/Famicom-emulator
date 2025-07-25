@@ -6,7 +6,6 @@ import (
 	"Famicom-emulator/cpu"
 	"Famicom-emulator/joypad"
 	"Famicom-emulator/ppu"
-	"fmt"
 	"log"
 	"os"
 	"time"
@@ -96,7 +95,6 @@ func main() {
 				case sdl.K_k:
 					j.SetButtonPressed(joypad.JOYPAD_BUTTON_A_POSITION, e.State == sdl.PRESSED)
 				case sdl.K_j:
-					fmt.Println("STATE K_j: ", e.State == sdl.PRESSED)
 					j.SetButtonPressed(joypad.JOYPAD_BUTTON_B_POSITION, e.State == sdl.PRESSED)
 				case sdl.K_w:
 					j.SetButtonPressed(joypad.JOYPAD_BUTTON_UP_POSITION, e.State == sdl.PRESSED)
