@@ -290,7 +290,7 @@ type StatusRegister struct {
 
 // ステータスレジスタのコンストラクタ
 func (sr *StatusRegister) Init() {
-	sr.update(0b0000_0000)
+	sr.update(0b0001_0000)
 }
 
 // VBlankフラグの設定メソッド
