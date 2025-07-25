@@ -7,6 +7,7 @@ import (
 )
 
 type Cartridge struct {
+	IsCHRRAM bool
 	ProgramROM []uint8
 	CharacterROM []uint8
 	Mapper uint8
@@ -69,12 +70,20 @@ func (c *Cartridge) Load(raw []uint8) error {
 
 	prgROMStart := 16 + trainerOffset
 	chrROMStart := prgROMStart + prgROMSize
+	var chr_rom []uint8
+
+	if chrROMSize == 0 {
+		chr_rom = make([]uint8, CHR_ROM_PAGE_SIZE)
+	} else {
+		chr_rom = raw[chrROMStart:(chrROMStart+chrROMSize)]
+	}
 
 	// fmt.Printf("PRG_ROM_START: %04X, SIZE: %d\n", prgROMStart, prgROMSize)
 	// fmt.Printf("CHR_ROM_START: %04X, SIZE: %d\n", chrROMStart, chrROMSize)
 
+	c.IsCHRRAM = chrROMSize == 0
 	c.ProgramROM = raw[prgROMStart:(prgROMStart+prgROMSize)]
-	c.CharacterROM = raw[chrROMStart:(chrROMStart+chrROMSize)]
+	c.CharacterROM = chr_rom
 	c.Mapper = mapper
 	c.ScreenMirroring = mirroring
 

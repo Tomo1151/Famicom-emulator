@@ -42,7 +42,7 @@ func (b *Bus) InitWithCartridge(cartridge *cartridge.Cartridge, gameroutine func
 	}
 	b.cartridge = *cartridge
 	b.ppu = ppu.PPU{}
-	b.ppu.Init(b.cartridge.CharacterROM, b.cartridge.ScreenMirroring)
+	b.ppu.Init(b.cartridge.IsCHRRAM , b.cartridge.CharacterROM, b.cartridge.ScreenMirroring)
 	b.joypad1 = &joypad.JoyPad{}
 	b.joypad1.Init()
 	b.gameroutine = gameroutine

@@ -21,6 +21,7 @@ const (
 
 // MARK: PPUの定義
 type PPU struct {
+	isCHRRAM bool
 	CHR_ROM []uint8
 	PaletteTable [PALETTE_TABLE_SIZE+1]uint8
 	vram [VRAM_SIZE]uint8
@@ -42,7 +43,8 @@ type PPU struct {
 }
 
 // MARK: PPUの初期化メソッド
-func (p *PPU) Init(chr_rom []uint8, mirroring cartridge.Mirroring){
+func (p *PPU) Init(is_chr_ram bool, chr_rom []uint8, mirroring cartridge.Mirroring){
+	p.isCHRRAM = is_chr_ram
 	p.CHR_ROM = chr_rom
 	p.Mirroring = mirroring
 	for addr := range p.vram { p.vram[addr] = 0x00 }
@@ -130,8 +132,9 @@ func (p *PPU) WriteVRAM(value uint8) {
 
 	switch {
 	case addr <= 0x1FFF:
-		// panic(fmt.Sprintf("addr space 0x0000..0x1FFF is not expected to write, requested: %04X", addr))
-		return
+		if p.isCHRRAM {
+			p.CHR_ROM[addr] = value
+		}
 	case 0x2000 <= addr && addr <= 0x2FFF:
 		p.vram[p.mirrorVRAMAddress(addr)] = value
 	case 0x3000 <= addr && addr <= 0x3EFF:
