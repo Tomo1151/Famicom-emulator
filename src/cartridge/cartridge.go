@@ -2,6 +2,7 @@ package cartridge
 
 import (
 	"errors"
+	"fmt"
 	"log"
 	"reflect"
 )
@@ -87,10 +88,27 @@ func (c *Cartridge) Load(raw []uint8) error {
 	c.Mapper = mapper
 	c.ScreenMirroring = mirroring
 
-	// fmt.Printf("PRG: %v\n", c.ProgramROM[0:8])
-	// fmt.Printf("CHR: %v\n", c.CharacterROM[0:8])
-	// fmt.Printf("Map: %v\n", c.Mapper)
-	// fmt.Printf("Mir: %v\n", c.ScreenMirroring)
+	c.DumpInfo()
 
 	return nil
+}
+
+func (c *Cartridge) DumpInfo() {
+	fmt.Printf("Cartridge loaded:\n")
+	fmt.Printf("  Mapper: %d\n", c.Mapper)
+	fmt.Printf("  PRG ROM Size: %d bytes\n", len(c.ProgramROM))
+	fmt.Printf("  CHR ROM Size: %d bytes\n", len(c.CharacterROM))
+	fmt.Printf("  CHR RAM: %v\n", c.IsCHRRAM)
+	var mirroringStr string
+	switch c.ScreenMirroring {
+	case MIRRORING_VERTICAL:
+		mirroringStr = "Vertical"
+	case MIRRORING_HORIZONTAL:
+		mirroringStr = "Horizontal"
+	case MIRRORING_FOUR_SCREEN:
+		mirroringStr = "Four Screen"
+	default:
+		mirroringStr = "Unknown"
+	}
+	fmt.Printf("  Mirroring: %s\n", mirroringStr)
 }
