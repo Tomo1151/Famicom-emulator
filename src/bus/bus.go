@@ -1,6 +1,7 @@
 package bus
 
 import (
+	"Famicom-emulator/apu"
 	"Famicom-emulator/cartridge"
 	"Famicom-emulator/joypad"
 	"Famicom-emulator/ppu"
@@ -21,6 +22,7 @@ type Bus struct {
 	wram [CPU_WRAM_SIZE+1]uint8 // CPUのWRAM (2kB)
 	cartridge cartridge.Cartridge // カートリッジ
 	ppu ppu.PPU // PPU
+	apu apu.APU // APU
 	joypad1 *joypad.JoyPad // ポインタに変更
 	joypad2 joypad.JoyPad // コントローラ (2P)
 	cycles uint // CPUサイクル
@@ -43,6 +45,8 @@ func (b *Bus) InitWithCartridge(cartridge *cartridge.Cartridge, gameroutine func
 	b.cartridge = *cartridge
 	b.ppu = ppu.PPU{}
 	b.ppu.Init(b.cartridge.IsCHRRAM , b.cartridge.CharacterROM, b.cartridge.ScreenMirroring)
+	b.apu = apu.APU{}
+	b.apu.Init()
 	b.joypad1 = &joypad.JoyPad{}
 	b.joypad1.Init()
 	b.gameroutine = gameroutine
@@ -195,6 +199,8 @@ func (b *Bus) WriteByteAt(address uint16, data uint8) {
 		// $2008 ~ $3FFF は $2000 ~ $2007 (8bytesを繰り返すようにマスク) へミラーリング
 		ptr := address & 0b00100000_00000111
 		b.WriteByteAt(ptr, data)
+	case 0x4000 <= address && address <= 0x4003:
+		b.apu.Write1ch(address, data)
 	case address == 0x4014: // DMA転送
 		var buffer [256]uint8
 		upper := uint16(data) << 8

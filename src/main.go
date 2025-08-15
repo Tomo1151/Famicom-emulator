@@ -1,7 +1,6 @@
 package main
 
 import (
-	"Famicom-emulator/apu"
 	"Famicom-emulator/bus"
 	"Famicom-emulator/cartridge"
 	"Famicom-emulator/cpu"
@@ -116,6 +115,6 @@ func main() {
 
 	c := cpu.CPU{}
 	c.InitWithCartridge(bus, true)
-	go apu.PlaySquareWave()
+	// go apu.PlaySquareWave()
 	c.Run()
 }
