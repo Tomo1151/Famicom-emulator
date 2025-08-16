@@ -8,7 +8,6 @@ void SquareWaveCallback(void *userdata, Uint8 *stream, int len);
 import "C"
 import (
 	"fmt"
-	"math"
 	"sync"
 	"unsafe"
 
@@ -20,7 +19,6 @@ const (
 	MAX_VOLUME = 2
 	toneHz   = 440
 	sampleHz = 44100
-	dPhase   = 2 * math.Pi * toneHz / sampleHz
 	BUFFER_SIZE = 8192 // リングバッファサイズ
 )
 
