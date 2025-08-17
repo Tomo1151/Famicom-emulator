@@ -17,7 +17,8 @@ type SquareNote struct {
 }
 
 // MARK: 矩形波データ
-var squareWave SquareWave
+var squareWave1 SquareWave
+var squareWave2 SquareWave
 
 // MARK: PCM波形生成のgoroutine
 func (sw *SquareWave) generatePCM() {

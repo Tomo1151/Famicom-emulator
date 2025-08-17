@@ -199,13 +199,15 @@ func (b *Bus) WriteByteAt(address uint16, data uint8) {
 		// $2008 ~ $3FFF は $2000 ~ $2007 (8bytesを繰り返すようにマスク) へミラーリング
 		ptr := address & 0b00100000_00000111
 		b.WriteByteAt(ptr, data)
-	case 0x4000 <= address && address <= 0x4003:
+	case 0x4000 <= address && address <= 0x4003: // APU 1ch
 		b.apu.Write1ch(address, data)
-	case address == 0x400C:
+	case 0x4004 <= address && address <= 0x4007: // APU 2ch
+		b.apu.Write2ch(address, data)
+	case address == 0x400C: // APU 4ch
 		b.apu.Write4ch(address, data)
-	case address == 0x400E:
+	case address == 0x400E: // APU 4ch
 		b.apu.Write4ch(address, data)
-	case address == 0x400F:
+	case address == 0x400F: // APU 4ch
 		b.apu.Write4ch(address, data)
 	case address == 0x4014: // DMA転送
 		var buffer [256]uint8

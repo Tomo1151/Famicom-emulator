@@ -11,31 +11,57 @@ type NoiseRegisterMode uint8
 
 // MARK: 矩形波レジスタ
 type SquareWaveRegister struct {
-	toneVolume    uint8
-	sweep         uint8
-	frequencyLow       uint8
-	frequencyHighKeyOn uint8
+	// 0x4000 | 0x4004
+	volume uint8
+	envelope bool
+	keyOffCounter bool
+	duty uint8
+
+	// 0x4001 | 0x4005
+	sweepShift uint8
+	sweepDirection uint8
+	sweepPeriod uint8
+	sweepEnabled uint8
+
+	// 0x4002 | 0x4006
+	frequency uint16
+
+	// 0x4003 | 0x4007
+	keyOffCount uint8
 }
 
 // MARK: 矩形波レジスタの初期化メソッド
 func (swr *SquareWaveRegister) Init() {
-	swr.toneVolume = 0x00
-	swr.sweep = 0x00
-	swr.frequencyLow = 0x00
-	swr.frequencyHighKeyOn = 0x00
+	swr.volume = 0x00
+	swr.envelope = false
+	swr.keyOffCounter = false
+	swr.duty = 0x00
+	swr.sweepShift = 0x00
+	swr.sweepDirection = 0x00
+	swr.sweepPeriod = 0x00
+	swr.sweepEnabled = 0x00
+	swr.frequency = 0x00
+	swr.keyOffCount = 0x00
 }
 
 // MARK: 矩形波レジスタへ書き込むメソッド（1ch/2ch）
 func (swr *SquareWaveRegister) write(address uint16, data uint8) {
 	switch address {
-	case 0x4000:
-		swr.toneVolume = data
-	case 0x4001:
-		swr.sweep = data
-	case 0x4002:
-		swr.frequencyLow = data
-	case 0x4003:
-		swr.frequencyHighKeyOn = data
+	case 0x4000, 0x4004:
+		swr.volume = data & 0x0F
+		swr.envelope = (data & 0x10) == 0
+		swr.keyOffCounter = (data & 0x20) == 0
+		swr.duty = (data & 0xC0) >> 6
+	case 0x4001, 0x4005:
+		swr.sweepShift = data & 0x07
+		swr.sweepDirection = (data & 0x08) >> 3
+		swr.sweepPeriod = (data & 0x70) >> 4
+		swr.sweepEnabled = (data & 0x80) >> 7
+	case 0x4002, 0x4006:
+		swr.frequency = (swr.frequency & 0x0700) | uint16(data)
+	case 0x4003, 0x4007:
+		swr.frequency = (swr.frequency & 0x00FF) | uint16(data & 0x07) << 8
+		swr.keyOffCount = (data & 0xF8) >> 3
 	default:
 		panic(fmt.Sprintf("APU Error: Invalid write at: %04X", address))
 	}
@@ -44,8 +70,7 @@ func (swr *SquareWaveRegister) write(address uint16, data uint8) {
 // MARK: レジスタからデューティ比を取得するメソッド
 func (swr *SquareWaveRegister) getDuty() float32 {
 	// 00: 12.5%, 01: 25.0%, 10: 50.0%, 11: 75.0%
-	value := (swr.toneVolume & 0xC0) >> 6
-	switch value {
+	switch swr.duty {
 	case 0b00:
 		return 0.125
 	case 0b01:
@@ -61,19 +86,18 @@ func (swr *SquareWaveRegister) getDuty() float32 {
 
 // MARK: そのチャンネルの矩形波を鳴らすかどうかを取得するメソッド
 func (swr *SquareWaveRegister) isEnabled() bool {
-	return (swr.toneVolume & 0x0F) > 0 // ボリュームが0より大きければ有効（テスト実装）
+	return (swr.volume & 0x0F) > 0 // ボリュームが0より大きければ有効（テスト実装）
 }
 
 // MARK: レジスタからボリュームを取得するメソッド（1ch/2ch）
 func (swr *SquareWaveRegister) getVolume() float32 {
 	// 0が消音，15が最大 ※ スウィープ無効時のみ
-	return float32(swr.toneVolume&0x0F) / 15.0
+	return float32(swr.volume) / 15.0
 }
 
 // MARK: レジスタから矩形波のピッチを取得するメソッド
 func (swr *SquareWaveRegister) getFrequency() float32 {
-	value := ((uint16(swr.frequencyHighKeyOn) & 0x07) << 8) | uint16(swr.frequencyLow)
-	return CPU_CLOCK / (16.0*float32(value) + 1.0)
+	return CPU_CLOCK / (16.0*float32(swr.frequency) + 1.0)
 }
 
 // MARK: ノイズレジスタ

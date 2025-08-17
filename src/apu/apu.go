@@ -27,6 +27,11 @@ type APU struct {
 	Ch1Channel chan SquareNote
 	Ch1Buffer *RingBuffer
 
+	// CH2
+	Ch2Register SquareWaveRegister
+	Ch2Channel chan SquareNote
+	Ch2Buffer *RingBuffer
+
 	// CH4
 	Ch4Register NoiseWaveRegister
 	Ch4Channel chan NoiseNote
@@ -39,15 +44,22 @@ func (a *APU) Init() {
 	a.Ch1Register = SquareWaveRegister{}
 	a.Ch1Register.Init()
 	a.Ch1Buffer = &RingBuffer{}
-	a.Ch1Buffer.Init() // 追加: バッファを初期化
-	a.Ch1Channel = init1ch(a.Ch1Buffer)
+	a.Ch1Buffer.Init()
+	a.Ch1Channel = initSquareChannel(&squareWave1, a.Ch1Buffer)
+
+	// CH2
+	a.Ch2Register = SquareWaveRegister{}
+	a.Ch2Register.Init()
+	a.Ch2Buffer = &RingBuffer{}
+	a.Ch2Buffer.Init()
+	a.Ch2Channel = initSquareChannel(&squareWave2, a.Ch2Buffer)
 
 	// CH4
 	a.Ch4Register = NoiseWaveRegister{}
 	a.Ch4Register.Init()
 	a.Ch4Buffer = &RingBuffer{}
-	a.Ch4Buffer.Init() // 追加: バッファを初期化
-	a.Ch4Channel = init4ch(a.Ch4Buffer)
+	a.Ch4Buffer.Init()
+	a.Ch4Channel = initNoiseChannel(a.Ch4Buffer)
 
 
 	// オーディオデバイスの初期化
@@ -72,6 +84,23 @@ func (a *APU) Write1ch(address uint16, data uint8) {
 	}
 }
 
+// MARK: 2chへの書き込みメソッド（矩形波）
+func (a *APU) Write2ch(address uint16, data uint8) {
+	a.Ch2Register.write(address, data)
+
+	var volume float32
+	if a.Ch2Register.isEnabled() {
+		volume = a.Ch2Register.getVolume()
+	} else {
+		volume = 0.0
+	}
+	a.Ch2Channel <- SquareNote{
+		hz: a.Ch2Register.getFrequency(),
+		duty: a.Ch2Register.getDuty(),
+		volume: volume,
+	}
+}
+
 // MARK: 4chへの書き込みメソッド（ノイズ）
 func (a *APU) Write4ch(address uint16, data uint8) {
 	a.Ch4Register.write(address, data)
@@ -92,7 +121,11 @@ func MixedAudioCallback(userdata unsafe.Pointer, stream *C.Uint8, length C.int) 
 
 	// 1chのデータの読み込み
 	ch1Buffer := make([]float32, n)
-	squareWave.buffer.Read(ch1Buffer)
+	squareWave1.buffer.Read(ch1Buffer)
+
+	// 2chのデータの読み込み
+	ch2Buffer := make([]float32, n)
+	squareWave2.buffer.Read(ch2Buffer)
 
 	// 4chのデータの読み込み
 	ch4Buffer := make([]float32, n)
@@ -100,7 +133,7 @@ func MixedAudioCallback(userdata unsafe.Pointer, stream *C.Uint8, length C.int) 
 
 	for i := range n {
 		// ミックス
-		mixed := (ch1Buffer[i] + ch4Buffer[i]) / 50
+		mixed := (ch1Buffer[i] + ch2Buffer[i] + ch4Buffer[i]) / 75
 
 		if mixed > MAX_VOLUME {
 			mixed = MAX_VOLUME
@@ -130,10 +163,10 @@ func (a *APU) initAudioDevice() {
 }
 
 // MARK: 1chの初期化メソッド
-func init1ch(buffer *RingBuffer) chan SquareNote {
+func initSquareChannel(wave *SquareWave, buffer *RingBuffer) chan SquareNote {
 	ch1Channel := make(chan SquareNote, 10) // バッファ付きチャンネル
 	// SquareWave構造体を初期化
-	squareWave = SquareWave{
+	*wave = SquareWave{
 		freq:   44100.0,
 		phase:  0.0,
 		channel: ch1Channel,
@@ -146,14 +179,14 @@ func init1ch(buffer *RingBuffer) chan SquareNote {
 	}
 
 	// PCM生成のgoroutineを開始
-	go squareWave.generatePCM()
+	go wave.generatePCM()
 
 	return ch1Channel
 }
 
 
 // MARK: 4ch の初期化メソッド
-func init4ch(buffer *RingBuffer) chan NoiseNote {
+func initNoiseChannel(buffer *RingBuffer) chan NoiseNote {
 	ch4Channel := make(chan NoiseNote, 10) // バッファ付きチャンネル
 	// NoiseWave構造体を初期化
 	noiseWave = NoiseWave{
