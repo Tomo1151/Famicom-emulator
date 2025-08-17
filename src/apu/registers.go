@@ -44,7 +44,7 @@ func (swr *SquareWaveRegister) Init() {
 	swr.keyOffCount = 0x00
 }
 
-// MARK: 矩形波レジスタへ書き込むメソッド（1ch/2ch）
+// MARK: 矩形波レジスタの書き込みメソッド（1ch/2ch）
 func (swr *SquareWaveRegister) write(address uint16, data uint8) {
 	switch address {
 	case 0x4000, 0x4004:
@@ -100,6 +100,48 @@ func (swr *SquareWaveRegister) getFrequency() float32 {
 	return CPU_CLOCK / (16.0*float32(swr.frequency) + 1.0)
 }
 
+
+// MARK: 三角波レジスタ
+type TriangleWaveRegister struct {
+	// 0x4008
+	length uint8
+	keyOffCounter bool
+
+	// 0x400A, 0x400B
+	frequency uint16
+	keyOffCount uint8
+}
+
+// 三角波レジスタの書き込みメソッド
+func (twr *TriangleWaveRegister) Init() {
+	twr.length = 0x00
+	twr.keyOffCounter = false
+	twr.frequency = 0x0000
+	twr.keyOffCount = 0x00
+}
+
+// 三角波レジスタの書き込みメソッド（3ch）
+func (twr *TriangleWaveRegister) write(address uint16, data uint8) {
+	switch address {
+	case 0x4008:
+		twr.length = data & 0x7F
+		twr.keyOffCounter = (data & 0x80) == 0
+	case 0x400A:
+		twr.frequency = (twr.frequency & 0x0700) | uint16(data)
+	case 0x400B:
+		twr.frequency = (twr.frequency & 0x00FF) | uint16(data & 0x07) << 8
+		twr.keyOffCount = (data & 0xF8) >> 3
+	default:
+		panic(fmt.Sprintf("APU Error: Invalid write at: %04X", address))
+	}
+}
+
+// MARK: レジスタから三角波のピッチを取得するメソッド
+func (twr *TriangleWaveRegister) getFrequency() float32 {
+	return CPU_CLOCK / (16.0*float32(twr.frequency) + 1.0)
+}
+
+
 // MARK: ノイズレジスタ
 type NoiseWaveRegister struct {
 	// 0x400C
@@ -125,7 +167,7 @@ func (nwr *NoiseWaveRegister) Init() {
 	nwr.keyOffCount = 0x00
 }
 
-// MARK: ノイズレジスタの書き込みメソッド
+// MARK: ノイズレジスタの書き込みメソッド（4ch）
 func (nwr *NoiseWaveRegister) write(adress uint16, data uint8) {
 	switch adress {
 	case 0x400C:

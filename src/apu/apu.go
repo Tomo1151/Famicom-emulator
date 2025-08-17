@@ -32,6 +32,11 @@ type APU struct {
 	Ch2Channel chan SquareNote
 	Ch2Buffer *RingBuffer
 
+	// CH3
+	Ch3Register TriangleWaveRegister
+	Ch3Channel chan TriangleNote
+	Ch3Buffer *RingBuffer
+
 	// CH4
 	Ch4Register NoiseWaveRegister
 	Ch4Channel chan NoiseNote
@@ -53,6 +58,13 @@ func (a *APU) Init() {
 	a.Ch2Buffer = &RingBuffer{}
 	a.Ch2Buffer.Init()
 	a.Ch2Channel = initSquareChannel(&squareWave2, a.Ch2Buffer)
+
+	// CH3
+	a.Ch3Register = TriangleWaveRegister{}
+	a.Ch3Register.Init()
+	a.Ch3Buffer = &RingBuffer{}
+	a.Ch3Buffer.Init()
+	a.Ch3Channel = initTriangleChannel(a.Ch3Buffer)
 
 	// CH4
 	a.Ch4Register = NoiseWaveRegister{}
@@ -101,6 +113,15 @@ func (a *APU) Write2ch(address uint16, data uint8) {
 	}
 }
 
+// MARK: 3chへの書き込みメソッド（三角波）
+func (a *APU) Write3ch(address uint16, data uint8) {
+	a.Ch3Register.write(address, data)
+
+	a.Ch3Channel <- TriangleNote{
+		hz: a.Ch3Register.getFrequency(),
+	}
+}
+
 // MARK: 4chへの書き込みメソッド（ノイズ）
 func (a *APU) Write4ch(address uint16, data uint8) {
 	a.Ch4Register.write(address, data)
@@ -127,13 +148,17 @@ func MixedAudioCallback(userdata unsafe.Pointer, stream *C.Uint8, length C.int) 
 	ch2Buffer := make([]float32, n)
 	squareWave2.buffer.Read(ch2Buffer)
 
+	// 3chのデータの読み込み
+	ch3Buffer := make([]float32, n)
+	triangleWave.buffer.Read(ch3Buffer)
+
 	// 4chのデータの読み込み
 	ch4Buffer := make([]float32, n)
 	noiseWave.buffer.Read(ch4Buffer)
 
 	for i := range n {
 		// ミックス
-		mixed := (ch1Buffer[i] + ch2Buffer[i] + ch4Buffer[i]) / 75
+		mixed := (ch1Buffer[i] + ch2Buffer[i] + ch3Buffer[i] + ch4Buffer[i]) / 75
 
 		if mixed > MAX_VOLUME {
 			mixed = MAX_VOLUME
@@ -162,9 +187,10 @@ func (a *APU) initAudioDevice() {
 	sdl.PauseAudio(false)
 }
 
-// MARK: 1chの初期化メソッド
+// MARK: 1ch/2chの初期化メソッド
 func initSquareChannel(wave *SquareWave, buffer *RingBuffer) chan SquareNote {
-	ch1Channel := make(chan SquareNote, 10) // バッファ付きチャンネル
+	ch1Channel := make(chan SquareNote, 10)
+
 	// SquareWave構造体を初期化
 	*wave = SquareWave{
 		freq:   44100.0,
@@ -184,10 +210,29 @@ func initSquareChannel(wave *SquareWave, buffer *RingBuffer) chan SquareNote {
 	return ch1Channel
 }
 
+// MARK: 3chの初期化メソッド
+func initTriangleChannel(buffer *RingBuffer) chan TriangleNote {
+	ch3Channel := make(chan TriangleNote, 10)
+
+	triangleWave = TriangleWave{
+		freq: 44100.0,
+		phase: 0.0,
+		channel: ch3Channel,
+		buffer: buffer,
+		note: TriangleNote{
+			hz: 0.0,
+		},
+	}
+
+	go triangleWave.generatePCM()
+
+	return ch3Channel
+}
 
 // MARK: 4ch の初期化メソッド
 func initNoiseChannel(buffer *RingBuffer) chan NoiseNote {
-	ch4Channel := make(chan NoiseNote, 10) // バッファ付きチャンネル
+	ch4Channel := make(chan NoiseNote, 10)
+
 	// NoiseWave構造体を初期化
 	noiseWave = NoiseWave{
 		freq:   44100.0,
