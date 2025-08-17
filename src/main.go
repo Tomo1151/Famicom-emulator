@@ -113,8 +113,10 @@ func main() {
 		}
 	})
 
+	// オーディオ再生開始
+	sdl.PauseAudio(false)
+
 	c := cpu.CPU{}
 	c.InitWithCartridge(bus, true)
-	// go apu.PlaySquareWave()
 	c.Run()
 }
