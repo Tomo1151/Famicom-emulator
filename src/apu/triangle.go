@@ -54,7 +54,7 @@ func (tw *TriangleWave) generatePCM() {
 				sample = 1.0-tw.phase // 下がっていく
 			}
 
-			pcmBuffer[i] = (sample - 0.25) * 2 // 真ん中へずらす, ボリュームは固定
+			pcmBuffer[i] = (sample - 0.25) * 4 // 真ん中へずらす, ボリュームは固定
 		}
 
 		// リングバッファに書き込み
