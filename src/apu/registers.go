@@ -2,6 +2,14 @@ package apu
 
 import "fmt"
 
+const (
+	NOISE_MODE_SHORT NoiseRegisterMode = iota
+	NOISE_MODE_LONG
+)
+
+type NoiseRegisterMode uint8
+
+// MARK: 矩形波レジスタ
 type SquareWaveRegister struct {
 	toneVolume    uint8
 	sweep         uint8
@@ -58,4 +66,49 @@ func (swr *SquareWaveRegister) volume() float32 {
 func (swr *SquareWaveRegister) freq() float32 {
 	value := ((uint16(swr.freqHighKeyOn) & 0x07) << 8) | uint16(swr.freqLow)
 	return CPU_CLOCK / (16.0*float32(value) + 1.0)
+}
+
+
+// MARK: ノイズシフトレジスタ
+type NoiseShiftRegister struct {
+	mode   NoiseRegisterMode
+	value  uint16
+}
+
+func (nsr *NoiseShiftRegister) InitWithLongMode() {
+	nsr.mode = NOISE_MODE_LONG
+	nsr.value = 1
+}
+
+func (nsr *NoiseShiftRegister) InitWithShortMode() {
+	nsr.mode = NOISE_MODE_SHORT
+	nsr.value = 1
+}
+
+func (nsr *NoiseShiftRegister) next() bool {
+	/*
+		タイマーによってシフトレジスタが励起されるたびに1ビット右シフト
+		もしショートモードなら
+			ビット0とビット6のXOR
+		ロングモードなら
+			ビット0とビット1のXOR
+		が入る
+	*/
+	var shiftBit uint16
+
+	switch nsr.mode {
+	case NOISE_MODE_LONG:
+		shiftBit = 1
+	case NOISE_MODE_SHORT:
+		shiftBit = 6
+	default:
+		panic(fmt.Sprintf("APU Error: unexpected noise shift register mode: %04X", shiftBit))
+	}
+
+	value := (nsr.value & 0x01) ^ ((nsr.value >> shiftBit) & 0x01)
+	nsr.value >>= 1
+	nsr.value = (nsr.value & 0b011_1111_1111_1111) | value<<14
+
+	// シフトレジスタのビット0が1であればチャンネルの出力が0になる
+	return nsr.value&0x01 != 0
 }

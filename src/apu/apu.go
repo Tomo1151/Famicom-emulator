@@ -23,7 +23,7 @@ const (
 type APU struct {
 	Ch1Register SquareWaveRegister
 	Ch1Channel chan SquareNote
-	ringBuffer *RingBuffer
+	Ch1Buffer *RingBuffer
 }
 
 // MARK: APUの初期化メソッド
@@ -34,8 +34,8 @@ func (a *APU) Init() {
 		freqLow:       0,
 		freqHighKeyOn: 0,
 	}
-	a.ringBuffer = &RingBuffer{}
-	a.Ch1Channel = init1ch(a.ringBuffer)
+	a.Ch1Buffer = &RingBuffer{}
+	a.Ch1Channel = init1ch(a.Ch1Buffer)
 }
 
 // MARK: 1chへの書き込みメソッド（矩形波）
@@ -66,7 +66,7 @@ func SquareWaveCallback(userdata unsafe.Pointer, stream *C.Uint8, length C.int) 
 
 	// リングバッファから直接読み込み
 	readBuffer := make([]uint8, n)
-	squareWave.ringBuffer.Read(readBuffer)
+	squareWave.buffer.Read(readBuffer)
 
 	// バッファをコピー
 	for i := range n {
@@ -75,14 +75,14 @@ func SquareWaveCallback(userdata unsafe.Pointer, stream *C.Uint8, length C.int) 
 }
 
 // MARK: 1chの初期化メソッド
-func init1ch(ringBuffer *RingBuffer) chan SquareNote {
+func init1ch(buffer *RingBuffer) chan SquareNote {
 	ch1Channel := make(chan SquareNote, 10) // バッファ付きチャンネル
 	// SquareWave構造体を初期化
 	squareWave = SquareWave{
 		freq:   44100.0,
 		phase:  0.0,
 		channel: ch1Channel,
-		ringBuffer: ringBuffer,
+		buffer: buffer,
 		note: SquareNote{
 			hz: 0,
 			volume: 0.0,
