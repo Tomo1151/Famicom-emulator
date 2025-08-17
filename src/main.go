@@ -113,9 +113,6 @@ func main() {
 		}
 	})
 
-	// オーディオ再生開始
-	sdl.PauseAudio(false)
-
 	c := cpu.CPU{}
 	c.InitWithCartridge(bus, true)
 	c.Run()

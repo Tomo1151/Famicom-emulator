@@ -13,8 +13,16 @@ type NoiseRegisterMode uint8
 type SquareWaveRegister struct {
 	toneVolume    uint8
 	sweep         uint8
-	freqLow       uint8
-	freqHighKeyOn uint8
+	frequencyLow       uint8
+	frequencyHighKeyOn uint8
+}
+
+// MARK: 矩形波レジスタの初期化メソッド
+func (swr *SquareWaveRegister) Init() {
+	swr.toneVolume = 0x00
+	swr.sweep = 0x00
+	swr.frequencyLow = 0x00
+	swr.frequencyHighKeyOn = 0x00
 }
 
 // MARK: 矩形波レジスタへ書き込むメソッド（1ch/2ch）
@@ -25,16 +33,16 @@ func (swr *SquareWaveRegister) write(address uint16, data uint8) {
 	case 0x4001:
 		swr.sweep = data
 	case 0x4002:
-		swr.freqLow = data
+		swr.frequencyLow = data
 	case 0x4003:
-		swr.freqHighKeyOn = data
+		swr.frequencyHighKeyOn = data
 	default:
 		panic(fmt.Sprintf("APU Error: Invalid write at: %04X", address))
 	}
 }
 
 // MARK: レジスタからデューティ比を取得するメソッド
-func (swr *SquareWaveRegister) duty() float32 {
+func (swr *SquareWaveRegister) getDuty() float32 {
 	// 00: 12.5%, 01: 25.0%, 10: 50.0%, 11: 75.0%
 	value := (swr.toneVolume & 0xC0) >> 6
 	switch value {
@@ -57,15 +65,97 @@ func (swr *SquareWaveRegister) isEnabled() bool {
 }
 
 // MARK: レジスタからボリュームを取得するメソッド（1ch/2ch）
-func (swr *SquareWaveRegister) volume() float32 {
+func (swr *SquareWaveRegister) getVolume() float32 {
 	// 0が消音，15が最大 ※ スウィープ無効時のみ
 	return float32(swr.toneVolume&0x0F) / 15.0
 }
 
 // MARK: レジスタから矩形波のピッチを取得するメソッド
-func (swr *SquareWaveRegister) freq() float32 {
-	value := ((uint16(swr.freqHighKeyOn) & 0x07) << 8) | uint16(swr.freqLow)
+func (swr *SquareWaveRegister) getFrequency() float32 {
+	value := ((uint16(swr.frequencyHighKeyOn) & 0x07) << 8) | uint16(swr.frequencyLow)
 	return CPU_CLOCK / (16.0*float32(value) + 1.0)
+}
+
+// MARK: ノイズレジスタ
+type NoiseWaveRegister struct {
+	// 0x400C
+	volume uint8
+	envelope bool
+	keyOffCounter bool
+
+	// 0x400E
+	frequency uint8
+	mode NoiseRegisterMode
+
+	// 0x400F
+	keyOffCount uint8
+}
+
+// MARK: ノイズレジスタの初期化メソッド
+func (nwr *NoiseWaveRegister) Init() {
+	nwr.volume = 0x00
+	nwr.envelope = false
+	nwr.keyOffCounter = false
+	nwr.frequency = 0x00
+	nwr.mode = NOISE_MODE_LONG
+	nwr.keyOffCount = 0x00
+}
+
+// MARK: ノイズレジスタの書き込みメソッド
+func (nwr *NoiseWaveRegister) write(adress uint16, data uint8) {
+	switch adress {
+	case 0x400C:
+		nwr.volume = data & 0x0F
+		nwr.envelope = (data & 0x10) == 0
+		nwr.keyOffCounter = (data & 0x20) == 0
+	case 0x400E:
+		nwr.frequency = data & 0x0F
+		mode := data & 0x80
+
+		if (mode != 0){
+			nwr.mode = NOISE_MODE_SHORT
+		} else {
+			nwr.mode = NOISE_MODE_LONG
+		}
+	case 0x400F:
+		nwr.keyOffCount = (data & 0xF8) >> 3
+	default:
+		panic(fmt.Sprintf("APU Error: unexpected write at %04X", adress))
+	}
+}
+
+// MARK: ノイズレジスタから4chの音量を取得するメソッド
+func (nwr *NoiseWaveRegister) getVolume() float32 {
+	return float32(nwr.volume) / 15.0
+}
+
+// MARK: ノイズレジスタから4chのモードを取得するメソッド
+func (nwr *NoiseWaveRegister) getMode() NoiseRegisterMode {
+	return nwr.mode
+}
+
+// MARK: ノイズレジスタからノイズのピッチを取得するメソッド
+func (nwr *NoiseWaveRegister) getFrequency() float32 {
+	noiseFrequencyTable := [16]uint16{
+		0x0002,
+		0x0004,
+		0x0008,
+		0x0010,
+		0x0020,
+		0x0030,
+		0x0040,
+		0x0050,
+		0x0065,
+		0x007F,
+		0x00BE,
+		0x00FE,
+		0x017D,
+		0x01FC,
+		0x03F9,
+		0x07F2,
+	}
+
+	return CPU_CLOCK / float32(noiseFrequencyTable[nwr.frequency])
 }
 
 
@@ -110,5 +200,8 @@ func (nsr *NoiseShiftRegister) next() bool {
 	nsr.value = (nsr.value & 0b011_1111_1111_1111) | value<<14
 
 	// シフトレジスタのビット0が1であればチャンネルの出力が0になる
-	return nsr.value&0x01 != 0
+	result := nsr.value&0x01 != 0
+
+	// fmt.Printf("NoiseShift: mode=%d, value=0x%04X, result=%t\n", nsr.mode, nsr.value, result)
+	return result
 }

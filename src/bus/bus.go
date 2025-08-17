@@ -201,6 +201,12 @@ func (b *Bus) WriteByteAt(address uint16, data uint8) {
 		b.WriteByteAt(ptr, data)
 	case 0x4000 <= address && address <= 0x4003:
 		b.apu.Write1ch(address, data)
+	case address == 0x400C:
+		b.apu.Write4ch(address, data)
+	case address == 0x400E:
+		b.apu.Write4ch(address, data)
+	case address == 0x400F:
+		b.apu.Write4ch(address, data)
 	case address == 0x4014: // DMA転送
 		var buffer [256]uint8
 		upper := uint16(data) << 8

@@ -2,7 +2,8 @@ package apu
 
 /*
 typedef unsigned char Uint8;
-void SquareWaveCallback(void *userdata, Uint8 *stream, int len);
+typedef float Float32;
+void MixedAudioCallback(void *userdata, Uint8 *stream, int len);
 */
 import "C"
 import (
@@ -12,8 +13,8 @@ import (
 )
 
 const (
-	CPU_CLOCK = 1_789_773 // 1.78MHz
-	MAX_VOLUME = 2
+	CPU_CLOCK = 1_789_772.5 // 1.78MHz
+	MAX_VOLUME = 0.4
 	toneHz   = 440
 	sampleHz = 44100
 	BUFFER_SIZE = 8192 // リングバッファサイズ
@@ -21,57 +22,111 @@ const (
 
 // MARK: APUの定義
 type APU struct {
+	// CH1
 	Ch1Register SquareWaveRegister
 	Ch1Channel chan SquareNote
 	Ch1Buffer *RingBuffer
+
+	// CH4
+	Ch4Register NoiseWaveRegister
+	Ch4Channel chan NoiseNote
+	Ch4Buffer *RingBuffer
 }
 
 // MARK: APUの初期化メソッド
 func (a *APU) Init() {
-	a.Ch1Register = SquareWaveRegister{
-		toneVolume:    0,
-		sweep:         0,
-		freqLow:       0,
-		freqHighKeyOn: 0,
-	}
+	// CH1
+	a.Ch1Register = SquareWaveRegister{}
+	a.Ch1Register.Init()
 	a.Ch1Buffer = &RingBuffer{}
+	a.Ch1Buffer.Init() // 追加: バッファを初期化
 	a.Ch1Channel = init1ch(a.Ch1Buffer)
+
+	// CH4
+	a.Ch4Register = NoiseWaveRegister{}
+	a.Ch4Register.Init()
+	a.Ch4Buffer = &RingBuffer{}
+	a.Ch4Buffer.Init() // 追加: バッファを初期化
+	a.Ch4Channel = init4ch(a.Ch4Buffer)
+
+
+	// オーディオデバイスの初期化
+	a.initAudioDevice()
 }
 
 // MARK: 1chへの書き込みメソッド（矩形波）
 func (a *APU) Write1ch(address uint16, data uint8) {
 	a.Ch1Register.write(address, data)
 
-	// fmt.Printf("Ch1 write: %f hz / %f % / %f", a.Ch1Register.freq(), a.Ch1Register.duty(), a.Ch1Register.volume())
-
 	// SDL側に送信
 	var volume float32
 	if a.Ch1Register.isEnabled() {
-		volume = a.Ch1Register.volume()
+		volume = a.Ch1Register.getVolume()
 	} else {
 		volume = 0.0
 	}
 	a.Ch1Channel <- SquareNote{
-		hz: a.Ch1Register.freq(),
-		duty: a.Ch1Register.duty(),
+		hz: a.Ch1Register.getFrequency(),
+		duty: a.Ch1Register.getDuty(),
 		volume: volume,
 	}
 }
 
-// MARK: 矩形波生成メソッド
-//export SquareWaveCallback
-func SquareWaveCallback(userdata unsafe.Pointer, stream *C.Uint8, length C.int) {
-	n := int(length)
-	buf := unsafe.Slice((*C.Uint8)(stream), n)
+// MARK: 4chへの書き込みメソッド（ノイズ）
+func (a *APU) Write4ch(address uint16, data uint8) {
+	a.Ch4Register.write(address, data)
 
-	// リングバッファから直接読み込み
-	readBuffer := make([]uint8, n)
-	squareWave.buffer.Read(readBuffer)
-
-	// バッファをコピー
-	for i := range n {
-		buf[i] = C.Uint8(readBuffer[i])
+	a.Ch4Channel <- NoiseNote{
+		hz: a.Ch4Register.getFrequency(),
+		volume: a.Ch4Register.getVolume(),
+		noiseMode: a.Ch4Register.getMode(),
 	}
+}
+
+
+// MARK: 全チャンネルをミックスした音声生成コールバック
+//export MixedAudioCallback
+func MixedAudioCallback(userdata unsafe.Pointer, stream *C.Uint8, length C.int) {
+	n := int(length) / 4
+	buffer := unsafe.Slice((*float32)(unsafe.Pointer(stream)), n)
+
+	// 1chのデータの読み込み
+	ch1Buffer := make([]float32, n)
+	squareWave.buffer.Read(ch1Buffer)
+
+	// 4chのデータの読み込み
+	ch4Buffer := make([]float32, n)
+	noiseWave.buffer.Read(ch4Buffer)
+
+	for i := range n {
+		// ミックス
+		mixed := (ch1Buffer[i] + ch4Buffer[i]) / 50
+
+		if mixed > MAX_VOLUME {
+			mixed = MAX_VOLUME
+		} else if mixed < -MAX_VOLUME {
+			mixed = -MAX_VOLUME
+		}
+
+		buffer[i] = mixed
+	}
+}
+
+// MARK: オーディオの初期化メソッド
+func (a *APU) initAudioDevice() {
+	spec := &sdl.AudioSpec{
+		Freq: sampleHz,
+		Format: sdl.AUDIO_F32,
+		Channels: 1,
+		Samples: 2048,
+		Callback: sdl.AudioCallback(C.MixedAudioCallback),
+	}
+	if err := sdl.OpenAudio(spec, nil); err != nil {
+		panic(err)
+	}
+
+	// オーディオ再生開始
+	sdl.PauseAudio(false)
 }
 
 // MARK: 1chの初期化メソッド
@@ -93,16 +148,35 @@ func init1ch(buffer *RingBuffer) chan SquareNote {
 	// PCM生成のgoroutineを開始
 	go squareWave.generatePCM()
 
-	spec := &sdl.AudioSpec{
-		Freq:     sampleHz,
-		Format:   sdl.AUDIO_U8,
-		Channels: 1,
-		Samples:  2048, // バッファサイズを大きくしてアンダーランを防ぐ
-		Callback: sdl.AudioCallback(C.SquareWaveCallback),
-	}
-	if err := sdl.OpenAudio(spec, nil); err != nil {
-		panic(err)
+	return ch1Channel
+}
+
+
+// MARK: 4ch の初期化メソッド
+func init4ch(buffer *RingBuffer) chan NoiseNote {
+	ch4Channel := make(chan NoiseNote, 10) // バッファ付きチャンネル
+	// NoiseWave構造体を初期化
+	noiseWave = NoiseWave{
+		freq:   44100.0,
+		phase:  0.0,
+		channel: ch4Channel,
+		buffer: buffer,
+		noise: false,
+		note: NoiseNote{
+			hz: 0,
+			volume: 0.0,
+			noiseMode: NOISE_MODE_SHORT,
+		},
+
+		longNoise: NoiseShiftRegister{},
+		shortNoise: NoiseShiftRegister{},
 	}
 
-	return ch1Channel
+	noiseWave.shortNoise.InitWithShortMode()
+	noiseWave.longNoise.InitWithLongMode()
+
+	// PCM生成のgoroutineを開始
+	go noiseWave.generatePCM()
+
+	return ch4Channel
 }

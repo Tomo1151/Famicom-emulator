@@ -38,7 +38,7 @@ func (sw *SquareWave) generatePCM() {
 
 		// 小さなバッファでPCMサンプルを生成
 		const chunkSize = 512 // チャンクサイズを大きくしてアンダーランを防ぐ
-		pcmBuffer := make([]uint8, chunkSize)
+		pcmBuffer := make([]float32, chunkSize)
 		
 		// 現在の音符の周波数に基づいてphaseIncrementを計算
 		phaseIncrement := float32(sw.note.hz) / float32(sampleHz)
@@ -49,17 +49,17 @@ func (sw *SquareWave) generatePCM() {
 				sw.phase -= 1.0
 			}
 
-			var sample uint8
+			var sample float32
 			if sw.note.volume > 0 { // ボリュームが0より大きい場合のみ音を出す
 				if sw.phase < sw.note.duty {
-					sample = uint8(128 + (MAX_VOLUME * sw.note.volume * 127 / 256)) // 正の波形
+					sample = MAX_VOLUME // 正の波形
 				} else {
-					sample = uint8(128 - (MAX_VOLUME * sw.note.volume * 127 / 256)) // 負の波形
+					sample = -MAX_VOLUME // 負の波形
 				}
 			} else {
-				sample = 128 // 無音（中央値）
+				sample = 0.0 // 無音（中央値）
 			}
-			pcmBuffer[i] = sample
+			pcmBuffer[i] = sample * sw.note.volume
 		}
 
 		// リングバッファに書き込み

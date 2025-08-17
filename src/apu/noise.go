@@ -41,8 +41,8 @@ func (nw *NoiseWave) generatePCM() {
 		}
 
 		// 小さなバッファでPCMサンプルを生成
-		const chunkSize = 512 // チャンクサイズを大きくしてアンダーランを防ぐ
-		pcmBuffer := make([]uint8, chunkSize)
+		const chunkSize = 512
+		pcmBuffer := make([]float32, chunkSize)
 		
 		// 現在の音符の周波数に基づいてphaseIncrementを計算
 		phaseIncrement := float32(nw.note.hz) / float32(sampleHz)
@@ -52,6 +52,7 @@ func (nw *NoiseWave) generatePCM() {
 			if nw.phase >= 1.0 {
 				nw.phase -= 1.0
 
+				// ノイズシフトレジスタを更新
 				switch nw.note.noiseMode {
 				case NOISE_MODE_LONG:
 					nw.noise = nw.longNoise.next()
@@ -60,11 +61,15 @@ func (nw *NoiseWave) generatePCM() {
 				}
 			}
 
-			var sample uint8
-			if nw.noise {
-				sample = 128
+			var sample float32
+			if nw.note.volume > 0 { // ボリュームチェックを追加
+				if nw.noise {
+					sample = 0.0 // ノイズがtrueの場合は無音
+				} else {
+					sample = MAX_VOLUME * nw.note.volume
+				}
 			} else {
-				sample = uint8(128 + (MAX_VOLUME * nw.note.volume * 127 / 256))
+				sample = 0.0
 			}
 
 			pcmBuffer[i] = sample
