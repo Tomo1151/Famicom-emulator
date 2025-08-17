@@ -57,6 +57,12 @@ func (b *Bus) GetNMIStatus() *uint8 {
 	return b.ppu.GetNMI()
 }
 
+// MARK: APUのIRQを取得
+func (b *Bus) GetAPUIRQ() bool {
+	return b.apu.Status.GetFrameIRQ()
+}
+
+
 // MARK: サイクルを進める
 func (b *Bus) Tick(cycles uint) {
 	b.cycles += cycles
@@ -67,6 +73,9 @@ func (b *Bus) Tick(cycles uint) {
 	for range [3]int{} {
 		b.ppu.Tick(cycles)
 	}
+
+	// APUと同期
+	b.apu.Tick(cycles)
 
 	nmiAfter := b.ppu.NMI
 	if nmiBefore == nil && nmiAfter != nil {
@@ -122,6 +131,8 @@ func (b *Bus) ReadByteFrom(address uint16) uint8 {
 		return b.ReadByteFrom(ptr)
 	case address == 0x4014: // OAM_DATA (DMA)
 		panic("Error: attempt to read from OAM Data register")
+	case address == 0x4015: // APU
+		return b.apu.ReadStatus()
 	case address == 0x4016: // JOYPAD (1P)
 		result := b.joypad1.Read()
 		// fmt.Printf("JOYPAD Read: state=0x%02X, index=%d, result=0x%02X\n", 
@@ -220,11 +231,13 @@ func (b *Bus) WriteByteAt(address uint16, data uint8) {
 			b.Tick(1)
 		}
 		b.ppu.DMATransfer(&buffer)
+	case address == 0x4015: // APU
+		b.apu.WriteStatus(data)
 	case address == 0x4016: // コントローラ (1P)
 		// fmt.Printf("JOYPAD Write: data=0x%02X\n", data)
 		b.joypad1.Write(data)
-	case address == 0x4017: // コントローラ (2P)
-		// b.joypad2.Write(data)
+	case address == 0x4017: // APU フレームカウンタ
+		b.apu.WriteFrameCounter(data)
 	case 0x8000 <= address: // プログラムROM
 		panic(fmt.Sprintf("Error: attempt to write to cartridge ROM space $%04X, 0x%02X\n", address, data))
 	default:

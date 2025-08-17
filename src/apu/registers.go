@@ -7,6 +7,21 @@ const (
 	NOISE_MODE_LONG
 )
 
+const (
+	STATUS_REG_ENABLE_1CH_POS = 0
+	STATUS_REG_ENABLE_2CH_POS = 1
+	STATUS_REG_ENABLE_3CH_POS = 2
+	STATUS_REG_ENABLE_4CH_POS = 3
+	STATUS_REG_ENABLE_5CH_POS = 4
+	STATUS_REG_ENABLE_FRAME_IRQ_POS = 6
+	STATUS_REG_ENABLE_DMC_IRQ_POS = 7
+)
+
+const (
+	FRAME_COUNTER_IRQ_POS = 6
+	FRAME_COUNTER_MODE_POS = 7
+)
+
 type NoiseRegisterMode uint8
 
 // MARK: 矩形波レジスタ
@@ -270,4 +285,107 @@ func (nsr *NoiseShiftRegister) next() bool {
 
 	// fmt.Printf("NoiseShift: mode=%d, value=0x%04X, result=%t\n", nsr.mode, nsr.value, result)
 	return result
+}
+
+// MARK: ステータスレジスタ
+type StatusRegister struct {
+	enable1ch bool
+	enable2ch bool
+	enable3ch bool
+	enable4ch bool
+	enable5ch bool
+	enableFrameIRQ bool
+	enableDMCIRQ bool
+}
+
+// MARK: ステータスレジスタの初期化メソッド
+func (sr *StatusRegister) Init() {
+	sr.update(0b1101_1111)
+}
+
+// MARK: フレーム割込みフラグを取得
+func (sr *StatusRegister) GetFrameIRQ() bool {
+	return sr.enableFrameIRQ
+}
+
+// MARK: フレーム割込みフラグをセット
+func (sr *StatusRegister) SetFrameIRQ() {
+	sr.enableFrameIRQ = true
+}
+
+// MARK: フレーム割り込みフラグをクリア
+func (sr *StatusRegister) ClearFrameIRQ() {
+	sr.enableFrameIRQ = false
+}
+
+// MARK: ステータスレジスタをuint8へ変換するメソッド
+func (sr *StatusRegister) ToByte() uint8 {
+	var value uint8 = 0x00
+
+	if sr.enable1ch {
+		value |= 1 << STATUS_REG_ENABLE_1CH_POS
+	}
+	if sr.enable2ch {
+		value |= 1 << STATUS_REG_ENABLE_2CH_POS
+	}
+	if sr.enable3ch {
+		value |= 1 << STATUS_REG_ENABLE_3CH_POS
+	}
+	if sr.enable4ch {
+		value |= 1 << STATUS_REG_ENABLE_4CH_POS
+	}
+	if sr.enable5ch {
+		value |= 1 << STATUS_REG_ENABLE_5CH_POS
+	}
+	if sr.enableFrameIRQ {
+		value |= 1 << STATUS_REG_ENABLE_FRAME_IRQ_POS
+	}
+	if sr.enableDMCIRQ {
+		value |= 1 << STATUS_REG_ENABLE_DMC_IRQ_POS
+	}
+
+	return value
+}
+
+// MARK: ステータスレジスタの更新メソッド
+func (sr *StatusRegister) update(value uint8) {
+	sr.enable1ch = (value & (1 << STATUS_REG_ENABLE_1CH_POS)) != 0
+	sr.enable2ch = (value & (1 << STATUS_REG_ENABLE_2CH_POS)) != 0
+	sr.enable3ch = (value & (1 << STATUS_REG_ENABLE_3CH_POS)) != 0
+	sr.enable4ch = (value & (1 << STATUS_REG_ENABLE_4CH_POS)) != 0
+	sr.enable5ch = (value & (1 << STATUS_REG_ENABLE_5CH_POS)) != 0
+	sr.enableFrameIRQ = (value & (1 << STATUS_REG_ENABLE_FRAME_IRQ_POS)) != 0
+	sr.enableDMCIRQ = (value & (1 << STATUS_REG_ENABLE_DMC_IRQ_POS)) != 0
+
+}
+
+
+// MARK: フレームカウンタ
+type FrameCounter struct {
+	DisableIRQ bool
+	SequencerMode bool
+}
+
+func (fc *FrameCounter) Init() {
+	fc.DisableIRQ = true
+	fc.SequencerMode = true
+}
+
+func (fc *FrameCounter) getMode() uint8 {
+	if fc.SequencerMode {
+		return 5
+	} else {
+		return 4
+	}
+}
+func (fc *FrameCounter) getDisableIRQ() bool {
+	return fc.DisableIRQ
+}
+
+func (fc *FrameCounter) update(data uint8) {
+	irq := ((data & 0x40) >> FRAME_COUNTER_IRQ_POS) != 0
+	mode := ((data & 0x80) >> FRAME_COUNTER_MODE_POS) != 0
+
+	fc.DisableIRQ = irq
+	fc.SequencerMode = mode
 }

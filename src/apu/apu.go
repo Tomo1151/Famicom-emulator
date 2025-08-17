@@ -7,6 +7,7 @@ void MixedAudioCallback(void *userdata, Uint8 *stream, int len);
 */
 import "C"
 import (
+	"fmt"
 	"unsafe"
 
 	"github.com/veandco/go-sdl2/sdl"
@@ -14,6 +15,7 @@ import (
 
 const (
 	CPU_CLOCK = 1_789_772.5 // 1.78MHz
+	APU_CYCLE_INTERVAL = 7457
 	MAX_VOLUME = 0.4
 	toneHz   = 440
 	sampleHz = 44100
@@ -41,6 +43,11 @@ type APU struct {
 	Ch4Register NoiseWaveRegister
 	Ch4Channel chan NoiseNote
 	Ch4Buffer *RingBuffer
+
+	frameCounter FrameCounter
+	cycles uint
+	counter uint
+	Status StatusRegister
 }
 
 // MARK: APUの初期化メソッド
@@ -73,6 +80,12 @@ func (a *APU) Init() {
 	a.Ch4Buffer.Init()
 	a.Ch4Channel = initNoiseChannel(a.Ch4Buffer)
 
+	a.frameCounter = FrameCounter{}
+	a.frameCounter.Init()
+
+	a.cycles = 0
+	a.Status = StatusRegister{}
+	a.Status.Init()
 
 	// オーディオデバイスの初期化
 	a.initAudioDevice()
@@ -131,6 +144,24 @@ func (a *APU) Write4ch(address uint16, data uint8) {
 		volume: a.Ch4Register.getVolume(),
 		noiseMode: a.Ch4Register.getMode(),
 	}
+}
+
+// MARK: フレームカウンタの書き込みメソッド
+func (a *APU) WriteFrameCounter(data uint8) {
+	a.frameCounter.update(data)
+	a.counter = 0
+	a.cycles = 0
+}
+
+// MARK: ステータスレジスタの読み取りメソッド
+func (a *APU) ReadStatus() uint8 {
+	a.Status.ClearFrameIRQ()
+	return a.Status.ToByte()
+}
+
+// MARK: ステータスレジスタの書き込みメソッド
+func (a *APU) WriteStatus(data uint8) {
+	a.Status.update(data)
 }
 
 
@@ -258,3 +289,36 @@ func initNoiseChannel(buffer *RingBuffer) chan NoiseNote {
 
 	return ch4Channel
 }
+
+// MARK: CPUと同期してサイクルを進めるメソッド
+func (a *APU) Tick(cycles uint) {
+	a.cycles++
+
+	if a.cycles >= APU_CYCLE_INTERVAL {
+		a.cycles %= APU_CYCLE_INTERVAL
+		a.counter++
+
+		mode := a.frameCounter.getMode()
+
+		switch mode {
+		case 4:
+			if a.counter == 2 || a.counter == 4 {
+				// 長さカウンタとスイープ用のクロック生成
+			}
+			if a.counter == 4 {
+				// 割り込みフラグをセット
+				a.counter = 0
+				a.Status.SetFrameIRQ()
+			}
+			if a.counter == 1 || a.counter == 2 || a.counter == 3 || a.counter ==4 {}
+		case 5:
+			if a.counter == 2 || a.counter == 4 {
+				// 長さカウンタとスイープ用のクロック生成
+			}
+			if a.counter == 1 || a.counter == 2 || a.counter == 3 || a.counter ==4 {}
+		default:
+			panic(fmt.Sprintf("APU Error: unexpected Frame sequencer mode: %04X", mode))
+		}
+	}
+}
+
