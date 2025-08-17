@@ -138,7 +138,7 @@ func (twr *TriangleWaveRegister) write(address uint16, data uint8) {
 
 // MARK: レジスタから三角波のピッチを取得するメソッド
 func (twr *TriangleWaveRegister) getFrequency() float32 {
-	return CPU_CLOCK / (16.0*float32(twr.frequency) + 1.0)
+	return CPU_CLOCK / (32.0*float32(twr.frequency) + 1.0)
 }
 
 
