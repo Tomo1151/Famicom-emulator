@@ -564,6 +564,9 @@ func (a *APU) sendEnvelopeTick() {
 	a.Ch2Channel <- SquareWaveEvent{
 		eventType: SQUARE_WAVE_ENVELOPE_TICK,
 	}
+	a.Ch3Channel <- TriangleWaveEvent{
+		eventType: TRIANGLE_WAVE_LINEAR_COUNTER_TICK,
+	}
 	a.Ch4Channel <- NoiseWaveEvent{
 		eventType: NOISE_WAVE_ENVELOPE_TICK,
 	}
