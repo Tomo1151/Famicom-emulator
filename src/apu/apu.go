@@ -26,12 +26,12 @@ const (
 type APU struct {
 	// CH1
 	Ch1Register SquareWaveRegister
-	Ch1Channel chan SquareNote
+	Ch1Channel chan SquareWaveEvent
 	Ch1Buffer *RingBuffer
 
 	// CH2
 	Ch2Register SquareWaveRegister
-	Ch2Channel chan SquareNote
+	Ch2Channel chan SquareWaveEvent
 	Ch2Buffer *RingBuffer
 
 	// CH3
@@ -95,17 +95,19 @@ func (a *APU) Init() {
 func (a *APU) Write1ch(address uint16, data uint8) {
 	a.Ch1Register.write(address, data)
 
-	// SDL側に送信
-	var volume float32
-	if a.Ch1Register.isEnabled() {
-		volume = a.Ch1Register.getVolume()
-	} else {
-		volume = 0.0
+	a.Ch1Channel <- SquareWaveEvent{
+		eventType: SQUARE_WAVE_NOTE,
+		note: &SquareNote{
+			hz: a.Ch1Register.getFrequency(),
+			duty: a.Ch1Register.getDuty(),
+		},
 	}
-	a.Ch1Channel <- SquareNote{
-		hz: a.Ch1Register.getFrequency(),
-		duty: a.Ch1Register.getDuty(),
-		volume: volume,
+
+	envelope := Envelope{}
+	envelope.Init(a.Ch1Register.volume, a.Ch1Register.envelope, a.Ch1Register.keyOffCounter)
+	a.Ch1Channel <- SquareWaveEvent{
+		eventType: SQUARE_WAVE_ENVELOPE,
+		envelope: &envelope,
 	}
 }
 
@@ -113,16 +115,19 @@ func (a *APU) Write1ch(address uint16, data uint8) {
 func (a *APU) Write2ch(address uint16, data uint8) {
 	a.Ch2Register.write(address, data)
 
-	var volume float32
-	if a.Ch2Register.isEnabled() {
-		volume = a.Ch2Register.getVolume()
-	} else {
-		volume = 0.0
+	a.Ch2Channel <- SquareWaveEvent{
+		eventType: SQUARE_WAVE_NOTE,
+		note: &SquareNote{
+			hz: a.Ch2Register.getFrequency(),
+			duty: a.Ch2Register.getDuty(),
+		},
 	}
-	a.Ch2Channel <- SquareNote{
-		hz: a.Ch2Register.getFrequency(),
-		duty: a.Ch2Register.getDuty(),
-		volume: volume,
+
+	envelope := Envelope{}
+	envelope.Init(a.Ch2Register.volume, a.Ch2Register.envelope, a.Ch2Register.keyOffCounter)
+	a.Ch2Channel <- SquareWaveEvent{
+		eventType: SQUARE_WAVE_ENVELOPE,
+		envelope: &envelope,
 	}
 }
 
@@ -162,6 +167,22 @@ func (a *APU) ReadStatus() uint8 {
 // MARK: ステータスレジスタの書き込みメソッド
 func (a *APU) WriteStatus(data uint8) {
 	a.Status.update(data)
+
+	// 各チャンネルの状態によってミュートにする
+	a.Ch1Channel <- SquareWaveEvent{
+		eventType: SQUARE_WAVE_ENABLED,
+		enabled: a.Status.enable1ch,
+	}
+	a.Ch2Channel <- SquareWaveEvent{
+		eventType: SQUARE_WAVE_ENABLED,
+		enabled: a.Status.enable2ch,
+	}
+	if !a.Status.is3chEnabled() {
+		triangleWave.note.hz = 0.0
+	}
+	if !a.Status.is4chEnabled() {
+		noiseWave.note.volume = 0.0
+	}
 }
 
 
@@ -219,8 +240,10 @@ func (a *APU) initAudioDevice() {
 }
 
 // MARK: 1ch/2chの初期化メソッド
-func initSquareChannel(wave *SquareWave, buffer *RingBuffer) chan SquareNote {
-	ch1Channel := make(chan SquareNote, 10)
+func initSquareChannel(wave *SquareWave, buffer *RingBuffer) chan SquareWaveEvent {
+	ch1Channel := make(chan SquareWaveEvent, 10)
+	envelope := Envelope{}
+	envelope.Init(0, false, false)
 
 	// SquareWave構造体を初期化
 	*wave = SquareWave{
@@ -230,9 +253,10 @@ func initSquareChannel(wave *SquareWave, buffer *RingBuffer) chan SquareNote {
 		buffer: buffer,
 		note: SquareNote{
 			hz: 0,
-			volume: 0.0,
 			duty:   0.0,
 		},
+		envelope: envelope,
+		enabled: true,
 	}
 
 	// PCM生成のgoroutineを開始
@@ -305,17 +329,34 @@ func (a *APU) Tick(cycles uint) {
 			if a.counter == 2 || a.counter == 4 {
 				// 長さカウンタとスイープ用のクロック生成
 			}
+			if a.counter == 1 || a.counter == 2 || a.counter == 3 || a.counter ==4 {
+				a.Ch1Channel <- SquareWaveEvent{
+					eventType: SQUARE_WAVE_ENVELOPE_TICK,
+				}
+				a.Ch2Channel <- SquareWaveEvent{
+					eventType: SQUARE_WAVE_ENVELOPE_TICK,
+				}
+			}
 			if a.counter == 4 {
 				// 割り込みフラグをセット
 				a.counter = 0
 				a.Status.SetFrameIRQ()
 			}
-			if a.counter == 1 || a.counter == 2 || a.counter == 3 || a.counter ==4 {}
 		case 5:
-			if a.counter == 2 || a.counter == 4 {
+			if a.counter == 0 || a.counter == 2 {
 				// 長さカウンタとスイープ用のクロック生成
 			}
-			if a.counter == 1 || a.counter == 2 || a.counter == 3 || a.counter ==4 {}
+			if a.counter == 1 || a.counter == 2 || a.counter == 3 || a.counter ==4 {
+				a.Ch1Channel <- SquareWaveEvent{
+					eventType: SQUARE_WAVE_ENVELOPE_TICK,
+				}
+				a.Ch2Channel <- SquareWaveEvent{
+					eventType: SQUARE_WAVE_ENVELOPE_TICK,
+				}
+			}
+			if a.counter == 5 {
+				a.counter = 0
+			}
 		default:
 			panic(fmt.Sprintf("APU Error: unexpected Frame sequencer mode: %04X", mode))
 		}

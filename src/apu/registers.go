@@ -318,6 +318,31 @@ func (sr *StatusRegister) ClearFrameIRQ() {
 	sr.enableFrameIRQ = false
 }
 
+// MARK: 1chの有効/無効を取得
+func (sr *StatusRegister) is1chEnabled() bool {
+	return sr.enable1ch
+}
+
+// MARK: 2chの有効/無効を取得
+func (sr *StatusRegister) is2chEnabled() bool {
+	return sr.enable2ch
+}
+
+// MARK: 3chの有効/無効を取得
+func (sr *StatusRegister) is3chEnabled() bool {
+	return sr.enable3ch
+}
+
+// MARK: 4chの有効/無効を取得
+func (sr *StatusRegister) is4chEnabled() bool {
+	return sr.enable4ch
+}
+
+// MARK: 5chの有効/無効を取得
+func (sr *StatusRegister) is5chEnabled() bool {
+	return sr.enable5ch
+}
+
 // MARK: ステータスレジスタをuint8へ変換するメソッド
 func (sr *StatusRegister) ToByte() uint8 {
 	var value uint8 = 0x00
