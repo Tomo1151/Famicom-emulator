@@ -183,8 +183,8 @@ func (nwr *NoiseWaveRegister) Init() {
 }
 
 // MARK: ノイズレジスタの書き込みメソッド（4ch）
-func (nwr *NoiseWaveRegister) write(adress uint16, data uint8) {
-	switch adress {
+func (nwr *NoiseWaveRegister) write(address uint16, data uint8) {
+	switch address {
 	case 0x400C:
 		nwr.volume = data & 0x0F
 		nwr.envelope = (data & 0x10) == 0
@@ -201,7 +201,7 @@ func (nwr *NoiseWaveRegister) write(adress uint16, data uint8) {
 	case 0x400F:
 		nwr.keyOffCount = (data & 0xF8) >> 3
 	default:
-		panic(fmt.Sprintf("APU Error: unexpected write at %04X", adress))
+		panic(fmt.Sprintf("APU Error: unexpected write at %04X", address))
 	}
 }
 
@@ -286,6 +286,53 @@ func (nsr *NoiseShiftRegister) next() bool {
 	// fmt.Printf("NoiseShift: mode=%d, value=0x%04X, result=%t\n", nsr.mode, nsr.value, result)
 	return result
 }
+
+// MARK: DPCMレジスタ
+type DPCMRegister struct {
+	// 0x4010
+	irqEnabled bool
+	loop bool
+	frequencyIndex uint8
+
+	// 0x4011
+	deltaCounter uint8
+
+	// 0x4012
+	sampleStartAddress uint8
+
+	// 0x4013
+	byteCount uint8
+}
+
+// MARK: DPCMレジスタの初期化メソッド
+func (dr *DPCMRegister) Init() {
+	dr.irqEnabled = false
+	dr.loop = false
+	dr.frequencyIndex = 0
+	dr.deltaCounter = 0
+	dr.sampleStartAddress = 0x00
+	dr.byteCount = 0
+}
+
+// MARK: DPCMレジスタの書き込みメソッド（5ch）
+func (dr *DPCMRegister) write(address uint16, data uint8) {
+	switch address {
+	case 0x4010:
+		dr.irqEnabled = (data & 0x80) != 0
+		dr.loop = (data & 0x40) != 0
+		dr.frequencyIndex = data & 0x0F
+	case 0x4011:
+		dr.deltaCounter = data & 0x7F
+	case 0x4012:
+		dr.sampleStartAddress = data
+	case 0x4013:
+		dr.byteCount = data
+	default:
+		panic(fmt.Sprintf("APU Error: unexpected write at %04X", address))
+	}
+}
+
+
 
 // MARK: ステータスレジスタ
 type StatusRegister struct {

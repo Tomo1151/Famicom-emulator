@@ -52,6 +52,13 @@ type APU struct {
 	Ch4Buffer *RingBuffer
 	Ch4LengthCount uint8
 
+	// CH5
+	Ch5Register DPCMRegister
+	Ch5Channel chan DPCMWaveEvent
+	Ch5Receiver chan ChannelEvent
+	Ch5Buffer *RingBuffer
+	Ch5LengthCount uint8
+
 	frameCounter FrameCounter
 	cycles uint
 	counter uint
@@ -96,6 +103,14 @@ func (a *APU) Init() {
 	a.Ch4Buffer.Init()
 	a.Ch4Channel, a.Ch4Receiver = initNoiseChannel(a.Ch4Buffer)
 	a.Ch4LengthCount = 0
+
+	// CH5
+	a.Ch5Register = DPCMRegister{}
+	a.Ch5Register.Init()
+	a.Ch5Buffer = &RingBuffer{}
+	a.Ch5Buffer.Init()
+	a.Ch5Channel, a.Ch5Receiver = a.initDPCMChannel(a.Ch5Buffer)
+	a.Ch5LengthCount = 0
 
 	a.frameCounter = FrameCounter{}
 	a.frameCounter.Init()
@@ -292,6 +307,11 @@ func (a *APU) Write4ch(address uint16, data uint8) {
 	}
 }
 
+// MARK: 5chへの書き込みメソッド（DPCM）
+func (a *APU) Write5ch(address uint16, data uint8) {
+	a.Ch5Register.write(address, data)
+}
+
 // MARK: フレームカウンタの書き込みメソッド
 func (a *APU) WriteFrameCounter(data uint8) {
 	a.frameCounter.update(data)
@@ -326,6 +346,11 @@ func (a *APU) ReadStatus() uint8 {
 	} else {
 		status |= 1 << 3
 	}
+	if a.Ch5LengthCount == 0 {
+		status |= 0 << 4
+	} else {
+		status |= 1 << 4
+	}
 
 	a.Status.ClearFrameIRQ()
 
@@ -352,6 +377,10 @@ func (a *APU) WriteStatus(data uint8) {
 	a.Ch4Channel <- NoiseWaveEvent{
 		eventType: NOISE_WAVE_ENABLED,
 		enabled: a.Status.is4chEnabled(),
+	}
+	a.Ch5Channel <- DPCMWaveEvent{
+		eventType: DPCM_WAVE_ENABLED,
+		enabled: a.Status.is5chEnabled(),
 	}
 }
 
@@ -496,6 +525,7 @@ func initNoiseChannel(buffer *RingBuffer) (chan NoiseWaveEvent, chan ChannelEven
 
 		longNoise: NoiseShiftRegister{},
 		shortNoise: NoiseShiftRegister{},
+		enabled: true,
 	}
 
 	noiseWave.shortNoise.InitWithShortMode()
@@ -505,6 +535,26 @@ func initNoiseChannel(buffer *RingBuffer) (chan NoiseWaveEvent, chan ChannelEven
 	go noiseWave.generatePCM()
 
 	return ch4Channel, sendChannel
+}
+
+// MARK: 5chの初期化メソッド
+func (a *APU) initDPCMChannel(buffer *RingBuffer) (chan DPCMWaveEvent, chan ChannelEvent) {
+	ch5Channel := make(chan DPCMWaveEvent, 10)
+	sendChannel := make(chan ChannelEvent, 10)
+
+	dpcmWave = DPCMWave{
+		freq: 44100.0,
+		phase: 0.0,
+		channel: ch5Channel,
+		sender: sendChannel,
+		note: DPCMNote{},
+		buffer: buffer,
+		enabled: true,
+	}
+
+	go dpcmWave.generatePCM()
+
+	return ch5Channel, sendChannel
 }
 
 func (a *APU) sendEnvelopeTick() {
@@ -582,6 +632,16 @@ func (a *APU) receiveEvents() {
 			a.Ch4LengthCount = event.length
 		default:
 			break ch4EventLoop
+		}
+	}
+
+	ch5EventLoop:
+	for {
+		select {
+		case event := <-a.Ch5Receiver:
+			a.Ch5LengthCount = event.length
+		default:
+			break ch5EventLoop
 		}
 	}
 }
