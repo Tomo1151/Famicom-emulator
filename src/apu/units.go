@@ -1,32 +1,42 @@
 package apu
 
-type Envelope struct {
+type EnvelopeData struct {
 	rate    uint8
 	enabled bool
 	loop    bool
+}
+
+func (ed *EnvelopeData) Init(rate uint8, enabled bool, loop bool) {
+	ed.rate = rate
+	ed.enabled = enabled
+	ed.loop = loop
+}
+
+type Envelope struct {
+	data EnvelopeData
+
 	counter uint8
 	divider uint8
 }
 
-func (e *Envelope) Init(rate uint8, enabled bool, loop bool) {
-	e.rate = rate
-	e.enabled = enabled
-	e.loop = loop
+func (e *Envelope) Init() {
+	e.data = EnvelopeData{}
+	e.data.Init(0, false, false)
 	e.counter = 0x0F
-	e.divider = rate + 1
+	e.divider = e.data.rate + 1
 }
 
 func (e *Envelope) volume() float32 {
-	if e.enabled {
+	if e.data.enabled {
 		return float32(e.counter) / 15.0
 	} else {
-		return float32(e.rate) / 15.0
+		return float32(e.data.rate) / 15.0
 	}
 }
 
 func (e *Envelope) reset() {
 	e.counter = 0x0F
-	e.divider = e.rate + 1
+	e.divider = e.data.rate + 1
 }
 
 func (e *Envelope) tick() {
@@ -40,11 +50,11 @@ func (e *Envelope) tick() {
 	if e.counter != 0 {
 		e.counter--
 	} else {
-		if e.loop {
+		if e.data.loop {
 			e.reset()
 		}
 	}
-	e.divider = e.rate + 1
+	e.divider = e.data.rate + 1
 }
 
 type SweepUnit struct {

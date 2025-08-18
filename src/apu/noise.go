@@ -38,7 +38,7 @@ type NoiseNote struct {
 type NoiseWaveEvent struct {
 	eventType     NoiseWaveEventType
 	note          *NoiseNote
-	envelope      *Envelope
+	envelopeData  *EnvelopeData
 	lengthCounter *LengthCounter
 	enabled       bool
 }
@@ -63,8 +63,8 @@ func (nw *NoiseWave) generatePCM() {
 						nw.phase = 0.0 // 音符が変わったらphaseをリセット
 					}
 				case NOISE_WAVE_ENVELOPE: // ENVELOPEイベント
-					if event.envelope != nil {
-						nw.envelope = *event.envelope
+					if event.envelopeData != nil {
+						nw.envelope.data = *event.envelopeData
 					}
 				case NOISE_WAVE_ENVELOPE_TICK: // ENVELOPE TICKイベント
 					nw.envelope.tick()

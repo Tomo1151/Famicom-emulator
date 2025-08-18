@@ -35,7 +35,7 @@ type SquareNote struct {
 type SquareWaveEvent struct {
 	eventType     SquareWaveEventType
 	note          *SquareNote
-	envelope      *Envelope
+	envelopeData  *EnvelopeData
 	lengthCounter *LengthCounter
 	sweepUnit     *SweepUnit
 	enabled       bool
@@ -62,8 +62,8 @@ func (sw *SquareWave) generatePCM() {
 						sw.phase = 0.0 // 音符が変わったらphaseをリセット
 					}
 				case SQUARE_WAVE_ENVELOPE: // ENVELOPEイベント
-					if event.envelope != nil {
-						sw.envelope = *event.envelope
+					if event.envelopeData != nil {
+						sw.envelope.data = *event.envelopeData
 					}
 				case SQUARE_WAVE_ENVELOPE_TICK: // ENVELOPE TICKイベント
 					sw.envelope.tick()

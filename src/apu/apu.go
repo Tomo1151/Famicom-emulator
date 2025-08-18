@@ -102,11 +102,15 @@ func (a *APU) Write1ch(address uint16, data uint8) {
 		},
 	}
 
-	envelope := Envelope{}
-	envelope.Init(a.Ch1Register.volume, a.Ch1Register.envelope, a.Ch1Register.keyOffCounter)
+	envelopeData := EnvelopeData{}
+	envelopeData.Init(
+		a.Ch1Register.volume,
+		a.Ch1Register.envelope,
+		!a.Ch1Register.keyOffCounter,
+	)
 	a.Ch1Channel <- SquareWaveEvent{
 		eventType: SQUARE_WAVE_ENVELOPE,
-		envelope: &envelope,
+		envelopeData: &envelopeData,
 	}
 
 	lengthCounter := LengthCounter{enabled: a.Ch1Register.keyOffCounter}
@@ -146,11 +150,15 @@ func (a *APU) Write2ch(address uint16, data uint8) {
 		},
 	}
 
-	envelope := Envelope{}
-	envelope.Init(a.Ch2Register.volume, a.Ch2Register.envelope, a.Ch2Register.keyOffCounter)
+	envelopeData := EnvelopeData{}
+	envelopeData.Init(
+		a.Ch2Register.volume,
+		a.Ch2Register.envelope,
+		!a.Ch2Register.keyOffCounter,
+	)
 	a.Ch2Channel <- SquareWaveEvent{
 		eventType: SQUARE_WAVE_ENVELOPE,
-		envelope: &envelope,
+		envelopeData: &envelopeData,
 	}
 
 	lengthCounter := LengthCounter{enabled: a.Ch2Register.keyOffCounter}
@@ -224,11 +232,15 @@ func (a *APU) Write4ch(address uint16, data uint8) {
 		},
 	}
 
-	envelope := Envelope{}
-	envelope.Init(a.Ch4Register.volume, a.Ch4Register.envelope, a.Ch4Register.keyOffCounter)
+	envelopeData := EnvelopeData{}
+	envelopeData.Init(
+		a.Ch4Register.volume,
+		a.Ch4Register.envelope,
+		!a.Ch4Register.keyOffCounter,
+	)
 	a.Ch4Channel <- NoiseWaveEvent{
 		eventType: NOISE_WAVE_ENVELOPE,
-		envelope: &envelope,
+		envelopeData: &envelopeData,
 	}
 
 	lengthCounter := LengthCounter{enabled: a.Ch4Register.keyOffCounter}
@@ -338,7 +350,7 @@ func (a *APU) initAudioDevice() {
 func initSquareChannel(wave *SquareWave, buffer *RingBuffer) chan SquareWaveEvent {
 	ch1Channel := make(chan SquareWaveEvent, 10)
 	envelope := Envelope{}
-	envelope.Init(0, false, false)
+	envelope.Init()
 
 	// SquareWave構造体を初期化
 	*wave = SquareWave{
