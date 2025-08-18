@@ -29,11 +29,11 @@ type TriangleNote struct {
 }
 
 type TriangleWaveEvent struct {
-	eventType     TriangleWaveEventType
-	note          *TriangleNote
-	lengthCounter *LengthCounter
-	linearCounter *LinearCounter
-	enabled       bool
+	eventType         TriangleWaveEventType
+	note              *TriangleNote
+	lengthCounterData *LengthCounterData
+	linearCounterData *LinearCounterData
+	enabled           bool
 }
 
 // MARK: 三角波データ
@@ -56,12 +56,12 @@ func (tw *TriangleWave) generatePCM() {
 						tw.phase = 0.0 // 音符が変わったらphaseをリセット
 					}
 				case TRIANGLE_WAVE_LINEAR_COUNTER: // LINEAR COUNTERイベント
-					if event.linearCounter != nil {
-						tw.linearCounter = *event.linearCounter
+					if event.linearCounterData != nil {
+						tw.linearCounter.data = *event.linearCounterData
 					}
 				case TRIANGLE_WAVE_LENGTH_COUNTER: // LENGTH COUNTERイベント
-					if event.lengthCounter != nil {
-						tw.lengthCounter = *event.lengthCounter
+					if event.lengthCounterData != nil {
+						tw.lengthCounter.data = *event.lengthCounterData
 					}
 				case TRIANGLE_WAVE_LENGTH_COUNTER_TICK: // LENGTH COUNTER TICKイベント
 					tw.lengthCounter.tick()

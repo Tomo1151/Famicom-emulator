@@ -33,12 +33,12 @@ type SquareNote struct {
 }
 
 type SquareWaveEvent struct {
-	eventType     SquareWaveEventType
-	note          *SquareNote
-	envelopeData  *EnvelopeData
-	lengthCounter *LengthCounter
-	sweepUnit     *SweepUnit
-	enabled       bool
+	eventType         SquareWaveEventType
+	note              *SquareNote
+	envelopeData      *EnvelopeData
+	lengthCounterData *LengthCounterData
+	sweepUnitData     *SweepUnitData
+	enabled           bool
 }
 
 // MARK: 矩形波データ
@@ -68,14 +68,14 @@ func (sw *SquareWave) generatePCM() {
 				case SQUARE_WAVE_ENVELOPE_TICK: // ENVELOPE TICKイベント
 					sw.envelope.tick()
 				case SQUARE_WAVE_LENGTH_COUNTER: // LENGTH COUNTERイベント
-					if event.lengthCounter != nil {
-						sw.lengthCounter = *event.lengthCounter
+					if event.lengthCounterData != nil {
+						sw.lengthCounter.data = *event.lengthCounterData
 					}
 				case SQUARE_WAVE_LENGTH_COUNTER_TICK: // LENGTH COUNTER TICKイベント
 					sw.lengthCounter.tick()
 				case SQUARE_WAVE_SWEEP: // SWEEPイベント
-					if event.sweepUnit != nil {
-						sw.sweepUnit = *event.sweepUnit
+					if event.sweepUnitData != nil {
+						sw.sweepUnit.data = *event.sweepUnitData
 					}
 				case SQUARE_WAVE_SWEEP_TICK: // SWEEP TICKイベント
 					sw.sweepUnit.tick(&sw.lengthCounter)

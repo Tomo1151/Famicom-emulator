@@ -113,23 +113,29 @@ func (a *APU) Write1ch(address uint16, data uint8) {
 		envelopeData: &envelopeData,
 	}
 
-	lengthCounter := LengthCounter{enabled: a.Ch1Register.keyOffCounter}
-	lengthCounter.setCount(a.Ch1Register.keyOffCount)
+	lengthCounterData := LengthCounterData{}
+	lengthCounterData.Init(
+		a.Ch1Register.keyOffCount,
+		a.Ch1Register.keyOffCounter,
+	)
+
 	a.Ch1Channel <- SquareWaveEvent{
 		eventType: SQUARE_WAVE_LENGTH_COUNTER,
-		lengthCounter: &lengthCounter,
+		lengthCounterData: &lengthCounterData,
 	}
+
+	sweepUnitData := SweepUnitData{}
+	sweepUnitData.Init(
+		a.Ch1Register.frequency,
+		a.Ch1Register.sweepShift,
+		a.Ch1Register.sweepDirection,
+		a.Ch1Register.sweepPeriod,
+		a.Ch1Register.sweepEnabled,
+	)
 
 	a.Ch1Channel <- SquareWaveEvent{
 		eventType: SQUARE_WAVE_SWEEP,
-		sweepUnit: &SweepUnit{
-			prevFrequency: a.Ch1Register.frequency,
-			frequency: a.Ch1Register.frequency,
-			amount: a.Ch1Register.sweepShift,
-			direction: a.Ch1Register.sweepDirection,
-			timerCount: a.Ch1Register.sweepPeriod,
-			enabled: a.Ch1Register.sweepEnabled,
-		},
+		sweepUnitData: &sweepUnitData,
 	}
 
 	if address == 0x4003 {
@@ -161,23 +167,30 @@ func (a *APU) Write2ch(address uint16, data uint8) {
 		envelopeData: &envelopeData,
 	}
 
-	lengthCounter := LengthCounter{enabled: a.Ch2Register.keyOffCounter}
-	lengthCounter.setCount(a.Ch2Register.keyOffCount)
+	lengthCounterData := LengthCounterData{}
+	lengthCounterData.Init(
+		a.Ch2Register.keyOffCount,
+		a.Ch2Register.keyOffCounter,
+	)
+
 	a.Ch2Channel <- SquareWaveEvent{
 		eventType: SQUARE_WAVE_LENGTH_COUNTER,
-		lengthCounter: &lengthCounter,
+		lengthCounterData: &lengthCounterData,
 	}
+
+
+	sweepUnitData := SweepUnitData{}
+	sweepUnitData.Init(
+		a.Ch2Register.frequency,
+		a.Ch2Register.sweepShift,
+		a.Ch2Register.sweepDirection,
+		a.Ch2Register.sweepPeriod,
+		a.Ch2Register.sweepEnabled,
+	)
 
 	a.Ch2Channel <- SquareWaveEvent{
 		eventType: SQUARE_WAVE_SWEEP,
-		sweepUnit: &SweepUnit{
-			prevFrequency: a.Ch2Register.frequency,
-			frequency: a.Ch2Register.frequency,
-			amount: a.Ch2Register.sweepShift,
-			direction: a.Ch2Register.sweepDirection,
-			timerCount: a.Ch2Register.sweepPeriod,
-			enabled: a.Ch2Register.sweepEnabled,
-		},
+		sweepUnitData: &sweepUnitData,
 	}
 
 	if address == 0x4007 {
@@ -198,18 +211,20 @@ func (a *APU) Write3ch(address uint16, data uint8) {
 		},
 	}
 
-	lengthCounter := LengthCounter{enabled: a.Ch3Register.keyOffCounter}
-	lengthCounter.setCount(a.Ch3Register.keyOffCount)
+	lengthCounterData := LengthCounterData{}
+	lengthCounterData.Init(
+		a.Ch3Register.keyOffCount,
+		a.Ch3Register.keyOffCounter,
+	)
 	a.Ch3Channel <- TriangleWaveEvent{
 		eventType: TRIANGLE_WAVE_LENGTH_COUNTER,
-		lengthCounter: &lengthCounter,
+		lengthCounterData: &lengthCounterData,
 	}
 
 	a.Ch3Channel <- TriangleWaveEvent{
 		eventType: TRIANGLE_WAVE_LINEAR_COUNTER,
-		linearCounter: &LinearCounter{
-			prevCount: a.Ch3Register.length,
-			counter: a.Ch3Register.length,
+		linearCounterData: &LinearCounterData{
+			count: a.Ch3Register.length,
 		},
 	}
 
@@ -243,11 +258,14 @@ func (a *APU) Write4ch(address uint16, data uint8) {
 		envelopeData: &envelopeData,
 	}
 
-	lengthCounter := LengthCounter{enabled: a.Ch4Register.keyOffCounter}
-	lengthCounter.setCount(a.Ch4Register.keyOffCount)
+	lengthCounterData := LengthCounterData{}
+	lengthCounterData.Init(
+		a.Ch4Register.keyOffCount,
+		a.Ch4Register.keyOffCounter,
+	)
 	a.Ch4Channel <- NoiseWaveEvent{
 		eventType: TRIANGLE_WAVE_LENGTH_COUNTER,
-		lengthCounter: &lengthCounter,
+		lengthCounterData: &lengthCounterData,
 	}
 
 	if address == 0x400F {
@@ -349,8 +367,13 @@ func (a *APU) initAudioDevice() {
 // MARK: 1ch/2chの初期化メソッド
 func initSquareChannel(wave *SquareWave, buffer *RingBuffer) chan SquareWaveEvent {
 	ch1Channel := make(chan SquareWaveEvent, 10)
+
 	envelope := Envelope{}
 	envelope.Init()
+	lengthCounter := LengthCounter{}
+	lengthCounter.Init()
+	sweepUnit := SweepUnit{}
+	sweepUnit.Init()
 
 	// SquareWave構造体を初期化
 	*wave = SquareWave{
@@ -362,18 +385,8 @@ func initSquareChannel(wave *SquareWave, buffer *RingBuffer) chan SquareWaveEven
 			duty:   0.0,
 		},
 		envelope: envelope,
-		lengthCounter: LengthCounter{
-			counter: 0,
-			enabled: false,
-		},
-		sweepUnit: SweepUnit{
-			frequency: 0,
-			amount: 0,
-			direction: 0,
-			timerCount: 0,
-			counter: 0,
-			enabled: false,
-		},
+		lengthCounter: lengthCounter,
+		sweepUnit: sweepUnit,
 		enabled: true,
 	}
 
@@ -387,6 +400,11 @@ func initSquareChannel(wave *SquareWave, buffer *RingBuffer) chan SquareWaveEven
 func initTriangleChannel(buffer *RingBuffer) chan TriangleWaveEvent {
 	ch3Channel := make(chan TriangleWaveEvent, 10)
 
+	lengthCounter := LengthCounter{}
+	lengthCounter.Init()
+	linearCounter := LinearCounter{}
+	linearCounter.Init()
+
 	triangleWave = TriangleWave{
 		freq: 44100.0,
 		phase: 0.0,
@@ -395,14 +413,8 @@ func initTriangleChannel(buffer *RingBuffer) chan TriangleWaveEvent {
 		note: TriangleNote{
 			hz: 0.0,
 		},
-		lengthCounter: LengthCounter{
-			counter: 0,
-			enabled: false,
-		},
-		linearCounter: LinearCounter{
-			prevCount: 0,
-			counter: 0,
-		},
+		lengthCounter: lengthCounter,
+		linearCounter: linearCounter,
 		enabled: true,
 	}
 
@@ -415,6 +427,9 @@ func initTriangleChannel(buffer *RingBuffer) chan TriangleWaveEvent {
 func initNoiseChannel(buffer *RingBuffer) chan NoiseWaveEvent {
 	ch4Channel := make(chan NoiseWaveEvent, 10)
 
+	lengthCounter := LengthCounter{}
+	lengthCounter.Init()
+
 	// NoiseWave構造体を初期化
 	noiseWave = NoiseWave{
 		freq:   44100.0,
@@ -426,10 +441,7 @@ func initNoiseChannel(buffer *RingBuffer) chan NoiseWaveEvent {
 			hz: 0,
 			noiseMode: NOISE_MODE_SHORT,
 		},
-		lengthCounter: LengthCounter{
-			counter: 0,
-			enabled: false,
-		},
+		lengthCounter: lengthCounter,
 
 		longNoise: NoiseShiftRegister{},
 		shortNoise: NoiseShiftRegister{},

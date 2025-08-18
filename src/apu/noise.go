@@ -36,11 +36,11 @@ type NoiseNote struct {
 }
 
 type NoiseWaveEvent struct {
-	eventType     NoiseWaveEventType
-	note          *NoiseNote
-	envelopeData  *EnvelopeData
-	lengthCounter *LengthCounter
-	enabled       bool
+	eventType         NoiseWaveEventType
+	note              *NoiseNote
+	envelopeData      *EnvelopeData
+	lengthCounterData *LengthCounterData
+	enabled           bool
 }
 
 // MARK: 矩形波データ
@@ -69,8 +69,8 @@ func (nw *NoiseWave) generatePCM() {
 				case NOISE_WAVE_ENVELOPE_TICK: // ENVELOPE TICKイベント
 					nw.envelope.tick()
 				case NOISE_WAVE_LENGTH_COUNTER: // LENGTH COUNTER TICKイベント
-					if event.lengthCounter != nil {
-						nw.lengthCounter = *event.lengthCounter
+					if event.lengthCounterData != nil {
+						nw.lengthCounter.data = *event.lengthCounterData
 					}
 				case NOISE_WAVE_LENGTH_COUNTER_TICK: // LENGTH COUNTER TICKイベント
 					nw.lengthCounter.tick()

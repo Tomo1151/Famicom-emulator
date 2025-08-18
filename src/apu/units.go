@@ -1,5 +1,40 @@
 package apu
 
+var LENGTH_COUNTER_TABLE = [32]uint8{
+	0x05,
+	0x7F,
+	0x0A,
+	0x01,
+	0x14,
+	0x02,
+	0x28,
+	0x03,
+	0x50,
+	0x04,
+	0x1E,
+	0x05,
+	0x07,
+	0x06,
+	0x0D,
+	0x07,
+	0x06,
+	0x08,
+	0x0C,
+	0x09,
+	0x18,
+	0x0A,
+	0x30,
+	0x0B,
+	0x60,
+	0x0C,
+	0x24,
+	0x0D,
+	0x08,
+	0x0E,
+	0x10,
+	0x0F,
+}
+
 type EnvelopeData struct {
 	rate    uint8
 	enabled bool
@@ -57,14 +92,32 @@ func (e *Envelope) tick() {
 	e.divider = e.data.rate + 1
 }
 
+type SweepUnitData struct {
+	frequency  uint16
+	shift      uint8
+	direction  uint8
+	timerCount uint8
+	enabled    bool
+}
+
+func (sud *SweepUnitData) Init(frequency uint16, shift uint8, direction uint8, timerCount uint8, enabled bool) {
+	sud.frequency = frequency
+	sud.direction = direction
+	sud.timerCount = timerCount
+	sud.enabled = enabled
+}
+
 type SweepUnit struct {
-	prevFrequency uint16
-	frequency     uint16
-	amount        uint8
-	direction     uint8
-	timerCount    uint8
-	counter       uint8
-	enabled       bool
+	data      SweepUnitData
+	frequency uint16
+	counter   uint8
+}
+
+func (su *SweepUnit) Init() {
+	su.data = SweepUnitData{}
+	su.data.Init(0, 0, 0, 0, false)
+	su.frequency = 0
+	su.counter = 0
 }
 
 func (su *SweepUnit) getFrequency() float32 {
@@ -75,27 +128,27 @@ func (su *SweepUnit) getFrequency() float32 {
 }
 
 func (su *SweepUnit) reset() {
-	su.frequency = su.prevFrequency
+	su.frequency = su.data.frequency
 	su.counter = 0
 }
 
 func (su *SweepUnit) tick(lengthCounter *LengthCounter) {
-	if !su.enabled || su.amount == 0 || lengthCounter.isMuted() {
+	if !su.data.enabled || su.data.shift == 0 || lengthCounter.isMuted() {
 		return
 	}
 
 	su.counter++
 
-	if su.counter < su.timerCount+1 {
+	if su.counter < su.data.timerCount+1 {
 		return
 	}
 
 	su.counter = 0
 
-	if su.direction == 0 { // 上
-		su.frequency = su.frequency + (su.frequency >> uint16(su.amount))
+	if su.data.direction == 0 { // 上
+		su.frequency = su.frequency + (su.frequency >> uint16(su.data.shift))
 	} else { // 下
-		su.frequency = su.frequency - (su.frequency >> uint16(su.amount))
+		su.frequency = su.frequency - (su.frequency >> uint16(su.data.shift))
 	}
 
 	if su.frequency < 8 || su.frequency >= 0x7FF {
@@ -103,9 +156,18 @@ func (su *SweepUnit) tick(lengthCounter *LengthCounter) {
 	}
 }
 
+type LinearCounterData struct {
+	count uint8
+}
+
 type LinearCounter struct {
-	prevCount uint8
-	counter   uint8
+	data    LinearCounterData
+	counter uint8
+}
+
+func (lc *LinearCounter) Init() {
+	lc.data = LinearCounterData{count: 0}
+	lc.counter = 0
 }
 
 func (lc *LinearCounter) tick() {
@@ -119,64 +181,40 @@ func (lc *LinearCounter) isMuted() bool {
 }
 
 func (lc *LinearCounter) reset() {
-	lc.counter = lc.prevCount
+	lc.counter = lc.data.count
+}
+
+type LengthCounterData struct {
+	count   uint8
+	enabled bool
+}
+
+func (lcd *LengthCounterData) Init(count uint8, enabled bool) {
+	lcd.count = LENGTH_COUNTER_TABLE[count]
+	lcd.enabled = enabled
 }
 
 type LengthCounter struct {
-	prevCount uint8
-	counter   uint8
-	enabled   bool
+	data    LengthCounterData
+	counter uint8
 }
 
-func (lc *LengthCounter) setCount(count uint8) {
-	lengthCounterTable := [32]uint8{
-		0x05,
-		0x7F,
-		0x0A,
-		0x01,
-		0x14,
-		0x02,
-		0x28,
-		0x03,
-		0x50,
-		0x04,
-		0x1E,
-		0x05,
-		0x07,
-		0x06,
-		0x0D,
-		0x07,
-		0x06,
-		0x08,
-		0x0C,
-		0x09,
-		0x18,
-		0x0A,
-		0x30,
-		0x0B,
-		0x60,
-		0x0C,
-		0x24,
-		0x0D,
-		0x08,
-		0x0E,
-		0x10,
-		0x0F,
-	}
-	lc.counter = lengthCounterTable[count]
-	lc.prevCount = lc.counter
+func (lc *LengthCounter) Init() {
+	lc.data = LengthCounterData{}
+	lc.data.Init(0, false)
+	lc.counter = 0
 }
 
 func (lc *LengthCounter) isMuted() bool {
-	return lc.enabled && lc.counter == 0
+	return lc.data.enabled && lc.counter == 0
 }
 
 func (lc *LengthCounter) reset() {
-	lc.counter = lc.prevCount
+	lc.counter = lc.data.count
 }
 
 func (lc *LengthCounter) tick() {
-	if !lc.enabled {
+	if !lc.data.enabled {
 		return
 	}
 
