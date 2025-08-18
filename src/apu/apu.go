@@ -127,47 +127,59 @@ func (a *APU) Init() {
 func (a *APU) Write1ch(address uint16, data uint8) {
 	a.Ch1Register.write(address, data)
 
-	a.Ch1Channel <- SquareWaveEvent{
-		eventType: SQUARE_WAVE_NOTE,
-		note: &SquareNote{
-			duty: a.Ch1Register.getDuty(),
-		},
+	if address == 0x4000 {
+		a.Ch1Channel <- SquareWaveEvent{
+			eventType: SQUARE_WAVE_NOTE,
+			note: &SquareNote{
+				duty: a.Ch1Register.getDuty(),
+			},
+		}
+
+		envelopeData := EnvelopeData{}
+		envelopeData.Init(
+			a.Ch1Register.volume,
+			a.Ch1Register.envelope,
+			!a.Ch1Register.keyOffCounter,
+		)
+		a.Ch1Channel <- SquareWaveEvent{
+			eventType: SQUARE_WAVE_ENVELOPE,
+			envelopeData: &envelopeData,
+		}
 	}
 
-	envelopeData := EnvelopeData{}
-	envelopeData.Init(
-		a.Ch1Register.volume,
-		a.Ch1Register.envelope,
-		!a.Ch1Register.keyOffCounter,
-	)
-	a.Ch1Channel <- SquareWaveEvent{
-		eventType: SQUARE_WAVE_ENVELOPE,
-		envelopeData: &envelopeData,
+	if address == 0x4000 || address == 0x4003 {
+		lengthCounterData := LengthCounterData{}
+		lengthCounterData.Init(
+			a.Ch1Register.keyOffCount,
+			a.Ch1Register.keyOffCounter,
+		)
+
+		a.Ch1Channel <- SquareWaveEvent{
+			eventType: SQUARE_WAVE_LENGTH_COUNTER,
+			lengthCounterData: &lengthCounterData,
+		}
 	}
 
-	lengthCounterData := LengthCounterData{}
-	lengthCounterData.Init(
-		a.Ch1Register.keyOffCount,
-		a.Ch1Register.keyOffCounter,
-	)
+	if address == 0x4001 {
+		sweepUnitData := SweepUnitData{}
+		sweepUnitData.Init(
+			a.Ch1Register.sweepShift,
+			a.Ch1Register.sweepDirection,
+			a.Ch1Register.sweepPeriod,
+			a.Ch1Register.sweepEnabled,
+		)
 
-	a.Ch1Channel <- SquareWaveEvent{
-		eventType: SQUARE_WAVE_LENGTH_COUNTER,
-		lengthCounterData: &lengthCounterData,
+		a.Ch1Channel <- SquareWaveEvent{
+			eventType: SQUARE_WAVE_SWEEP,
+			sweepUnitData: &sweepUnitData,
+		}
 	}
 
-	sweepUnitData := SweepUnitData{}
-	sweepUnitData.Init(
-		a.Ch1Register.frequency,
-		a.Ch1Register.sweepShift,
-		a.Ch1Register.sweepDirection,
-		a.Ch1Register.sweepPeriod,
-		a.Ch1Register.sweepEnabled,
-	)
-
-	a.Ch1Channel <- SquareWaveEvent{
-		eventType: SQUARE_WAVE_SWEEP,
-		sweepUnitData: &sweepUnitData,
+	if address == 0x4002 || address == 0x4003 {
+		a.Ch1Channel <- SquareWaveEvent{
+			eventType: SQUARE_WAVE_SWEEP_FREQUENCY,
+			frequency: &a.Ch1Register.frequency,
+		}
 	}
 
 	if address == 0x4003 {
@@ -181,48 +193,60 @@ func (a *APU) Write1ch(address uint16, data uint8) {
 func (a *APU) Write2ch(address uint16, data uint8) {
 	a.Ch2Register.write(address, data)
 
-	a.Ch2Channel <- SquareWaveEvent{
-		eventType: SQUARE_WAVE_NOTE,
-		note: &SquareNote{
-			duty: a.Ch2Register.getDuty(),
-		},
+	if address == 0x4004 {
+		a.Ch2Channel <- SquareWaveEvent{
+			eventType: SQUARE_WAVE_NOTE,
+			note: &SquareNote{
+				duty: a.Ch2Register.getDuty(),
+			},
+		}
+
+		envelopeData := EnvelopeData{}
+		envelopeData.Init(
+			a.Ch2Register.volume,
+			a.Ch2Register.envelope,
+			!a.Ch2Register.keyOffCounter,
+		)
+		a.Ch2Channel <- SquareWaveEvent{
+			eventType: SQUARE_WAVE_ENVELOPE,
+			envelopeData: &envelopeData,
+		}
 	}
 
-	envelopeData := EnvelopeData{}
-	envelopeData.Init(
-		a.Ch2Register.volume,
-		a.Ch2Register.envelope,
-		!a.Ch2Register.keyOffCounter,
-	)
-	a.Ch2Channel <- SquareWaveEvent{
-		eventType: SQUARE_WAVE_ENVELOPE,
-		envelopeData: &envelopeData,
-	}
+	if address == 0x4004 || address == 0x4007 {
+		lengthCounterData := LengthCounterData{}
+		lengthCounterData.Init(
+			a.Ch2Register.keyOffCount,
+			a.Ch2Register.keyOffCounter,
+		)
 
-	lengthCounterData := LengthCounterData{}
-	lengthCounterData.Init(
-		a.Ch2Register.keyOffCount,
-		a.Ch2Register.keyOffCounter,
-	)
-
-	a.Ch2Channel <- SquareWaveEvent{
-		eventType: SQUARE_WAVE_LENGTH_COUNTER,
-		lengthCounterData: &lengthCounterData,
+		a.Ch2Channel <- SquareWaveEvent{
+			eventType: SQUARE_WAVE_LENGTH_COUNTER,
+			lengthCounterData: &lengthCounterData,
+		}
 	}
 
 
-	sweepUnitData := SweepUnitData{}
-	sweepUnitData.Init(
-		a.Ch2Register.frequency,
-		a.Ch2Register.sweepShift,
-		a.Ch2Register.sweepDirection,
-		a.Ch2Register.sweepPeriod,
-		a.Ch2Register.sweepEnabled,
-	)
+	if address == 0x4005 {
+		sweepUnitData := SweepUnitData{}
+		sweepUnitData.Init(
+			a.Ch2Register.sweepShift,
+			a.Ch2Register.sweepDirection,
+			a.Ch2Register.sweepPeriod,
+			a.Ch2Register.sweepEnabled,
+		)
 
-	a.Ch2Channel <- SquareWaveEvent{
-		eventType: SQUARE_WAVE_SWEEP,
-		sweepUnitData: &sweepUnitData,
+		a.Ch2Channel <- SquareWaveEvent{
+			eventType: SQUARE_WAVE_SWEEP,
+			sweepUnitData: &sweepUnitData,
+		}
+	}
+
+	if address == 0x4006 || address == 0x4007 {
+		a.Ch2Channel <- SquareWaveEvent{
+			eventType: SQUARE_WAVE_SWEEP_FREQUENCY,
+			frequency: &a.Ch2Register.frequency,
+		}
 	}
 
 	if address == 0x4007 {

@@ -1,38 +1,38 @@
 package apu
 
 var LENGTH_COUNTER_TABLE = [32]uint8{
-	0x05,
-	0x7F,
 	0x0A,
-	0x01,
+	0xFE,
 	0x14,
 	0x02,
 	0x28,
-	0x03,
-	0x50,
 	0x04,
-	0x1E,
-	0x05,
-	0x07,
+	0x50,
 	0x06,
-	0x0D,
-	0x07,
-	0x06,
+	0xA0,
 	0x08,
-	0x0C,
-	0x09,
-	0x18,
+	0x3C,
 	0x0A,
-	0x30,
-	0x0B,
-	0x60,
-	0x0C,
-	0x24,
-	0x0D,
-	0x08,
 	0x0E,
+	0x0C,
+	0x1A,
+	0x0E,
+	0x0C,
 	0x10,
-	0x0F,
+	0x18,
+	0x12,
+	0x30,
+	0x14,
+	0x60,
+	0x16,
+	0xC0,
+	0x18,
+	0x48,
+	0x1A,
+	0x10,
+	0x1C,
+	0x20,
+	0x1E,
 }
 
 type EnvelopeData struct {
@@ -93,15 +93,13 @@ func (e *Envelope) tick() {
 }
 
 type SweepUnitData struct {
-	frequency  uint16
 	shift      uint8
 	direction  uint8
 	timerCount uint8
 	enabled    bool
 }
 
-func (sud *SweepUnitData) Init(frequency uint16, shift uint8, direction uint8, timerCount uint8, enabled bool) {
-	sud.frequency = frequency
+func (sud *SweepUnitData) Init(shift uint8, direction uint8, timerCount uint8, enabled bool) {
 	sud.shift = shift
 	sud.direction = direction
 	sud.timerCount = timerCount
@@ -116,7 +114,7 @@ type SweepUnit struct {
 
 func (su *SweepUnit) Init() {
 	su.data = SweepUnitData{}
-	su.data.Init(0, 0, 0, 0, false)
+	su.data.Init(0, 0, 0, false)
 	su.frequency = 0
 	su.counter = 0
 }
@@ -129,7 +127,6 @@ func (su *SweepUnit) getFrequency() float32 {
 }
 
 func (su *SweepUnit) reset() {
-	su.frequency = su.data.frequency
 	su.counter = 0
 }
 
@@ -207,7 +204,7 @@ func (lc *LengthCounter) Init() {
 }
 
 func (lc *LengthCounter) isMuted() bool {
-	return lc.data.enabled && lc.counter == 0
+	return lc.counter == 0
 }
 
 func (lc *LengthCounter) reset() {
