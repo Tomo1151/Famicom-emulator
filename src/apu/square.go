@@ -43,7 +43,6 @@ func (sw *SquareWave) generatePCM() {
 		// チャンネルから新しい音符を受信
 	eventLoop:
 		for {
-
 			select {
 			case event := <-sw.channel:
 				switch event.eventType {
@@ -54,14 +53,12 @@ func (sw *SquareWave) generatePCM() {
 						sw.note = *event.note
 						sw.phase = 0.0 // 音符が変わったらphaseをリセット
 					}
-				case SQUARE_WAVE_ENVELOPE:
+				case SQUARE_WAVE_ENVELOPE: // ENVELOPEイベント
 					if event.envelope != nil {
 						sw.envelope = *event.envelope
 					}
-				case SQUARE_WAVE_ENVELOPE_TICK:
-					if event.envelope != nil {
-						sw.envelope.tick()
-					}
+				case SQUARE_WAVE_ENVELOPE_TICK: // ENVELOPE TICKイベント
+					sw.envelope.tick()
 				}
 			default:
 				// 新しい音符がない場合は現在の音符を継続

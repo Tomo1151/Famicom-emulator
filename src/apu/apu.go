@@ -36,12 +36,12 @@ type APU struct {
 
 	// CH3
 	Ch3Register TriangleWaveRegister
-	Ch3Channel chan TriangleNote
+	Ch3Channel chan TriangleWaveEvent
 	Ch3Buffer *RingBuffer
 
 	// CH4
 	Ch4Register NoiseWaveRegister
-	Ch4Channel chan NoiseNote
+	Ch4Channel chan NoiseWaveEvent
 	Ch4Buffer *RingBuffer
 
 	frameCounter FrameCounter
@@ -135,8 +135,11 @@ func (a *APU) Write2ch(address uint16, data uint8) {
 func (a *APU) Write3ch(address uint16, data uint8) {
 	a.Ch3Register.write(address, data)
 
-	a.Ch3Channel <- TriangleNote{
-		hz: a.Ch3Register.getFrequency(),
+	a.Ch3Channel <- TriangleWaveEvent{
+		eventType: TRIANGLE_WAVE_NOTE,
+		note: &TriangleNote{
+			hz: a.Ch3Register.getFrequency(),
+		},
 	}
 }
 
@@ -144,10 +147,19 @@ func (a *APU) Write3ch(address uint16, data uint8) {
 func (a *APU) Write4ch(address uint16, data uint8) {
 	a.Ch4Register.write(address, data)
 
-	a.Ch4Channel <- NoiseNote{
-		hz: a.Ch4Register.getFrequency(),
-		volume: a.Ch4Register.getVolume(),
-		noiseMode: a.Ch4Register.getMode(),
+	a.Ch4Channel <- NoiseWaveEvent{
+		eventType: NOISE_WAVE_NOTE,
+		note: &NoiseNote{
+			hz: a.Ch4Register.getFrequency(),
+			noiseMode: a.Ch4Register.getMode(),
+		},
+	}
+
+	envelope := Envelope{}
+	envelope.Init(a.Ch4Register.volume, a.Ch4Register.envelope, a.Ch4Register.keyOffCounter)
+	a.Ch4Channel <- NoiseWaveEvent{
+		eventType: NOISE_WAVE_ENVELOPE,
+		envelope: &envelope,
 	}
 }
 
@@ -180,8 +192,9 @@ func (a *APU) WriteStatus(data uint8) {
 	if !a.Status.is3chEnabled() {
 		triangleWave.note.hz = 0.0
 	}
-	if !a.Status.is4chEnabled() {
-		noiseWave.note.volume = 0.0
+	a.Ch4Channel <- NoiseWaveEvent{
+		eventType: NOISE_WAVE_ENABLED,
+		enabled: a.Status.enable4ch,
 	}
 }
 
@@ -266,8 +279,8 @@ func initSquareChannel(wave *SquareWave, buffer *RingBuffer) chan SquareWaveEven
 }
 
 // MARK: 3chの初期化メソッド
-func initTriangleChannel(buffer *RingBuffer) chan TriangleNote {
-	ch3Channel := make(chan TriangleNote, 10)
+func initTriangleChannel(buffer *RingBuffer) chan TriangleWaveEvent {
+	ch3Channel := make(chan TriangleWaveEvent, 10)
 
 	triangleWave = TriangleWave{
 		freq: 44100.0,
@@ -285,8 +298,8 @@ func initTriangleChannel(buffer *RingBuffer) chan TriangleNote {
 }
 
 // MARK: 4ch の初期化メソッド
-func initNoiseChannel(buffer *RingBuffer) chan NoiseNote {
-	ch4Channel := make(chan NoiseNote, 10)
+func initNoiseChannel(buffer *RingBuffer) chan NoiseWaveEvent {
+	ch4Channel := make(chan NoiseWaveEvent, 10)
 
 	// NoiseWave構造体を初期化
 	noiseWave = NoiseWave{
@@ -297,7 +310,6 @@ func initNoiseChannel(buffer *RingBuffer) chan NoiseNote {
 		noise: false,
 		note: NoiseNote{
 			hz: 0,
-			volume: 0.0,
 			noiseMode: NOISE_MODE_SHORT,
 		},
 
@@ -336,6 +348,9 @@ func (a *APU) Tick(cycles uint) {
 				a.Ch2Channel <- SquareWaveEvent{
 					eventType: SQUARE_WAVE_ENVELOPE_TICK,
 				}
+				a.Ch4Channel <- NoiseWaveEvent{
+					eventType: NOISE_WAVE_ENVELOPE_TICK,
+				}
 			}
 			if a.counter == 4 {
 				// 割り込みフラグをセット
@@ -352,6 +367,9 @@ func (a *APU) Tick(cycles uint) {
 				}
 				a.Ch2Channel <- SquareWaveEvent{
 					eventType: SQUARE_WAVE_ENVELOPE_TICK,
+				}
+				a.Ch4Channel <- NoiseWaveEvent{
+					eventType: NOISE_WAVE_ENVELOPE_TICK,
 				}
 			}
 			if a.counter == 5 {
