@@ -589,10 +589,10 @@ func (a *APU) sendLengthCounterTick() {
 		eventType: SQUARE_WAVE_LENGTH_COUNTER_TICK,
 	}
 	a.Ch3Channel <- TriangleWaveEvent{
-		eventType: SQUARE_WAVE_LENGTH_COUNTER_TICK,
+		eventType: TRIANGLE_WAVE_LENGTH_COUNTER_TICK,
 	}
 	a.Ch4Channel <- NoiseWaveEvent{
-		eventType: SQUARE_WAVE_LENGTH_COUNTER_TICK,
+		eventType: NOISE_WAVE_LENGTH_COUNTER_TICK,
 	}
 }
 

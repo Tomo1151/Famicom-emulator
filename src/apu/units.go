@@ -102,6 +102,7 @@ type SweepUnitData struct {
 
 func (sud *SweepUnitData) Init(frequency uint16, shift uint8, direction uint8, timerCount uint8, enabled bool) {
 	sud.frequency = frequency
+	sud.shift = shift
 	sud.direction = direction
 	sud.timerCount = timerCount
 	sud.enabled = enabled
