@@ -214,6 +214,12 @@ func (b *Bus) WriteByteAt(address uint16, data uint8) {
 		b.apu.Write1ch(address, data)
 	case 0x4004 <= address && address <= 0x4007: // APU 2ch
 		b.apu.Write2ch(address, data)
+	case address == 0x4008: // APU 3ch
+		b.apu.Write3ch(address, data)
+	case address == 0x400A: // APU 3ch
+		b.apu.Write3ch(address, data)
+	case address == 0x400B: // APU 3ch
+		b.apu.Write3ch(address, data)
 	case address == 0x400C: // APU 4ch
 		b.apu.Write4ch(address, data)
 	case address == 0x400E: // APU 4ch
