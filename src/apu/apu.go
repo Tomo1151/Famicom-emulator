@@ -296,7 +296,7 @@ func (a *APU) Write4ch(address uint16, data uint8) {
 		a.Ch4Register.keyOffCounter,
 	)
 	a.Ch4Channel <- NoiseWaveEvent{
-		eventType: TRIANGLE_WAVE_LENGTH_COUNTER,
+		eventType: NOISE_WAVE_LENGTH_COUNTER,
 		lengthCounterData: &lengthCounterData,
 	}
 
