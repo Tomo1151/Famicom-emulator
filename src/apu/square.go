@@ -9,6 +9,7 @@ const (
 	SQUARE_WAVE_LENGTH_COUNTER_TICK
 	SQUARE_WAVE_SWEEP
 	SQUARE_WAVE_SWEEP_TICK
+	SQUARE_WAVE_CHANNEL
 	SQUARE_WAVE_RESET
 )
 
@@ -19,6 +20,7 @@ type SquareWave struct {
 	freq          float32
 	phase         float32
 	channel       chan SquareWaveEvent
+	sender        chan ChannelEvent
 	note          SquareNote
 	envelope      Envelope
 	lengthCounter LengthCounter
@@ -73,6 +75,9 @@ func (sw *SquareWave) generatePCM() {
 					}
 				case SQUARE_WAVE_LENGTH_COUNTER_TICK: // LENGTH COUNTER TICKイベント
 					sw.lengthCounter.tick()
+					sw.sender <- ChannelEvent{
+						length: sw.lengthCounter.counter,
+					}
 				case SQUARE_WAVE_SWEEP: // SWEEPイベント
 					if event.sweepUnitData != nil {
 						sw.sweepUnit.data = *event.sweepUnitData

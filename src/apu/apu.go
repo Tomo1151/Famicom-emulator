@@ -27,28 +27,41 @@ type APU struct {
 	// CH1
 	Ch1Register SquareWaveRegister
 	Ch1Channel chan SquareWaveEvent
+	Ch1Receiver chan ChannelEvent
 	Ch1Buffer *RingBuffer
+	Ch1LengthCount uint8
 
 	// CH2
 	Ch2Register SquareWaveRegister
 	Ch2Channel chan SquareWaveEvent
+	Ch2Receiver chan ChannelEvent
 	Ch2Buffer *RingBuffer
+	Ch2LengthCount uint8
 
 	// CH3
 	Ch3Register TriangleWaveRegister
 	Ch3Channel chan TriangleWaveEvent
+	Ch3Receiver chan ChannelEvent
 	Ch3Buffer *RingBuffer
+	Ch3LengthCount uint8
 
 	// CH4
 	Ch4Register NoiseWaveRegister
 	Ch4Channel chan NoiseWaveEvent
+	Ch4Receiver chan ChannelEvent
 	Ch4Buffer *RingBuffer
+	Ch4LengthCount uint8
 
 	frameCounter FrameCounter
 	cycles uint
 	counter uint
 	Status StatusRegister
 }
+
+type ChannelEvent struct {
+	length uint8
+}
+
 
 // MARK: APUの初期化メソッド
 func (a *APU) Init() {
@@ -57,28 +70,32 @@ func (a *APU) Init() {
 	a.Ch1Register.Init()
 	a.Ch1Buffer = &RingBuffer{}
 	a.Ch1Buffer.Init()
-	a.Ch1Channel = initSquareChannel(&squareWave1, a.Ch1Buffer)
+	a.Ch1Channel, a.Ch1Receiver = initSquareChannel(&squareWave1, a.Ch1Buffer)
+	a.Ch1LengthCount = 0
 
 	// CH2
 	a.Ch2Register = SquareWaveRegister{}
 	a.Ch2Register.Init()
 	a.Ch2Buffer = &RingBuffer{}
 	a.Ch2Buffer.Init()
-	a.Ch2Channel = initSquareChannel(&squareWave2, a.Ch2Buffer)
+	a.Ch2Channel, a.Ch2Receiver = initSquareChannel(&squareWave2, a.Ch2Buffer)
+	a.Ch2LengthCount = 0
 
 	// CH3
 	a.Ch3Register = TriangleWaveRegister{}
 	a.Ch3Register.Init()
 	a.Ch3Buffer = &RingBuffer{}
 	a.Ch3Buffer.Init()
-	a.Ch3Channel = initTriangleChannel(a.Ch3Buffer)
+	a.Ch3Channel, a.Ch3Receiver = initTriangleChannel(a.Ch3Buffer)
+	a.Ch3LengthCount = 0
 
 	// CH4
 	a.Ch4Register = NoiseWaveRegister{}
 	a.Ch4Register.Init()
 	a.Ch4Buffer = &RingBuffer{}
 	a.Ch4Buffer.Init()
-	a.Ch4Channel = initNoiseChannel(a.Ch4Buffer)
+	a.Ch4Channel, a.Ch4Receiver = initNoiseChannel(a.Ch4Buffer)
+	a.Ch4LengthCount = 0
 
 	a.frameCounter = FrameCounter{}
 	a.frameCounter.Init()
@@ -284,8 +301,35 @@ func (a *APU) WriteFrameCounter(data uint8) {
 
 // MARK: ステータスレジスタの読み取りメソッド
 func (a *APU) ReadStatus() uint8 {
+	status := a.Status.ToByte()
+
+	a.receiveEvents()
+	status = status & 0xF0
+
+	if a.Ch1LengthCount == 0 {
+		status |= 0 << 0
+	} else {
+		status |= 1 << 0
+	}
+	if a.Ch2LengthCount == 0 {
+		status |= 0 << 1
+	} else {
+		status |= 1 << 1
+	}
+	if a.Ch3LengthCount == 0 {
+		status |= 0 << 2
+	} else {
+		status |= 1 << 2
+	}
+	if a.Ch4LengthCount == 0 {
+		status |= 0 << 3
+	} else {
+		status |= 1 << 3
+	}
+
 	a.Status.ClearFrameIRQ()
-	return a.Status.ToByte()
+
+	return status
 }
 
 // MARK: ステータスレジスタの書き込みメソッド
@@ -295,18 +339,19 @@ func (a *APU) WriteStatus(data uint8) {
 	// 各チャンネルの状態によってミュートにする
 	a.Ch1Channel <- SquareWaveEvent{
 		eventType: SQUARE_WAVE_ENABLED,
-		enabled: a.Status.enable1ch,
+		enabled: a.Status.is1chEnabled(),
 	}
 	a.Ch2Channel <- SquareWaveEvent{
 		eventType: SQUARE_WAVE_ENABLED,
-		enabled: a.Status.enable2ch,
+		enabled: a.Status.is2chEnabled(),
 	}
-	if !a.Status.is3chEnabled() {
-		triangleWave.note.hz = 0.0
+	a.Ch3Channel <- TriangleWaveEvent{
+		eventType: TRIANGLE_WAVE_ENABLED,
+		enabled: a.Status.is3chEnabled(),
 	}
 	a.Ch4Channel <- NoiseWaveEvent{
 		eventType: NOISE_WAVE_ENABLED,
-		enabled: a.Status.enable4ch,
+		enabled: a.Status.is4chEnabled(),
 	}
 }
 
@@ -365,8 +410,9 @@ func (a *APU) initAudioDevice() {
 }
 
 // MARK: 1ch/2chの初期化メソッド
-func initSquareChannel(wave *SquareWave, buffer *RingBuffer) chan SquareWaveEvent {
+func initSquareChannel(wave *SquareWave, buffer *RingBuffer) (chan SquareWaveEvent, chan ChannelEvent) {
 	ch1Channel := make(chan SquareWaveEvent, 10)
+	sendChannel := make(chan ChannelEvent, 10)
 
 	envelope := Envelope{}
 	envelope.Init()
@@ -380,6 +426,7 @@ func initSquareChannel(wave *SquareWave, buffer *RingBuffer) chan SquareWaveEven
 		freq:   44100.0,
 		phase:  0.0,
 		channel: ch1Channel,
+		sender: sendChannel,
 		buffer: buffer,
 		note: SquareNote{
 			duty:   0.0,
@@ -393,12 +440,13 @@ func initSquareChannel(wave *SquareWave, buffer *RingBuffer) chan SquareWaveEven
 	// PCM生成のgoroutineを開始
 	go wave.generatePCM()
 
-	return ch1Channel
+	return ch1Channel, sendChannel
 }
 
 // MARK: 3chの初期化メソッド
-func initTriangleChannel(buffer *RingBuffer) chan TriangleWaveEvent {
+func initTriangleChannel(buffer *RingBuffer) (chan TriangleWaveEvent, chan ChannelEvent) {
 	ch3Channel := make(chan TriangleWaveEvent, 10)
+	sendChannel := make(chan ChannelEvent, 10)
 
 	lengthCounter := LengthCounter{}
 	lengthCounter.Init()
@@ -409,6 +457,7 @@ func initTriangleChannel(buffer *RingBuffer) chan TriangleWaveEvent {
 		freq: 44100.0,
 		phase: 0.0,
 		channel: ch3Channel,
+		sender: sendChannel,
 		buffer: buffer,
 		note: TriangleNote{
 			hz: 0.0,
@@ -420,12 +469,13 @@ func initTriangleChannel(buffer *RingBuffer) chan TriangleWaveEvent {
 
 	go triangleWave.generatePCM()
 
-	return ch3Channel
+	return ch3Channel, sendChannel
 }
 
 // MARK: 4ch の初期化メソッド
-func initNoiseChannel(buffer *RingBuffer) chan NoiseWaveEvent {
+func initNoiseChannel(buffer *RingBuffer) (chan NoiseWaveEvent, chan ChannelEvent) {
 	ch4Channel := make(chan NoiseWaveEvent, 10)
+	sendChannel := make(chan ChannelEvent, 10)
 
 	lengthCounter := LengthCounter{}
 	lengthCounter.Init()
@@ -435,6 +485,7 @@ func initNoiseChannel(buffer *RingBuffer) chan NoiseWaveEvent {
 		freq:   44100.0,
 		phase:  0.0,
 		channel: ch4Channel,
+		sender: sendChannel,
 		buffer: buffer,
 		noise: false,
 		note: NoiseNote{
@@ -453,7 +504,7 @@ func initNoiseChannel(buffer *RingBuffer) chan NoiseWaveEvent {
 	// PCM生成のgoroutineを開始
 	go noiseWave.generatePCM()
 
-	return ch4Channel
+	return ch4Channel, sendChannel
 }
 
 func (a *APU) sendEnvelopeTick() {
@@ -492,6 +543,49 @@ func (a *APU) sendLengthCounterTick() {
 	}
 }
 
+// MARK: イベント受け取りのメソッド
+func (a *APU) receiveEvents() {
+	ch1EventLoop:
+	for {
+		select {
+		case event := <-a.Ch1Receiver:
+			a.Ch1LengthCount = event.length
+		default:
+			break ch1EventLoop
+		}
+	}
+
+	ch2EventLoop:
+	for {
+		select {
+		case event := <-a.Ch2Receiver:
+			a.Ch2LengthCount = event.length
+		default:
+			break ch2EventLoop
+		}
+	}
+
+	ch3EventLoop:
+	for {
+		select {
+		case event := <-a.Ch3Receiver:
+			a.Ch3LengthCount = event.length
+		default:
+			break ch3EventLoop
+		}
+	}
+
+	ch4EventLoop:
+	for {
+		select {
+		case event := <-a.Ch4Receiver:
+			a.Ch4LengthCount = event.length
+		default:
+			break ch4EventLoop
+		}
+	}
+}
+
 // MARK: CPUと同期してサイクルを進めるメソッド
 func (a *APU) Tick(cycles uint) {
 	a.cycles++
@@ -500,6 +594,7 @@ func (a *APU) Tick(cycles uint) {
 		a.cycles %= APU_CYCLE_INTERVAL
 		a.counter++
 
+		a.receiveEvents()
 		mode := a.frameCounter.getMode()
 
 		switch mode {

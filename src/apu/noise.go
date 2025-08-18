@@ -7,6 +7,7 @@ const (
 	NOISE_WAVE_ENVELOPE_TICK
 	NOISE_WAVE_LENGTH_COUNTER
 	NOISE_WAVE_LENGTH_COUNTER_TICK
+	NOISE_WAVE_CHANNEL
 	NOISE_WAVE_RESET
 )
 
@@ -17,6 +18,7 @@ type NoiseWave struct {
 	freq          float32
 	phase         float32
 	channel       chan NoiseWaveEvent
+	sender        chan ChannelEvent
 	note          NoiseNote
 	envelope      Envelope
 	noise         bool
@@ -74,6 +76,9 @@ func (nw *NoiseWave) generatePCM() {
 					}
 				case NOISE_WAVE_LENGTH_COUNTER_TICK: // LENGTH COUNTER TICKイベント
 					nw.lengthCounter.tick()
+					nw.sender <- ChannelEvent{
+						length: nw.lengthCounter.counter,
+					}
 				case NOISE_WAVE_RESET: // RESETイベント
 					nw.envelope.reset()
 					nw.lengthCounter.reset()

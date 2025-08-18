@@ -6,6 +6,7 @@ const (
 	TRIANGLE_WAVE_LENGTH_COUNTER
 	TRIANGLE_WAVE_LENGTH_COUNTER_TICK
 	TRIANGLE_WAVE_LINEAR_COUNTER
+	TRIANGLE_WAVE_CHANNEL
 	TRIANGLE_WAVE_RESET
 )
 
@@ -16,6 +17,7 @@ type TriangleWave struct {
 	freq          float32
 	phase         float32
 	channel       chan TriangleWaveEvent
+	sender        chan ChannelEvent
 	note          TriangleNote
 	lengthCounter LengthCounter
 	linearCounter LinearCounter
@@ -66,6 +68,9 @@ func (tw *TriangleWave) generatePCM() {
 				case TRIANGLE_WAVE_LENGTH_COUNTER_TICK: // LENGTH COUNTER TICKイベント
 					tw.lengthCounter.tick()
 					tw.linearCounter.tick()
+					tw.sender <- ChannelEvent{
+						length: tw.lengthCounter.counter,
+					}
 				case TRIANGLE_WAVE_RESET: // RESETイベント
 					tw.lengthCounter.reset()
 					tw.linearCounter.reset()
