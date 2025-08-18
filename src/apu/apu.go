@@ -484,7 +484,9 @@ func (a *APU) Tick(cycles uint) {
 			if a.counter == 4 {
 				// 割り込みフラグをセット
 				a.counter = 0
-				a.Status.SetFrameIRQ()
+				if !a.frameCounter.getDisableIRQ() {
+					a.Status.SetFrameIRQ()
+				}
 			}
 		case 5:
 			/*
