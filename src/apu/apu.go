@@ -260,28 +260,34 @@ func (a *APU) Write2ch(address uint16, data uint8) {
 func (a *APU) Write3ch(address uint16, data uint8) {
 	a.Ch3Register.write(address, data)
 
-	a.Ch3Channel <- TriangleWaveEvent{
-		eventType: TRIANGLE_WAVE_NOTE,
-		note: &TriangleNote{
-			hz: a.Ch3Register.getFrequency(),
-		},
+	if address == 0x400A || address == 0x400B {
+		a.Ch3Channel <- TriangleWaveEvent{
+			eventType: TRIANGLE_WAVE_NOTE,
+			note: &TriangleNote{
+				hz: a.Ch3Register.getFrequency(),
+			},
+		}
 	}
 
-	lengthCounterData := LengthCounterData{}
-	lengthCounterData.Init(
-		a.Ch3Register.keyOffCount,
-		a.Ch3Register.keyOffCounter,
-	)
-	a.Ch3Channel <- TriangleWaveEvent{
-		eventType: TRIANGLE_WAVE_LENGTH_COUNTER,
-		lengthCounterData: &lengthCounterData,
+	if address == 0x4008 || address == 0x400B {
+		lengthCounterData := LengthCounterData{}
+		lengthCounterData.Init(
+			a.Ch3Register.keyOffCount,
+			a.Ch3Register.keyOffCounter,
+		)
+		a.Ch3Channel <- TriangleWaveEvent{
+			eventType: TRIANGLE_WAVE_LENGTH_COUNTER,
+			lengthCounterData: &lengthCounterData,
+		}
 	}
 
-	a.Ch3Channel <- TriangleWaveEvent{
-		eventType: TRIANGLE_WAVE_LINEAR_COUNTER,
-		linearCounterData: &LinearCounterData{
-			count: a.Ch3Register.length,
-		},
+	if address == 0x4008 {
+		a.Ch3Channel <- TriangleWaveEvent{
+			eventType: TRIANGLE_WAVE_LINEAR_COUNTER,
+			linearCounterData: &LinearCounterData{
+				count: a.Ch3Register.length,
+			},
+		}
 	}
 
 	if address == 0x400B {
@@ -295,33 +301,39 @@ func (a *APU) Write3ch(address uint16, data uint8) {
 func (a *APU) Write4ch(address uint16, data uint8) {
 	a.Ch4Register.write(address, data)
 
-	a.Ch4Channel <- NoiseWaveEvent{
-		eventType: NOISE_WAVE_NOTE,
-		note: &NoiseNote{
-			hz: a.Ch4Register.getFrequency(),
-			noiseMode: a.Ch4Register.getMode(),
-		},
+	if address == 0x400E {
+		a.Ch4Channel <- NoiseWaveEvent{
+			eventType: NOISE_WAVE_NOTE,
+			note: &NoiseNote{
+				hz: a.Ch4Register.getFrequency(),
+				noiseMode: a.Ch4Register.getMode(),
+			},
+		}
 	}
 
-	envelopeData := EnvelopeData{}
-	envelopeData.Init(
-		a.Ch4Register.volume,
-		a.Ch4Register.envelope,
-		!a.Ch4Register.keyOffCounter,
-	)
-	a.Ch4Channel <- NoiseWaveEvent{
-		eventType: NOISE_WAVE_ENVELOPE,
-		envelopeData: &envelopeData,
+	if address == 0x400C {
+		envelopeData := EnvelopeData{}
+		envelopeData.Init(
+			a.Ch4Register.volume,
+			a.Ch4Register.envelope,
+			!a.Ch4Register.keyOffCounter,
+		)
+		a.Ch4Channel <- NoiseWaveEvent{
+			eventType: NOISE_WAVE_ENVELOPE,
+			envelopeData: &envelopeData,
+		}
 	}
 
-	lengthCounterData := LengthCounterData{}
-	lengthCounterData.Init(
-		a.Ch4Register.keyOffCount,
-		a.Ch4Register.keyOffCounter,
-	)
-	a.Ch4Channel <- NoiseWaveEvent{
-		eventType: NOISE_WAVE_LENGTH_COUNTER,
-		lengthCounterData: &lengthCounterData,
+	if address == 0x400C || address == 0x400F {
+		lengthCounterData := LengthCounterData{}
+		lengthCounterData.Init(
+			a.Ch4Register.keyOffCount,
+			a.Ch4Register.keyOffCounter,
+		)
+		a.Ch4Channel <- NoiseWaveEvent{
+			eventType: NOISE_WAVE_LENGTH_COUNTER,
+			lengthCounterData: &lengthCounterData,
+		}
 	}
 
 	if address == 0x400F {

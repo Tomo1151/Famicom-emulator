@@ -131,10 +131,6 @@ func (su *SweepUnit) reset() {
 }
 
 func (su *SweepUnit) tick(lengthCounter *LengthCounter) {
-	if !su.data.enabled || su.data.shift == 0 || lengthCounter.isMuted() {
-		return
-	}
-
 	su.counter++
 
 	if su.counter < su.data.timerCount+1 {
@@ -143,14 +139,18 @@ func (su *SweepUnit) tick(lengthCounter *LengthCounter) {
 
 	su.counter = 0
 
+	if !su.data.enabled || su.data.shift == 0 || lengthCounter.isMuted() {
+		return
+	}
+
 	if su.data.direction == 0 { // 上
 		su.frequency = su.frequency + (su.frequency >> uint16(su.data.shift))
 	} else { // 下
 		su.frequency = su.frequency - (su.frequency >> uint16(su.data.shift))
 	}
 
-	if su.frequency < 8 || su.frequency >= 0x7FF {
-		su.frequency = 0
+	if su.frequency < 0x08 || su.frequency > 0x7FF {
+		lengthCounter.counter = 0
 	}
 }
 
