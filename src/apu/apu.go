@@ -19,7 +19,15 @@ const (
 	MAX_VOLUME = 0.8
 	toneHz   = 440
 	sampleHz = 44100
-	BUFFER_SIZE = 8192 // リングバッファサイズ
+	BUFFER_SIZE = 16384 // リングバッファサイズ
+	CHUNK_SIZE = 1024
+)
+
+var (
+	ch1BufferPool = make([]float32, BUFFER_SIZE)
+	ch2BufferPool = make([]float32, BUFFER_SIZE)
+	ch3BufferPool = make([]float32, BUFFER_SIZE)
+	ch4BufferPool = make([]float32, BUFFER_SIZE)
 )
 
 // MARK: APUの定義
@@ -427,20 +435,22 @@ func MixedAudioCallback(userdata unsafe.Pointer, stream *C.Uint8, length C.int) 
 	n := int(length) / 4
 	buffer := unsafe.Slice((*float32)(unsafe.Pointer(stream)), n)
 
+	// 事前確保バッファを使用
+	ch1Buffer := ch1BufferPool[:n]
+	ch2Buffer := ch2BufferPool[:n]
+	ch3Buffer := ch3BufferPool[:n]
+	ch4Buffer := ch4BufferPool[:n]
+
 	// 1chのデータの読み込み
-	ch1Buffer := make([]float32, n)
 	squareWave1.buffer.Read(ch1Buffer)
-
+	
 	// 2chのデータの読み込み
-	ch2Buffer := make([]float32, n)
 	squareWave2.buffer.Read(ch2Buffer)
-
+	
 	// 3chのデータの読み込み
-	ch3Buffer := make([]float32, n)
 	triangleWave.buffer.Read(ch3Buffer)
-
+	
 	// 4chのデータの読み込み
-	ch4Buffer := make([]float32, n)
 	noiseWave.buffer.Read(ch4Buffer)
 
 	for i := range n {

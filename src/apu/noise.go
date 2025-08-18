@@ -50,6 +50,8 @@ var noiseWave NoiseWave
 
 // MARK: PCM波形生成のgoroutine
 func (nw *NoiseWave) generatePCM() {
+	pcmBuffer := make([]float32, CHUNK_SIZE)
+
 	for {
 		// チャンネルから新しい音符を受信
 	eventLoop:
@@ -94,14 +96,14 @@ func (nw *NoiseWave) generatePCM() {
 			continue
 		}
 
-		// 小さなバッファでPCMサンプルを生成
-		const chunkSize = 512
-		pcmBuffer := make([]float32, chunkSize)
+		for i := range pcmBuffer {
+			pcmBuffer[i] = 0.0
+		}
 
 		// 現在の音符の周波数に基づいてphaseIncrementを計算
 		phaseIncrement := float32(nw.note.hz) / float32(sampleHz)
 
-		for i := range chunkSize {
+		for i := range CHUNK_SIZE {
 			nw.phase += phaseIncrement
 			if nw.phase >= 1.0 {
 				nw.phase -= 1.0

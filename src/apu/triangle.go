@@ -44,6 +44,8 @@ var triangleWave TriangleWave
 
 // MARK: PCM波形生成のgoroutine
 func (tw *TriangleWave) generatePCM() {
+	pcmBuffer := make([]float32, CHUNK_SIZE)
+
 	for {
 		// チャンネルから新しい音符を受信
 	eventLoop:
@@ -88,14 +90,14 @@ func (tw *TriangleWave) generatePCM() {
 			continue
 		}
 
-		// 小さなバッファでPCMサンプルを生成
-		const chunkSize = 512 // チャンクサイズを大きくしてアンダーランを防ぐ
-		pcmBuffer := make([]float32, chunkSize)
+		for i := range pcmBuffer {
+			pcmBuffer[i] = 0.0
+		}
 
 		// 現在の音符の周波数に基づいてphaseIncrementを計算
 		phaseIncrement := float32(tw.note.hz) / float32(sampleHz)
 
-		for i := range chunkSize {
+		for i := range CHUNK_SIZE {
 			tw.phase += phaseIncrement
 			if tw.phase >= 1.0 {
 				tw.phase -= 1.0

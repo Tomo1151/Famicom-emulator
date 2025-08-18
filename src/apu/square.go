@@ -51,6 +51,9 @@ var squareWave2 SquareWave
 
 // MARK: PCM波形生成のgoroutine
 func (sw *SquareWave) generatePCM() {
+	// バッファを事前確保
+	pcmBuffer := make([]float32, CHUNK_SIZE)
+
 	for {
 		// チャンネルから新しい音符を受信
 	eventLoop:
@@ -106,15 +109,16 @@ func (sw *SquareWave) generatePCM() {
 			continue
 		}
 
-		// 小さなバッファでPCMサンプルを生成
-		const chunkSize = 512 // チャンクサイズを大きくしてアンダーランを防ぐ
-		pcmBuffer := make([]float32, chunkSize)
+		// pcmBufferを再利用
+		for i := range pcmBuffer {
+			pcmBuffer[i] = 0.0
+		}
 
 		// 現在の音符の周波数に基づいてphaseIncrementを計算
 		frequency := sw.sweepUnit.getFrequency()
 		phaseIncrement := frequency / float32(sampleHz)
 
-		for i := range chunkSize {
+		for i := range CHUNK_SIZE {
 			sw.phase += phaseIncrement
 			if sw.phase >= 1.0 {
 				sw.phase -= 1.0
