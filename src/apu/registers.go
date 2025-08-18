@@ -36,7 +36,7 @@ type SquareWaveRegister struct {
 	sweepShift uint8
 	sweepDirection uint8
 	sweepPeriod uint8
-	sweepEnabled uint8
+	sweepEnabled bool
 
 	// 0x4002 | 0x4006
 	frequency uint16
@@ -54,7 +54,7 @@ func (swr *SquareWaveRegister) Init() {
 	swr.sweepShift = 0x00
 	swr.sweepDirection = 0x00
 	swr.sweepPeriod = 0x00
-	swr.sweepEnabled = 0x00
+	swr.sweepEnabled = false
 	swr.frequency = 0x00
 	swr.keyOffCount = 0x00
 }
@@ -71,7 +71,7 @@ func (swr *SquareWaveRegister) write(address uint16, data uint8) {
 		swr.sweepShift = data & 0x07
 		swr.sweepDirection = (data & 0x08) >> 3
 		swr.sweepPeriod = (data & 0x70) >> 4
-		swr.sweepEnabled = (data & 0x80) >> 7
+		swr.sweepEnabled = (data & 0x80) != 0
 	case 0x4002, 0x4006:
 		swr.frequency = (swr.frequency & 0x0700) | uint16(data)
 	case 0x4003, 0x4007:

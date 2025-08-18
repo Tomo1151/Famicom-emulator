@@ -7,6 +7,8 @@ const (
 	SQUARE_WAVE_ENVELOPE_TICK
 	SQUARE_WAVE_LENGTH_COUNTER
 	SQUARE_WAVE_LENGTH_COUNTER_TICK
+	SQUARE_WAVE_SWEEP
+	SQUARE_WAVE_SWEEP_TICK
 )
 
 type SquareWaveEventType uint
@@ -19,13 +21,13 @@ type SquareWave struct {
 	note          SquareNote
 	envelope      Envelope
 	lengthCounter LengthCounter
+	sweepUnit     SweepUnit
 	buffer        *RingBuffer
 	enabled       bool
 }
 
 // MARK: 可変部分の構造体
 type SquareNote struct {
-	hz   float32
 	duty float32
 }
 
@@ -34,6 +36,7 @@ type SquareWaveEvent struct {
 	note          *SquareNote
 	envelope      *Envelope
 	lengthCounter *LengthCounter
+	sweepUnit     *SweepUnit
 	enabled       bool
 }
 
@@ -69,6 +72,12 @@ func (sw *SquareWave) generatePCM() {
 					}
 				case SQUARE_WAVE_LENGTH_COUNTER_TICK: // LENGTH COUNTER TICKイベント
 					sw.lengthCounter.tick()
+				case SQUARE_WAVE_SWEEP: // SWEEPイベント
+					if event.sweepUnit != nil {
+						sw.sweepUnit = *event.sweepUnit
+					}
+				case SQUARE_WAVE_SWEEP_TICK: // SWEEP TICKイベント
+					sw.sweepUnit.tick()
 				}
 			default:
 				// 新しい音符がない場合は現在の音符を継続
@@ -86,7 +95,8 @@ func (sw *SquareWave) generatePCM() {
 		pcmBuffer := make([]float32, chunkSize)
 
 		// 現在の音符の周波数に基づいてphaseIncrementを計算
-		phaseIncrement := float32(sw.note.hz) / float32(sampleHz)
+		frequency := sw.sweepUnit.getFrequency()
+		phaseIncrement := frequency / float32(sampleHz)
 
 		for i := range chunkSize {
 			sw.phase += phaseIncrement

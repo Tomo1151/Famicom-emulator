@@ -42,6 +42,42 @@ func (e *Envelope) tick() {
 	e.divider = e.rate + 1
 }
 
+type SweepUnit struct {
+	frequency  uint16
+	amount     uint8
+	direction  uint8
+	timerCount uint8
+	counter    uint8
+	enabled    bool
+}
+
+func (su *SweepUnit) tick() {
+	su.counter++
+
+	if !su.enabled || su.amount == 0 || su.counter < su.timerCount+1 {
+		return
+	}
+
+	su.counter = 0
+
+	if su.direction == 0 { // 上
+		su.frequency = su.frequency + (su.frequency >> uint16(su.amount))
+	} else { // 下
+		su.frequency = su.frequency - (su.frequency >> uint16(su.amount))
+	}
+
+	if su.frequency < 8 || su.frequency >= 0x7FF {
+		su.frequency = 0
+	}
+}
+
+func (su *SweepUnit) getFrequency() float32 {
+	if su.frequency == 0 {
+		return 0.0
+	}
+	return CPU_CLOCK / (16.0 * (float32(su.frequency) + 1.0))
+}
+
 type LengthCounter struct {
 	counter uint8
 	enabled bool

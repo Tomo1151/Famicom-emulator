@@ -98,7 +98,6 @@ func (a *APU) Write1ch(address uint16, data uint8) {
 	a.Ch1Channel <- SquareWaveEvent{
 		eventType: SQUARE_WAVE_NOTE,
 		note: &SquareNote{
-			hz: a.Ch1Register.getFrequency(),
 			duty: a.Ch1Register.getDuty(),
 		},
 	}
@@ -116,6 +115,17 @@ func (a *APU) Write1ch(address uint16, data uint8) {
 		eventType: SQUARE_WAVE_LENGTH_COUNTER,
 		lengthCounter: &lengthCounter,
 	}
+
+	a.Ch1Channel <- SquareWaveEvent{
+		eventType: SQUARE_WAVE_SWEEP,
+		sweepUnit: &SweepUnit{
+			frequency: a.Ch1Register.frequency,
+			amount: a.Ch1Register.sweepShift,
+			direction: a.Ch1Register.sweepDirection,
+			timerCount: a.Ch1Register.sweepPeriod,
+			enabled: a.Ch1Register.sweepEnabled,
+		},
+	}
 }
 
 // MARK: 2chへの書き込みメソッド（矩形波）
@@ -125,7 +135,6 @@ func (a *APU) Write2ch(address uint16, data uint8) {
 	a.Ch2Channel <- SquareWaveEvent{
 		eventType: SQUARE_WAVE_NOTE,
 		note: &SquareNote{
-			hz: a.Ch2Register.getFrequency(),
 			duty: a.Ch2Register.getDuty(),
 		},
 	}
@@ -142,6 +151,17 @@ func (a *APU) Write2ch(address uint16, data uint8) {
 	a.Ch2Channel <- SquareWaveEvent{
 		eventType: SQUARE_WAVE_LENGTH_COUNTER,
 		lengthCounter: &lengthCounter,
+	}
+
+	a.Ch2Channel <- SquareWaveEvent{
+		eventType: SQUARE_WAVE_SWEEP,
+		sweepUnit: &SweepUnit{
+			frequency: a.Ch2Register.frequency,
+			amount: a.Ch2Register.sweepShift,
+			direction: a.Ch2Register.sweepDirection,
+			timerCount: a.Ch2Register.sweepPeriod,
+			enabled: a.Ch2Register.sweepEnabled,
+		},
 	}
 }
 
@@ -293,11 +313,18 @@ func initSquareChannel(wave *SquareWave, buffer *RingBuffer) chan SquareWaveEven
 		channel: ch1Channel,
 		buffer: buffer,
 		note: SquareNote{
-			hz: 0,
 			duty:   0.0,
 		},
 		envelope: envelope,
 		lengthCounter: LengthCounter{
+			counter: 0,
+			enabled: false,
+		},
+		sweepUnit: SweepUnit{
+			frequency: 0,
+			amount: 0,
+			direction: 0,
+			timerCount: 0,
 			counter: 0,
 			enabled: false,
 		},
@@ -367,6 +394,42 @@ func initNoiseChannel(buffer *RingBuffer) chan NoiseWaveEvent {
 	return ch4Channel
 }
 
+func (a *APU) sendEnvelopeTick() {
+	a.Ch1Channel <- SquareWaveEvent{
+		eventType: SQUARE_WAVE_ENVELOPE_TICK,
+	}
+	a.Ch2Channel <- SquareWaveEvent{
+		eventType: SQUARE_WAVE_ENVELOPE_TICK,
+	}
+	a.Ch4Channel <- NoiseWaveEvent{
+		eventType: NOISE_WAVE_ENVELOPE_TICK,
+	}
+}
+
+func (a *APU) sendSweepTick() {
+	a.Ch1Channel <- SquareWaveEvent{
+		eventType: SQUARE_WAVE_SWEEP_TICK,
+	}
+	a.Ch2Channel <- SquareWaveEvent{
+		eventType: SQUARE_WAVE_SWEEP_TICK,
+	}
+}
+
+func (a *APU) sendLengthCounterTick() {
+	a.Ch1Channel <- SquareWaveEvent{
+		eventType: SQUARE_WAVE_LENGTH_COUNTER_TICK,
+	}
+	a.Ch2Channel <- SquareWaveEvent{
+		eventType: SQUARE_WAVE_LENGTH_COUNTER_TICK,
+	}
+	a.Ch3Channel <- TriangleWaveEvent{
+		eventType: SQUARE_WAVE_LENGTH_COUNTER_TICK,
+	}
+	a.Ch4Channel <- NoiseWaveEvent{
+		eventType: SQUARE_WAVE_LENGTH_COUNTER_TICK,
+	}
+}
+
 // MARK: CPUと同期してサイクルを進めるメソッド
 func (a *APU) Tick(cycles uint) {
 	a.cycles++
@@ -379,31 +442,18 @@ func (a *APU) Tick(cycles uint) {
 
 		switch mode {
 		case 4:
+			/*
+				割り込み　　： - - - f    60Hz
+				長さカウンタ： - l - l   120Hz
+				エンベロープ： e e e e   240Hz
+			*/
 			if a.counter == 2 || a.counter == 4 {
 				// 長さカウンタとスイープ用のクロック生成
-				a.Ch1Channel <- SquareWaveEvent{
-					eventType: SQUARE_WAVE_LENGTH_COUNTER_TICK,
-				}
-				a.Ch2Channel <- SquareWaveEvent{
-					eventType: SQUARE_WAVE_LENGTH_COUNTER_TICK,
-				}
-				a.Ch3Channel <- TriangleWaveEvent{
-					eventType: SQUARE_WAVE_LENGTH_COUNTER_TICK,
-				}
-				a.Ch4Channel <- NoiseWaveEvent{
-					eventType: SQUARE_WAVE_LENGTH_COUNTER_TICK,
-				}
+				a.sendLengthCounterTick()
+				a.sendSweepTick()
 			}
 			if a.counter == 1 || a.counter == 2 || a.counter == 3 || a.counter ==4 {
-				a.Ch1Channel <- SquareWaveEvent{
-					eventType: SQUARE_WAVE_ENVELOPE_TICK,
-				}
-				a.Ch2Channel <- SquareWaveEvent{
-					eventType: SQUARE_WAVE_ENVELOPE_TICK,
-				}
-				a.Ch4Channel <- NoiseWaveEvent{
-					eventType: NOISE_WAVE_ENVELOPE_TICK,
-				}
+				a.sendEnvelopeTick()
 			}
 			if a.counter == 4 {
 				// 割り込みフラグをセット
@@ -411,31 +461,18 @@ func (a *APU) Tick(cycles uint) {
 				a.Status.SetFrameIRQ()
 			}
 		case 5:
-			if a.counter == 0 || a.counter == 2 {
+			/*
+				割り込み　　： - - - - -   割り込みフラグセット無し
+				長さカウンタ： l - l - -    96Hz
+				エンベロープ： e e e e -   192Hz
+			*/
+			if a.counter == 1 || a.counter == 3 {
 				// 長さカウンタとスイープ用のクロック生成
-				a.Ch1Channel <- SquareWaveEvent{
-					eventType: SQUARE_WAVE_LENGTH_COUNTER_TICK,
-				}
-				a.Ch2Channel <- SquareWaveEvent{
-					eventType: SQUARE_WAVE_LENGTH_COUNTER_TICK,
-				}
-				a.Ch3Channel <- TriangleWaveEvent{
-					eventType: SQUARE_WAVE_LENGTH_COUNTER_TICK,
-				}
-				a.Ch4Channel <- NoiseWaveEvent{
-					eventType: SQUARE_WAVE_LENGTH_COUNTER_TICK,
-				}
+				a.sendLengthCounterTick()
+				a.sendSweepTick()
 			}
 			if a.counter == 1 || a.counter == 2 || a.counter == 3 || a.counter ==4 {
-				a.Ch1Channel <- SquareWaveEvent{
-					eventType: SQUARE_WAVE_ENVELOPE_TICK,
-				}
-				a.Ch2Channel <- SquareWaveEvent{
-					eventType: SQUARE_WAVE_ENVELOPE_TICK,
-				}
-				a.Ch4Channel <- NoiseWaveEvent{
-					eventType: NOISE_WAVE_ENVELOPE_TICK,
-				}
+				a.sendEnvelopeTick()
 			}
 			if a.counter == 5 {
 				a.counter = 0
