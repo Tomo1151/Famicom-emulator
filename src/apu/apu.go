@@ -109,6 +109,13 @@ func (a *APU) Write1ch(address uint16, data uint8) {
 		eventType: SQUARE_WAVE_ENVELOPE,
 		envelope: &envelope,
 	}
+
+	lengthCounter := LengthCounter{enabled: a.Ch1Register.keyOffCounter}
+	lengthCounter.setCount(a.Ch1Register.keyOffCount)
+	a.Ch1Channel <- SquareWaveEvent{
+		eventType: SQUARE_WAVE_LENGTH_COUNTER,
+		lengthCounter: &lengthCounter,
+	}
 }
 
 // MARK: 2chへの書き込みメソッド（矩形波）
@@ -129,6 +136,13 @@ func (a *APU) Write2ch(address uint16, data uint8) {
 		eventType: SQUARE_WAVE_ENVELOPE,
 		envelope: &envelope,
 	}
+
+	lengthCounter := LengthCounter{enabled: a.Ch2Register.keyOffCounter}
+	lengthCounter.setCount(a.Ch2Register.keyOffCount)
+	a.Ch2Channel <- SquareWaveEvent{
+		eventType: SQUARE_WAVE_LENGTH_COUNTER,
+		lengthCounter: &lengthCounter,
+	}
 }
 
 // MARK: 3chへの書き込みメソッド（三角波）
@@ -140,6 +154,13 @@ func (a *APU) Write3ch(address uint16, data uint8) {
 		note: &TriangleNote{
 			hz: a.Ch3Register.getFrequency(),
 		},
+	}
+
+	lengthCounter := LengthCounter{enabled: a.Ch3Register.keyOffCounter}
+	lengthCounter.setCount(a.Ch3Register.keyOffCount)
+	a.Ch3Channel <- TriangleWaveEvent{
+		eventType: TRIANGLE_WAVE_LENGTH_COUNTER,
+		lengthCounter: &lengthCounter,
 	}
 }
 
@@ -160,6 +181,13 @@ func (a *APU) Write4ch(address uint16, data uint8) {
 	a.Ch4Channel <- NoiseWaveEvent{
 		eventType: NOISE_WAVE_ENVELOPE,
 		envelope: &envelope,
+	}
+
+	lengthCounter := LengthCounter{enabled: a.Ch4Register.keyOffCounter}
+	lengthCounter.setCount(a.Ch4Register.keyOffCount)
+	a.Ch4Channel <- NoiseWaveEvent{
+		eventType: TRIANGLE_WAVE_LENGTH_COUNTER,
+		lengthCounter: &lengthCounter,
 	}
 }
 
@@ -269,6 +297,10 @@ func initSquareChannel(wave *SquareWave, buffer *RingBuffer) chan SquareWaveEven
 			duty:   0.0,
 		},
 		envelope: envelope,
+		lengthCounter: LengthCounter{
+			counter: 0,
+			enabled: false,
+		},
 		enabled: true,
 	}
 
@@ -290,6 +322,11 @@ func initTriangleChannel(buffer *RingBuffer) chan TriangleWaveEvent {
 		note: TriangleNote{
 			hz: 0.0,
 		},
+		lengthCounter: LengthCounter{
+			counter: 0,
+			enabled: false,
+		},
+		enabled: true,
 	}
 
 	go triangleWave.generatePCM()
@@ -311,6 +348,10 @@ func initNoiseChannel(buffer *RingBuffer) chan NoiseWaveEvent {
 		note: NoiseNote{
 			hz: 0,
 			noiseMode: NOISE_MODE_SHORT,
+		},
+		lengthCounter: LengthCounter{
+			counter: 0,
+			enabled: false,
 		},
 
 		longNoise: NoiseShiftRegister{},
@@ -340,6 +381,18 @@ func (a *APU) Tick(cycles uint) {
 		case 4:
 			if a.counter == 2 || a.counter == 4 {
 				// 長さカウンタとスイープ用のクロック生成
+				a.Ch1Channel <- SquareWaveEvent{
+					eventType: SQUARE_WAVE_LENGTH_COUNTER_TICK,
+				}
+				a.Ch2Channel <- SquareWaveEvent{
+					eventType: SQUARE_WAVE_LENGTH_COUNTER_TICK,
+				}
+				a.Ch3Channel <- TriangleWaveEvent{
+					eventType: SQUARE_WAVE_LENGTH_COUNTER_TICK,
+				}
+				a.Ch4Channel <- NoiseWaveEvent{
+					eventType: SQUARE_WAVE_LENGTH_COUNTER_TICK,
+				}
 			}
 			if a.counter == 1 || a.counter == 2 || a.counter == 3 || a.counter ==4 {
 				a.Ch1Channel <- SquareWaveEvent{
@@ -360,6 +413,18 @@ func (a *APU) Tick(cycles uint) {
 		case 5:
 			if a.counter == 0 || a.counter == 2 {
 				// 長さカウンタとスイープ用のクロック生成
+				a.Ch1Channel <- SquareWaveEvent{
+					eventType: SQUARE_WAVE_LENGTH_COUNTER_TICK,
+				}
+				a.Ch2Channel <- SquareWaveEvent{
+					eventType: SQUARE_WAVE_LENGTH_COUNTER_TICK,
+				}
+				a.Ch3Channel <- TriangleWaveEvent{
+					eventType: SQUARE_WAVE_LENGTH_COUNTER_TICK,
+				}
+				a.Ch4Channel <- NoiseWaveEvent{
+					eventType: SQUARE_WAVE_LENGTH_COUNTER_TICK,
+				}
 			}
 			if a.counter == 1 || a.counter == 2 || a.counter == 3 || a.counter ==4 {
 				a.Ch1Channel <- SquareWaveEvent{

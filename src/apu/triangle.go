@@ -3,18 +3,21 @@ package apu
 const (
 	TRIANGLE_WAVE_ENABLED = iota
 	TRIANGLE_WAVE_NOTE
+	TRIANGLE_WAVE_LENGTH_COUNTER
+	TRIANGLE_WAVE_LENGTH_COUNTER_TICK
 )
 
 type TriangleWaveEventType uint
 
 // MARK: 矩形波データの構造体
 type TriangleWave struct {
-	freq    float32
-	phase   float32
-	channel chan TriangleWaveEvent
-	note    TriangleNote
-	buffer  *RingBuffer
-	enabled bool
+	freq          float32
+	phase         float32
+	channel       chan TriangleWaveEvent
+	note          TriangleNote
+	lengthCounter LengthCounter
+	buffer        *RingBuffer
+	enabled       bool
 }
 
 // MARK: 可変部分の構造体
@@ -23,9 +26,10 @@ type TriangleNote struct {
 }
 
 type TriangleWaveEvent struct {
-	eventType TriangleWaveEventType
-	note      *TriangleNote
-	enabled   bool
+	eventType     TriangleWaveEventType
+	note          *TriangleNote
+	lengthCounter *LengthCounter
+	enabled       bool
 }
 
 // MARK: 三角波データ
@@ -40,13 +44,19 @@ func (tw *TriangleWave) generatePCM() {
 			select {
 			case event := <-tw.channel:
 				switch event.eventType {
-				case TRIANGLE_WAVE_ENABLED:
+				case TRIANGLE_WAVE_ENABLED: // ENABLEDイベント
 					tw.enabled = event.enabled
-				case TRIANGLE_WAVE_NOTE:
+				case TRIANGLE_WAVE_NOTE: // NOTEイベント
 					if event.note != nil {
 						tw.note = *event.note
 						tw.phase = 0.0 // 音符が変わったらphaseをリセット
 					}
+				case TRIANGLE_WAVE_LENGTH_COUNTER: // LENGTH COUNTERイベント
+					if event.lengthCounter != nil {
+						tw.lengthCounter = *event.lengthCounter
+					}
+				case TRIANGLE_WAVE_LENGTH_COUNTER_TICK: // LENGTH COUNTER TICKイベント
+					tw.lengthCounter.tick()
 				}
 			default:
 				// 新しい音符がない場合は現在の音符を継続
@@ -79,7 +89,7 @@ func (tw *TriangleWave) generatePCM() {
 				sample = 1.0 - tw.phase // 下がっていく
 			}
 
-			if tw.enabled {
+			if tw.enabled && !tw.lengthCounter.isMuted() {
 				pcmBuffer[i] = (sample - 0.25) * 4 * MAX_VOLUME // 真ん中へずらす, ボリュームは固定
 			} else {
 				pcmBuffer[i] = 0.0

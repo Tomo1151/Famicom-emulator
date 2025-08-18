@@ -5,19 +5,22 @@ const (
 	NOISE_WAVE_NOTE
 	NOISE_WAVE_ENVELOPE
 	NOISE_WAVE_ENVELOPE_TICK
+	NOISE_WAVE_LENGTH_COUNTER
+	NOISE_WAVE_LENGTH_COUNTER_TICK
 )
 
 type NoiseWaveEventType uint
 
 // MARK: 矩形波データの構造体
 type NoiseWave struct {
-	freq     float32
-	phase    float32
-	channel  chan NoiseWaveEvent
-	note     NoiseNote
-	envelope Envelope
-	noise    bool
-	buffer   *RingBuffer
+	freq          float32
+	phase         float32
+	channel       chan NoiseWaveEvent
+	note          NoiseNote
+	envelope      Envelope
+	noise         bool
+	lengthCounter LengthCounter
+	buffer        *RingBuffer
 
 	longNoise  NoiseShiftRegister
 	shortNoise NoiseShiftRegister
@@ -32,10 +35,11 @@ type NoiseNote struct {
 }
 
 type NoiseWaveEvent struct {
-	eventType NoiseWaveEventType
-	note      *NoiseNote
-	envelope  *Envelope
-	enabled   bool
+	eventType     NoiseWaveEventType
+	note          *NoiseNote
+	envelope      *Envelope
+	lengthCounter *LengthCounter
+	enabled       bool
 }
 
 // MARK: 矩形波データ
@@ -63,6 +67,12 @@ func (nw *NoiseWave) generatePCM() {
 					}
 				case NOISE_WAVE_ENVELOPE_TICK: // ENVELOPE TICKイベント
 					nw.envelope.tick()
+				case NOISE_WAVE_LENGTH_COUNTER:
+					if event.lengthCounter != nil {
+						nw.lengthCounter = *event.lengthCounter
+					}
+				case NOISE_WAVE_LENGTH_COUNTER_TICK:
+					nw.lengthCounter.tick()
 				}
 			default:
 				// 新しい音符がない場合は現在の音符を継続
@@ -107,7 +117,7 @@ func (nw *NoiseWave) generatePCM() {
 				sample = 0.0
 			}
 
-			if !nw.enabled {
+			if !nw.enabled || nw.lengthCounter.isMuted() {
 				sample = 0.0
 			}
 

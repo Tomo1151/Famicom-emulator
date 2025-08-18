@@ -41,3 +41,60 @@ func (e *Envelope) tick() {
 	}
 	e.divider = e.rate + 1
 }
+
+type LengthCounter struct {
+	counter uint8
+	enabled bool
+}
+
+func (lc *LengthCounter) setCount(count uint8) {
+	lengthCounterTable := [32]uint8{
+		0x05,
+		0x7F,
+		0x0A,
+		0x01,
+		0x14,
+		0x02,
+		0x28,
+		0x03,
+		0x50,
+		0x04,
+		0x1E,
+		0x05,
+		0x07,
+		0x06,
+		0x0D,
+		0x07,
+		0x06,
+		0x08,
+		0x0C,
+		0x09,
+		0x18,
+		0x0A,
+		0x30,
+		0x0B,
+		0x60,
+		0x0C,
+		0x24,
+		0x0D,
+		0x08,
+		0x0E,
+		0x10,
+		0x0F,
+	}
+	lc.counter = lengthCounterTable[count]
+}
+
+func (lc *LengthCounter) tick() {
+	if !lc.enabled {
+		return
+	}
+
+	if lc.counter > 0 {
+		lc.counter--
+	}
+}
+
+func (lc *LengthCounter) isMuted() bool {
+	return lc.enabled && lc.counter == 0
+}

@@ -5,19 +5,22 @@ const (
 	SQUARE_WAVE_NOTE
 	SQUARE_WAVE_ENVELOPE
 	SQUARE_WAVE_ENVELOPE_TICK
+	SQUARE_WAVE_LENGTH_COUNTER
+	SQUARE_WAVE_LENGTH_COUNTER_TICK
 )
 
 type SquareWaveEventType uint
 
 // MARK: 矩形波データの構造体
 type SquareWave struct {
-	freq     float32
-	phase    float32
-	channel  chan SquareWaveEvent
-	note     SquareNote
-	envelope Envelope
-	buffer   *RingBuffer
-	enabled  bool
+	freq          float32
+	phase         float32
+	channel       chan SquareWaveEvent
+	note          SquareNote
+	envelope      Envelope
+	lengthCounter LengthCounter
+	buffer        *RingBuffer
+	enabled       bool
 }
 
 // MARK: 可変部分の構造体
@@ -27,10 +30,11 @@ type SquareNote struct {
 }
 
 type SquareWaveEvent struct {
-	eventType SquareWaveEventType
-	note      *SquareNote
-	envelope  *Envelope
-	enabled   bool
+	eventType     SquareWaveEventType
+	note          *SquareNote
+	envelope      *Envelope
+	lengthCounter *LengthCounter
+	enabled       bool
 }
 
 // MARK: 矩形波データ
@@ -59,6 +63,12 @@ func (sw *SquareWave) generatePCM() {
 					}
 				case SQUARE_WAVE_ENVELOPE_TICK: // ENVELOPE TICKイベント
 					sw.envelope.tick()
+				case SQUARE_WAVE_LENGTH_COUNTER: // LENGTH COUNTERイベント
+					if event.lengthCounter != nil {
+						sw.lengthCounter = *event.lengthCounter
+					}
+				case SQUARE_WAVE_LENGTH_COUNTER_TICK: // LENGTH COUNTER TICKイベント
+					sw.lengthCounter.tick()
 				}
 			default:
 				// 新しい音符がない場合は現在の音符を継続
@@ -95,7 +105,7 @@ func (sw *SquareWave) generatePCM() {
 				sample = 0.0 // 無音（中央値）
 			}
 
-			if !sw.enabled {
+			if !sw.enabled || sw.lengthCounter.isMuted() {
 				sample = 0.0
 			}
 			pcmBuffer[i] = sample * sw.envelope.volume()
