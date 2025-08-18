@@ -24,6 +24,11 @@ func (e *Envelope) volume() float32 {
 	}
 }
 
+func (e *Envelope) reset() {
+	e.counter = 0x0F
+	e.divider = e.rate + 1
+}
+
 func (e *Envelope) tick() {
 	e.divider--
 
@@ -36,25 +41,42 @@ func (e *Envelope) tick() {
 		e.counter--
 	} else {
 		if e.loop {
-			e.counter = 0x0F
+			e.reset()
 		}
 	}
 	e.divider = e.rate + 1
 }
 
 type SweepUnit struct {
-	frequency  uint16
-	amount     uint8
-	direction  uint8
-	timerCount uint8
-	counter    uint8
-	enabled    bool
+	prevFrequency uint16
+	frequency     uint16
+	amount        uint8
+	direction     uint8
+	timerCount    uint8
+	counter       uint8
+	enabled       bool
+}
+
+func (su *SweepUnit) getFrequency() float32 {
+	if su.frequency == 0 {
+		return 0.0
+	}
+	return CPU_CLOCK / (16.0 * (float32(su.frequency) + 1.0))
+}
+
+func (su *SweepUnit) reset() {
+	su.frequency = su.prevFrequency
+	su.counter = 0
 }
 
 func (su *SweepUnit) tick() {
+	if !su.enabled || su.amount == 0 {
+		return
+	}
+
 	su.counter++
 
-	if !su.enabled || su.amount == 0 || su.counter < su.timerCount+1 {
+	if su.counter < su.timerCount+1 {
 		return
 	}
 
@@ -71,16 +93,10 @@ func (su *SweepUnit) tick() {
 	}
 }
 
-func (su *SweepUnit) getFrequency() float32 {
-	if su.frequency == 0 {
-		return 0.0
-	}
-	return CPU_CLOCK / (16.0 * (float32(su.frequency) + 1.0))
-}
-
 type LengthCounter struct {
-	counter uint8
-	enabled bool
+	prevCount uint8
+	counter   uint8
+	enabled   bool
 }
 
 func (lc *LengthCounter) setCount(count uint8) {
@@ -119,6 +135,15 @@ func (lc *LengthCounter) setCount(count uint8) {
 		0x0F,
 	}
 	lc.counter = lengthCounterTable[count]
+	lc.prevCount = lc.counter
+}
+
+func (lc *LengthCounter) isMuted() bool {
+	return lc.enabled && lc.counter == 0
+}
+
+func (lc *LengthCounter) reset() {
+	lc.counter = lc.prevCount
 }
 
 func (lc *LengthCounter) tick() {
@@ -129,8 +154,4 @@ func (lc *LengthCounter) tick() {
 	if lc.counter > 0 {
 		lc.counter--
 	}
-}
-
-func (lc *LengthCounter) isMuted() bool {
-	return lc.enabled && lc.counter == 0
 }

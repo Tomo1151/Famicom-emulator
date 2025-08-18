@@ -7,6 +7,7 @@ const (
 	NOISE_WAVE_ENVELOPE_TICK
 	NOISE_WAVE_LENGTH_COUNTER
 	NOISE_WAVE_LENGTH_COUNTER_TICK
+	NOISE_WAVE_RESET
 )
 
 type NoiseWaveEventType uint
@@ -67,12 +68,15 @@ func (nw *NoiseWave) generatePCM() {
 					}
 				case NOISE_WAVE_ENVELOPE_TICK: // ENVELOPE TICKイベント
 					nw.envelope.tick()
-				case NOISE_WAVE_LENGTH_COUNTER:
+				case NOISE_WAVE_LENGTH_COUNTER: // LENGTH COUNTER TICKイベント
 					if event.lengthCounter != nil {
 						nw.lengthCounter = *event.lengthCounter
 					}
-				case NOISE_WAVE_LENGTH_COUNTER_TICK:
+				case NOISE_WAVE_LENGTH_COUNTER_TICK: // LENGTH COUNTER TICKイベント
 					nw.lengthCounter.tick()
+				case NOISE_WAVE_RESET: // RESETイベント
+					nw.envelope.reset()
+					nw.lengthCounter.reset()
 				}
 			default:
 				// 新しい音符がない場合は現在の音符を継続

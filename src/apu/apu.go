@@ -16,7 +16,7 @@ import (
 const (
 	CPU_CLOCK = 1_789_772.5 // 1.78MHz
 	APU_CYCLE_INTERVAL = 7457
-	MAX_VOLUME = 0.4
+	MAX_VOLUME = 0.8
 	toneHz   = 440
 	sampleHz = 44100
 	BUFFER_SIZE = 8192 // リングバッファサイズ
@@ -119,12 +119,19 @@ func (a *APU) Write1ch(address uint16, data uint8) {
 	a.Ch1Channel <- SquareWaveEvent{
 		eventType: SQUARE_WAVE_SWEEP,
 		sweepUnit: &SweepUnit{
+			prevFrequency: a.Ch1Register.frequency,
 			frequency: a.Ch1Register.frequency,
 			amount: a.Ch1Register.sweepShift,
 			direction: a.Ch1Register.sweepDirection,
 			timerCount: a.Ch1Register.sweepPeriod,
 			enabled: a.Ch1Register.sweepEnabled,
 		},
+	}
+
+	if address == 0x4003 {
+		a.Ch1Channel <- SquareWaveEvent{
+			eventType: SQUARE_WAVE_RESET,
+		}
 	}
 }
 
@@ -156,12 +163,19 @@ func (a *APU) Write2ch(address uint16, data uint8) {
 	a.Ch2Channel <- SquareWaveEvent{
 		eventType: SQUARE_WAVE_SWEEP,
 		sweepUnit: &SweepUnit{
+			prevFrequency: a.Ch2Register.frequency,
 			frequency: a.Ch2Register.frequency,
 			amount: a.Ch2Register.sweepShift,
 			direction: a.Ch2Register.sweepDirection,
 			timerCount: a.Ch2Register.sweepPeriod,
 			enabled: a.Ch2Register.sweepEnabled,
 		},
+	}
+
+	if address == 0x4007 {
+		a.Ch2Channel <- SquareWaveEvent{
+			eventType: SQUARE_WAVE_RESET,
+		}
 	}
 }
 
@@ -181,6 +195,12 @@ func (a *APU) Write3ch(address uint16, data uint8) {
 	a.Ch3Channel <- TriangleWaveEvent{
 		eventType: TRIANGLE_WAVE_LENGTH_COUNTER,
 		lengthCounter: &lengthCounter,
+	}
+
+	if address == 0x400B {
+		a.Ch3Channel <- TriangleWaveEvent{
+			eventType: TRIANGLE_WAVE_RESET,
+		}
 	}
 }
 
@@ -208,6 +228,12 @@ func (a *APU) Write4ch(address uint16, data uint8) {
 	a.Ch4Channel <- NoiseWaveEvent{
 		eventType: TRIANGLE_WAVE_LENGTH_COUNTER,
 		lengthCounter: &lengthCounter,
+	}
+
+	if address == 0x400F {
+		a.Ch4Channel <- NoiseWaveEvent{
+			eventType: NOISE_WAVE_RESET,
+		}
 	}
 }
 

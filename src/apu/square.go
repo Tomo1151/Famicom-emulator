@@ -9,6 +9,7 @@ const (
 	SQUARE_WAVE_LENGTH_COUNTER_TICK
 	SQUARE_WAVE_SWEEP
 	SQUARE_WAVE_SWEEP_TICK
+	SQUARE_WAVE_RESET
 )
 
 type SquareWaveEventType uint
@@ -78,6 +79,10 @@ func (sw *SquareWave) generatePCM() {
 					}
 				case SQUARE_WAVE_SWEEP_TICK: // SWEEP TICKイベント
 					sw.sweepUnit.tick()
+				case SQUARE_WAVE_RESET: // RESETイベント
+					sw.envelope.reset()
+					sw.lengthCounter.reset()
+					sw.sweepUnit.reset()
 				}
 			default:
 				// 新しい音符がない場合は現在の音符を継続

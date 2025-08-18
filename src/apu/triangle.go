@@ -5,6 +5,7 @@ const (
 	TRIANGLE_WAVE_NOTE
 	TRIANGLE_WAVE_LENGTH_COUNTER
 	TRIANGLE_WAVE_LENGTH_COUNTER_TICK
+	TRIANGLE_WAVE_RESET
 )
 
 type TriangleWaveEventType uint
@@ -57,6 +58,8 @@ func (tw *TriangleWave) generatePCM() {
 					}
 				case TRIANGLE_WAVE_LENGTH_COUNTER_TICK: // LENGTH COUNTER TICKイベント
 					tw.lengthCounter.tick()
+				case TRIANGLE_WAVE_RESET: // RESETイベント
+					tw.lengthCounter.reset()
 				}
 			default:
 				// 新しい音符がない場合は現在の音符を継続

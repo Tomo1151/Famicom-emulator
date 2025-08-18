@@ -193,10 +193,10 @@ func (nwr *NoiseWaveRegister) write(adress uint16, data uint8) {
 		nwr.frequency = data & 0x0F
 		mode := data & 0x80
 
-		if (mode != 0){
-			nwr.mode = NOISE_MODE_SHORT
-		} else {
+		if (mode == 0){
 			nwr.mode = NOISE_MODE_LONG
+		} else {
+			nwr.mode = NOISE_MODE_SHORT
 		}
 	case 0x400F:
 		nwr.keyOffCount = (data & 0xF8) >> 3
