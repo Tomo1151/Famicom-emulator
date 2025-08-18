@@ -5,6 +5,7 @@ const (
 	TRIANGLE_WAVE_NOTE
 	TRIANGLE_WAVE_LENGTH_COUNTER
 	TRIANGLE_WAVE_LENGTH_COUNTER_TICK
+	TRIANGLE_WAVE_LINEAR_COUNTER
 	TRIANGLE_WAVE_RESET
 )
 
@@ -17,6 +18,7 @@ type TriangleWave struct {
 	channel       chan TriangleWaveEvent
 	note          TriangleNote
 	lengthCounter LengthCounter
+	linearCounter LinearCounter
 	buffer        *RingBuffer
 	enabled       bool
 }
@@ -30,6 +32,7 @@ type TriangleWaveEvent struct {
 	eventType     TriangleWaveEventType
 	note          *TriangleNote
 	lengthCounter *LengthCounter
+	linearCounter *LinearCounter
 	enabled       bool
 }
 
@@ -52,14 +55,20 @@ func (tw *TriangleWave) generatePCM() {
 						tw.note = *event.note
 						tw.phase = 0.0 // 音符が変わったらphaseをリセット
 					}
+				case TRIANGLE_WAVE_LINEAR_COUNTER: // LINEAR COUNTERイベント
+					if event.linearCounter != nil {
+						tw.linearCounter = *event.linearCounter
+					}
 				case TRIANGLE_WAVE_LENGTH_COUNTER: // LENGTH COUNTERイベント
 					if event.lengthCounter != nil {
 						tw.lengthCounter = *event.lengthCounter
 					}
 				case TRIANGLE_WAVE_LENGTH_COUNTER_TICK: // LENGTH COUNTER TICKイベント
 					tw.lengthCounter.tick()
+					tw.linearCounter.tick()
 				case TRIANGLE_WAVE_RESET: // RESETイベント
 					tw.lengthCounter.reset()
+					tw.linearCounter.reset()
 				}
 			default:
 				// 新しい音符がない場合は現在の音符を継続
@@ -92,7 +101,7 @@ func (tw *TriangleWave) generatePCM() {
 				sample = 1.0 - tw.phase // 下がっていく
 			}
 
-			if tw.enabled && !tw.lengthCounter.isMuted() {
+			if tw.enabled && !tw.linearCounter.isMuted() && !tw.lengthCounter.isMuted() {
 				pcmBuffer[i] = (sample - 0.25) * 4 * MAX_VOLUME // 真ん中へずらす, ボリュームは固定
 			} else {
 				pcmBuffer[i] = 0.0

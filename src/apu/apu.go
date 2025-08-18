@@ -197,6 +197,14 @@ func (a *APU) Write3ch(address uint16, data uint8) {
 		lengthCounter: &lengthCounter,
 	}
 
+	a.Ch3Channel <- TriangleWaveEvent{
+		eventType: TRIANGLE_WAVE_LINEAR_COUNTER,
+		linearCounter: &LinearCounter{
+			prevCount: a.Ch3Register.length,
+			counter: a.Ch3Register.length,
+		},
+	}
+
 	if address == 0x400B {
 		a.Ch3Channel <- TriangleWaveEvent{
 			eventType: TRIANGLE_WAVE_RESET,
@@ -378,6 +386,10 @@ func initTriangleChannel(buffer *RingBuffer) chan TriangleWaveEvent {
 		lengthCounter: LengthCounter{
 			counter: 0,
 			enabled: false,
+		},
+		linearCounter: LinearCounter{
+			prevCount: 0,
+			counter: 0,
 		},
 		enabled: true,
 	}

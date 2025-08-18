@@ -78,7 +78,7 @@ func (sw *SquareWave) generatePCM() {
 						sw.sweepUnit = *event.sweepUnit
 					}
 				case SQUARE_WAVE_SWEEP_TICK: // SWEEP TICKイベント
-					sw.sweepUnit.tick()
+					sw.sweepUnit.tick(&sw.lengthCounter)
 				case SQUARE_WAVE_RESET: // RESETイベント
 					sw.envelope.reset()
 					sw.lengthCounter.reset()

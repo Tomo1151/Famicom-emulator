@@ -69,8 +69,8 @@ func (su *SweepUnit) reset() {
 	su.counter = 0
 }
 
-func (su *SweepUnit) tick() {
-	if !su.enabled || su.amount == 0 {
+func (su *SweepUnit) tick(lengthCounter *LengthCounter) {
+	if !su.enabled || su.amount == 0 || lengthCounter.isMuted() {
 		return
 	}
 
@@ -91,6 +91,25 @@ func (su *SweepUnit) tick() {
 	if su.frequency < 8 || su.frequency >= 0x7FF {
 		su.frequency = 0
 	}
+}
+
+type LinearCounter struct {
+	prevCount uint8
+	counter   uint8
+}
+
+func (lc *LinearCounter) tick() {
+	if lc.counter > 0 {
+		lc.counter--
+	}
+}
+
+func (lc *LinearCounter) isMuted() bool {
+	return lc.counter == 0
+}
+
+func (lc *LinearCounter) reset() {
+	lc.counter = lc.prevCount
 }
 
 type LengthCounter struct {
