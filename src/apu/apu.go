@@ -290,11 +290,14 @@ func (a *APU) Write3ch(address uint16, data uint8) {
 	}
 
 	if address == 0x4008 {
+		linearCounterData := LinearCounterData{}
+		linearCounterData.Init(
+			a.Ch3Register.length,
+			a.Ch3Register.keyOffCounter,
+		)
 		a.Ch3Channel <- TriangleWaveEvent{
 			eventType: TRIANGLE_WAVE_LINEAR_COUNTER,
-			linearCounterData: &LinearCounterData{
-				count: a.Ch3Register.length,
-			},
+			linearCounterData: &linearCounterData,
 		}
 	}
 
@@ -486,8 +489,8 @@ func (a *APU) initAudioDevice() {
 
 // MARK: 1ch/2chの初期化メソッド
 func initSquareChannel(wave *SquareWave, buffer *RingBuffer) (chan SquareWaveEvent, chan ChannelEvent) {
-	ch1Channel := make(chan SquareWaveEvent, 10)
-	sendChannel := make(chan ChannelEvent, 10)
+	ch1Channel := make(chan SquareWaveEvent, 100)
+	sendChannel := make(chan ChannelEvent, 100)
 
 	envelope := Envelope{}
 	envelope.Init()
@@ -520,8 +523,8 @@ func initSquareChannel(wave *SquareWave, buffer *RingBuffer) (chan SquareWaveEve
 
 // MARK: 3chの初期化メソッド
 func initTriangleChannel(buffer *RingBuffer) (chan TriangleWaveEvent, chan ChannelEvent) {
-	ch3Channel := make(chan TriangleWaveEvent, 10)
-	sendChannel := make(chan ChannelEvent, 10)
+	ch3Channel := make(chan TriangleWaveEvent, 100)
+	sendChannel := make(chan ChannelEvent, 100)
 
 	lengthCounter := LengthCounter{}
 	lengthCounter.Init()
@@ -549,8 +552,8 @@ func initTriangleChannel(buffer *RingBuffer) (chan TriangleWaveEvent, chan Chann
 
 // MARK: 4ch の初期化メソッド
 func initNoiseChannel(buffer *RingBuffer) (chan NoiseWaveEvent, chan ChannelEvent) {
-	ch4Channel := make(chan NoiseWaveEvent, 10)
-	sendChannel := make(chan ChannelEvent, 10)
+	ch4Channel := make(chan NoiseWaveEvent, 100)
+	sendChannel := make(chan ChannelEvent, 100)
 
 	lengthCounter := LengthCounter{}
 	lengthCounter.Init()
@@ -585,8 +588,8 @@ func initNoiseChannel(buffer *RingBuffer) (chan NoiseWaveEvent, chan ChannelEven
 
 // MARK: 5chの初期化メソッド
 func (a *APU) initDPCMChannel(buffer *RingBuffer) (chan DPCMWaveEvent, chan ChannelEvent) {
-	ch5Channel := make(chan DPCMWaveEvent, 10)
-	sendChannel := make(chan ChannelEvent, 10)
+	ch5Channel := make(chan DPCMWaveEvent, 1000)
+	sendChannel := make(chan ChannelEvent, 1000)
 
 	dpcmWave = DPCMWave{
 		freq: 44100.0,
@@ -684,20 +687,20 @@ func (a *APU) receiveEvents() {
 		}
 	}
 
-	ch5EventLoop:
-	for {
-		select {
-		case event := <-a.Ch5Receiver:
-			a.Ch5LengthCount = event.length
-		default:
-			break ch5EventLoop
-		}
-	}
+	// ch5EventLoop:
+	// for {
+	// 	select {
+	// 	case event := <-a.Ch5Receiver:
+	// 		a.Ch5LengthCount = event.length
+	// 	default:
+	// 		break ch5EventLoop
+	// 	}
+	// }
 }
 
 // MARK: CPUと同期してサイクルを進めるメソッド
 func (a *APU) Tick(cycles uint) {
-	a.cycles++
+	a.cycles += cycles
 
 	if a.cycles >= APU_CYCLE_INTERVAL {
 		a.cycles %= APU_CYCLE_INTERVAL
@@ -718,15 +721,15 @@ func (a *APU) Tick(cycles uint) {
 				a.sendLengthCounterTick()
 				a.sendSweepTick()
 			}
-			if a.counter == 1 || a.counter == 2 || a.counter == 3 || a.counter ==4 {
-				a.sendEnvelopeTick()
-			}
 			if a.counter == 4 {
 				// 割り込みフラグをセット
 				a.counter = 0
 				if !a.frameCounter.getDisableIRQ() {
 					a.Status.SetFrameIRQ()
 				}
+			}
+			if a.counter == 1 || a.counter == 2 || a.counter == 3 || a.counter ==4 {
+				a.sendEnvelopeTick()
 			}
 		case 5:
 			/*

@@ -155,7 +155,13 @@ func (su *SweepUnit) tick(lengthCounter *LengthCounter) {
 }
 
 type LinearCounterData struct {
-	count uint8
+	count   uint8
+	enabled bool
+}
+
+func (lcd *LinearCounterData) Init(count uint8, enabled bool) {
+	lcd.count = count
+	lcd.enabled = enabled
 }
 
 type LinearCounter struct {
@@ -164,11 +170,16 @@ type LinearCounter struct {
 }
 
 func (lc *LinearCounter) Init() {
-	lc.data = LinearCounterData{count: 0}
+	lc.data = LinearCounterData{}
+	lc.data.Init(0, false)
 	lc.counter = 0
 }
 
 func (lc *LinearCounter) tick() {
+	if !lc.data.enabled {
+		return
+	}
+
 	if lc.counter > 0 {
 		lc.counter--
 	}
