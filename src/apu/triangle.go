@@ -1,5 +1,7 @@
 package apu
 
+import "time"
+
 const (
 	TRIANGLE_WAVE_ENABLED = iota
 	TRIANGLE_WAVE_NOTE
@@ -88,6 +90,7 @@ func (tw *TriangleWave) generatePCM() {
 
 		// バッファに十分なデータがある場合は少し待つ
 		if tw.buffer.Available() > BUFFER_SIZE/2 {
+			time.Sleep(1 * time.Millisecond)
 			continue
 		}
 

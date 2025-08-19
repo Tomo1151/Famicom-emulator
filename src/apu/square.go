@@ -1,5 +1,7 @@
 package apu
 
+import "time"
+
 const (
 	SQUARE_WAVE_ENABLED = iota
 	SQUARE_WAVE_NOTE
@@ -106,6 +108,7 @@ func (sw *SquareWave) generatePCM() {
 
 		// バッファに十分なデータがある場合は少し待つ
 		if sw.buffer.Available() > BUFFER_SIZE/2 {
+			time.Sleep(1 * time.Millisecond)
 			continue
 		}
 

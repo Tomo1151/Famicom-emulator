@@ -1,5 +1,7 @@
 package apu
 
+import "time"
+
 const (
 	NOISE_WAVE_ENABLED = iota
 	NOISE_WAVE_NOTE
@@ -93,6 +95,7 @@ func (nw *NoiseWave) generatePCM() {
 
 		// バッファに十分なデータがある場合は少し待つ
 		if nw.buffer.Available() > BUFFER_SIZE/2 {
+			time.Sleep(1 * time.Millisecond)
 			continue
 		}
 
