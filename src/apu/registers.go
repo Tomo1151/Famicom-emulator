@@ -314,7 +314,7 @@ type StatusRegister struct {
 
 // MARK: ステータスレジスタの初期化メソッド
 func (sr *StatusRegister) Init() {
-	sr.update(0b1101_1111)
+	sr.update(0b0000_0000)
 }
 
 // MARK: フレーム割込みフラグを取得

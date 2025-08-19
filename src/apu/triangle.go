@@ -58,11 +58,11 @@ func (tw *TriangleWave) generatePCM() {
 				case TRIANGLE_WAVE_NOTE: // NOTEイベント
 					if event.note != nil {
 						tw.note = *event.note
-						tw.phase = 0.0 // 音符が変わったらphaseをリセット
 					}
 				case TRIANGLE_WAVE_LINEAR_COUNTER: // LINEAR COUNTERイベント
 					if event.linearCounterData != nil {
 						tw.linearCounter.data = *event.linearCounterData
+						tw.linearCounter.reset()
 					}
 				case TRIANGLE_WAVE_LENGTH_COUNTER: // LENGTH COUNTERイベント
 					if event.lengthCounterData != nil {
@@ -78,6 +78,7 @@ func (tw *TriangleWave) generatePCM() {
 				case TRIANGLE_WAVE_RESET: // RESETイベント
 					tw.lengthCounter.reset()
 					tw.linearCounter.reset()
+					tw.phase = 0.0 // 音符が変わったらphaseをリセット
 				}
 			default:
 				// 新しい音符がない場合は現在の音符を継続
@@ -98,22 +99,22 @@ func (tw *TriangleWave) generatePCM() {
 		phaseIncrement := float32(tw.note.hz) / float32(sampleHz)
 
 		for i := range CHUNK_SIZE {
-			tw.phase += phaseIncrement
-			if tw.phase >= 1.0 {
-				tw.phase -= 1.0
-			}
-
 			var sample float32
 			if tw.phase < 0.5 {
 				sample = tw.phase // 上がっていく部分
 			} else {
-				sample = 1.0 - tw.phase // 下がっていく
+				sample = 1.0 - tw.phase // 下がっていく部分
 			}
 
 			if tw.enabled && !tw.linearCounter.isMuted() && !tw.lengthCounter.isMuted() {
 				pcmBuffer[i] = (sample - 0.25) * 4 * MAX_VOLUME // 真ん中へずらす, ボリュームは固定
 			} else {
 				pcmBuffer[i] = 0.0
+			}
+
+			tw.phase += phaseIncrement
+			if tw.phase >= 1.0 {
+				tw.phase -= 1.0
 			}
 		}
 

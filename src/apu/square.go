@@ -66,7 +66,6 @@ func (sw *SquareWave) generatePCM() {
 				case SQUARE_WAVE_NOTE: // NOTEイベント
 					if event.note != nil {
 						sw.note = *event.note
-						sw.phase = 0.0 // 音符が変わったらphaseをリセット
 					}
 				case SQUARE_WAVE_ENVELOPE: // ENVELOPEイベント
 					if event.envelopeData != nil {
@@ -97,6 +96,7 @@ func (sw *SquareWave) generatePCM() {
 					sw.envelope.reset()
 					sw.lengthCounter.reset()
 					sw.sweepUnit.reset()
+					sw.phase = 0.0 // 音符が変わったらphaseをリセット
 				}
 			default:
 				// 新しい音符がない場合は現在の音符を継続
@@ -119,26 +119,26 @@ func (sw *SquareWave) generatePCM() {
 		phaseIncrement := frequency / float32(sampleHz)
 
 		for i := range CHUNK_SIZE {
-			sw.phase += phaseIncrement
-			if sw.phase >= 1.0 {
-				sw.phase -= 1.0
-			}
-
 			var sample float32
-			if sw.envelope.volume() > 0 { // ボリュームが0より大きい場合のみ音を出す
-				if sw.phase < sw.note.duty {
-					sample = MAX_VOLUME // 正の波形
-				} else {
-					sample = -MAX_VOLUME // 負の波形
-				}
+
+			if sw.phase <= sw.note.duty {
+				sample = MAX_VOLUME // 正の波形
 			} else {
-				sample = 0.0 // 無音（中央値）
+				sample = -MAX_VOLUME // 負の波形
 			}
 
 			if !sw.enabled || sw.lengthCounter.isMuted() {
 				sample = 0.0
 			}
+
 			pcmBuffer[i] = sample * sw.envelope.volume()
+
+			if sw.sweepUnit.frequency != 0.0 {
+				sw.phase += phaseIncrement
+				if sw.phase >= 1.0 {
+					sw.phase -= 1.0
+				}
+			}
 		}
 
 		// リングバッファに書き込み

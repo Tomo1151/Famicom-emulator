@@ -64,7 +64,6 @@ func (nw *NoiseWave) generatePCM() {
 				case NOISE_WAVE_NOTE: // NOTEイベント
 					if event.note != nil {
 						nw.note = *event.note
-						nw.phase = 0.0 // 音符が変わったらphaseをリセット
 					}
 				case NOISE_WAVE_ENVELOPE: // ENVELOPEイベント
 					if event.envelopeData != nil {
@@ -84,6 +83,7 @@ func (nw *NoiseWave) generatePCM() {
 				case NOISE_WAVE_RESET: // RESETイベント
 					nw.envelope.reset()
 					nw.lengthCounter.reset()
+					nw.phase = 0.0 // 音符が変わったらphaseをリセット
 				}
 			default:
 				// 新しい音符がない場合は現在の音符を継続
@@ -104,6 +104,19 @@ func (nw *NoiseWave) generatePCM() {
 		phaseIncrement := float32(nw.note.hz) / float32(sampleHz)
 
 		for i := range CHUNK_SIZE {
+			var sample float32
+			if nw.noise {
+				sample = 0.0 // ノイズがtrueの場合は無音
+			} else {
+				sample = MAX_VOLUME * nw.envelope.volume()
+			}
+
+			if !nw.enabled || nw.lengthCounter.isMuted() {
+				sample = 0.0
+			}
+
+			pcmBuffer[i] = sample
+
 			nw.phase += phaseIncrement
 			if nw.phase >= 1.0 {
 				nw.phase -= 1.0
@@ -116,23 +129,6 @@ func (nw *NoiseWave) generatePCM() {
 					nw.noise = nw.shortNoise.next()
 				}
 			}
-
-			var sample float32
-			if nw.envelope.volume() > 0 { // ボリュームチェックを追加
-				if nw.noise {
-					sample = 0.0 // ノイズがtrueの場合は無音
-				} else {
-					sample = MAX_VOLUME * nw.envelope.volume()
-				}
-			} else {
-				sample = 0.0
-			}
-
-			if !nw.enabled || nw.lengthCounter.isMuted() {
-				sample = 0.0
-			}
-
-			pcmBuffer[i] = sample
 		}
 
 		// リングバッファに書き込み
