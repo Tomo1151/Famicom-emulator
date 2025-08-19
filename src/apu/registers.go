@@ -55,7 +55,7 @@ func (swr *SquareWaveRegister) Init() {
 	swr.sweepDirection = 0x00
 	swr.sweepPeriod = 0x00
 	swr.sweepEnabled = false
-	swr.frequency = 0x00
+	swr.frequency = 0x0000
 	swr.keyOffCount = 0x00
 }
 
@@ -75,7 +75,7 @@ func (swr *SquareWaveRegister) write(address uint16, data uint8) {
 	case 0x4002, 0x4006:
 		swr.frequency = (swr.frequency & 0x0700) | uint16(data)
 	case 0x4003, 0x4007:
-		swr.frequency = (swr.frequency & 0x00FF) | uint16(data & 0x07) << 8
+		swr.frequency = (swr.frequency & 0x00FF) | (uint16(data) & 0x07) << 8
 		swr.keyOffCount = (data & 0xF8) >> 3
 	default:
 		panic(fmt.Sprintf("APU Error: Invalid write at: %04X", address))
@@ -97,22 +97,6 @@ func (swr *SquareWaveRegister) getDuty() float32 {
 	default:
 		return 0.0
 	}
-}
-
-// MARK: そのチャンネルの矩形波を鳴らすかどうかを取得するメソッド
-func (swr *SquareWaveRegister) isEnabled() bool {
-	return (swr.volume & 0x0F) > 0 // ボリュームが0より大きければ有効（テスト実装）
-}
-
-// MARK: レジスタからボリュームを取得するメソッド（1ch/2ch）
-func (swr *SquareWaveRegister) getVolume() float32 {
-	// 0が消音，15が最大 ※ スウィープ無効時のみ
-	return float32(swr.volume) / 15.0
-}
-
-// MARK: レジスタから矩形波のピッチを取得するメソッド
-func (swr *SquareWaveRegister) getFrequency() float32 {
-	return CPU_CLOCK / (16.0*float32(swr.frequency) + 1.0)
 }
 
 
@@ -144,7 +128,7 @@ func (twr *TriangleWaveRegister) write(address uint16, data uint8) {
 	case 0x400A:
 		twr.frequency = (twr.frequency & 0x0700) | uint16(data)
 	case 0x400B:
-		twr.frequency = (twr.frequency & 0x00FF) | uint16(data & 0x07) << 8
+		twr.frequency = (twr.frequency & 0x00FF) | (uint16(data) & 0x07) << 8
 		twr.keyOffCount = (data & 0xF8) >> 3
 	default:
 		panic(fmt.Sprintf("APU Error: Invalid write at: %04X", address))
@@ -205,11 +189,6 @@ func (nwr *NoiseWaveRegister) write(address uint16, data uint8) {
 	}
 }
 
-// MARK: ノイズレジスタから4chの音量を取得するメソッド
-func (nwr *NoiseWaveRegister) getVolume() float32 {
-	return float32(nwr.volume) / 15.0
-}
-
 // MARK: ノイズレジスタから4chのモードを取得するメソッド
 func (nwr *NoiseWaveRegister) getMode() NoiseRegisterMode {
 	return nwr.mode
@@ -218,22 +197,10 @@ func (nwr *NoiseWaveRegister) getMode() NoiseRegisterMode {
 // MARK: ノイズレジスタからノイズのピッチを取得するメソッド
 func (nwr *NoiseWaveRegister) getFrequency() float32 {
 	noiseFrequencyTable := [16]uint16{
-		0x0002,
-		0x0004,
-		0x0008,
-		0x0010,
-		0x0020,
-		0x0030,
-		0x0040,
-		0x0050,
-		0x0065,
-		0x007F,
-		0x00BE,
-		0x00FE,
-		0x017D,
-		0x01FC,
-		0x03F9,
-		0x07F2,
+		0x0002, 0x0004, 0x0008, 0x0010,
+		0x0020, 0x0030, 0x0040, 0x0050,
+		0x0065, 0x007F, 0x00BE, 0x00FE,
+		0x017D, 0x01FC, 0x03F9, 0x07F2,
 	}
 
 	return CPU_CLOCK / float32(noiseFrequencyTable[nwr.frequency])
