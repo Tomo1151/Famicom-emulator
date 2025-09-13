@@ -5,13 +5,14 @@ import (
 	"fmt"
 	"log"
 	"reflect"
+
+	"Famicom-emulator/cartridge/mappers"
 )
 
 type Cartridge struct {
 	IsCHRRAM bool
-	ProgramROM []uint8
 	CharacterROM []uint8
-	Mapper uint8
+	Mapper mappers.Mapper
 	ScreenMirroring Mirroring
 }
 
@@ -37,7 +38,7 @@ func (c *Cartridge) Load(raw []uint8) error {
 		return errors.New("Invalid cartridge header")
 	}
 
-	mapper := (raw[7] & 0xF0) | (raw[6] >> 4)
+	mapperNo := (raw[7] & 0xF0) | (raw[6] >> 4)
 	iNESVer := (raw[7] >> 2) & 0b11
 	if iNESVer != 0 {
 		log.Fatalf("NES2.0 format is not supported")
@@ -82,10 +83,12 @@ func (c *Cartridge) Load(raw []uint8) error {
 	// fmt.Printf("PRG_ROM_START: %04X, SIZE: %d\n", prgROMStart, prgROMSize)
 	// fmt.Printf("CHR_ROM_START: %04X, SIZE: %d\n", chrROMStart, chrROMSize)
 
+	rom := c.GetMapper(mapperNo)
+	rom.Init(raw[prgROMStart:(prgROMStart+prgROMSize)])
+
 	c.IsCHRRAM = chrROMSize == 0
-	c.ProgramROM = raw[prgROMStart:(prgROMStart+prgROMSize)]
 	c.CharacterROM = chr_rom
-	c.Mapper = mapper
+	c.Mapper = rom
 	c.ScreenMirroring = mirroring
 
 	c.DumpInfo()
@@ -93,10 +96,21 @@ func (c *Cartridge) Load(raw []uint8) error {
 	return nil
 }
 
+func (c *Cartridge) GetMapper(mapperNo uint8) mappers.Mapper {
+	switch mapperNo {
+	case 0:
+		return &mappers.NROM{}
+	case 1:
+		return &mappers.UxROM{}
+	default:
+		return &mappers.NROM{}
+	}
+}
+
 func (c *Cartridge) DumpInfo() {
 	fmt.Printf("Cartridge loaded:\n")
-	fmt.Printf("  Mapper: %d\n", c.Mapper)
-	fmt.Printf("  PRG ROM Size: %d bytes\n", len(c.ProgramROM))
+	fmt.Printf("  Mapper: %s\n", c.Mapper.GetMapperInfo())
+	fmt.Printf("  PRG ROM Size: %d bytes\n", len(c.Mapper.GetProgramROM()))
 	fmt.Printf("  CHR ROM Size: %d bytes\n", len(c.CharacterROM))
 	fmt.Printf("  CHR RAM: %v\n", c.IsCHRRAM)
 	var mirroringStr string

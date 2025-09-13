@@ -5,7 +5,6 @@ import (
 	"Famicom-emulator/cartridge"
 	"Famicom-emulator/joypad"
 	"Famicom-emulator/ppu"
-	"fmt"
 )
 
 const (
@@ -15,6 +14,9 @@ const (
 
 	PPU_REG_START  = 0x2000
 	PPU_REG_END    = 0x3FFF
+
+	PRG_ROM_START  = 0x8000
+	PRG_ROM_END    = 0xFFFF
 )
 
 // MARK: Busの定義
@@ -24,7 +26,7 @@ type Bus struct {
 	ppu ppu.PPU // PPU
 	apu apu.APU // APU
 	joypad1 *joypad.JoyPad // ポインタに変更
-	joypad2 joypad.JoyPad // コントローラ (2P)
+	// joypad2 joypad.JoyPad // コントローラ (2P)
 	cycles uint // CPUサイクル
 	gameroutine func(*ppu.PPU, *joypad.JoyPad)
 }
@@ -140,8 +142,8 @@ func (b *Bus) ReadByteFrom(address uint16) uint8 {
 		return result
 	case address == 0x4017: // JOYPAD (2P)
 		return 0x00
-	case 0x8000 <= address: // プログラムROM
-		return b.ReadProgramROM(address)
+	case PRG_ROM_START <= PRG_ROM_END: // プログラムROM
+		return b.cartridge.Mapper.ReadProgramROM(address)
 	default:
 		// fmt.Printf("Ignoring memory access at $%04X\n", address)
 		return 0x00
@@ -246,8 +248,8 @@ func (b *Bus) WriteByteAt(address uint16, data uint8) {
 		b.joypad1.Write(data)
 	case address == 0x4017: // APU フレームカウンタ
 		b.apu.WriteFrameCounter(data)
-	case 0x8000 <= address: // プログラムROM
-		panic(fmt.Sprintf("Error: attempt to write to cartridge ROM space $%04X, 0x%02X\n", address, data))
+	case PRG_ROM_START <= PRG_ROM_END: // プログラムROM
+		b.cartridge.Mapper.Write(address, data)
 	default:
 		// fmt.Printf("Ignoring memory write to $%04X\n", address)
 	}
@@ -261,15 +263,4 @@ func (b *Bus) WriteWordAt(address uint16, data uint16) {
 	b.WriteByteAt(address + 1, upper)
 }
 
-// MARK: プログラムROMの読み取り
-func (b *Bus) ReadProgramROM(address uint16) uint8 {
-	// カートリッジは$8000-$FFFFにマッピングされるためオフセット分引く
-	addr := address - 0x8000
-
-	// 16kBのROMでアドレスが16kB以上の場合はミラーリング
-	if len(b.cartridge.ProgramROM) == 0x4000 && addr >= 0x4000 {
-		addr %= 0x4000
-	}
-	return b.cartridge.ProgramROM[addr]
-}
 
