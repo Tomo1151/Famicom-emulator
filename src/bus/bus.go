@@ -142,6 +142,8 @@ func (b *Bus) ReadByteFrom(address uint16) uint8 {
 		return result
 	case address == 0x4017: // JOYPAD (2P)
 		return 0x00
+	case 0x6000 <= address && address <= 0x7FFF: // プログラムRAM
+		return b.cartridge.Mapper.ReadProgramRAM(address)
 	case PRG_ROM_START <= PRG_ROM_END: // プログラムROM
 		return b.cartridge.Mapper.ReadProgramROM(address)
 	default:
@@ -248,6 +250,8 @@ func (b *Bus) WriteByteAt(address uint16, data uint8) {
 		b.joypad1.Write(data)
 	case address == 0x4017: // APU フレームカウンタ
 		b.apu.WriteFrameCounter(data)
+	case 0x6000 <= address && address <= 0x7FFF: // プログラムRAM
+		b.cartridge.Mapper.WriteToProgramRAM(address, data)
 	case PRG_ROM_START <= PRG_ROM_END: // プログラムROM
 		b.cartridge.Mapper.Write(address, data)
 	default:

@@ -33,6 +33,22 @@ func (n *NROM) ReadProgramROM(address uint16) uint8 {
 	return n.ProgramROM[romAddress]
 }
 
+// MARK: キャラクタROMの読み取り
+func (n *NROM) ReadCharacterROM(address uint16) uint8 {
+	return n.CharacterROM[address]
+}
+
+// MARK: キャラクタROMへの書き込み
+func (n *NROM) WriteToCharacterROM(address uint16, data uint8) {}
+
+// MARK: プログラムRAMの読み取り
+func (n *NROM) ReadProgramRAM(address uint16) uint8 {
+	panic("Error: unsupported read program RAM on NROM")
+}
+
+// MARK: プログラムRAMへの書き込み
+func (n *NROM) WriteToProgramRAM(address uint16, data uint8) {}
+
 // MARK: ミラーリングの取得
 func (n *NROM) GetMirroring() Mirroring {
 	return n.Mirroring
@@ -41,11 +57,6 @@ func (n *NROM) GetMirroring() Mirroring {
 // MARK: キャラクタRAMを使用するかどうかを取得
 func (n *NROM) GetIsCharacterRAM() bool {
 	return n.IsCharacterRAM
-}
-
-// MARK: キャラクタROMの読み取り
-func (n *NROM) ReadCharacterROM(address uint16) uint8 {
-	return n.CharacterROM[address]
 }
 
 // MARK: プログラムROMの取得

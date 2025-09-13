@@ -123,33 +123,33 @@ func (p *PPU) WriteVRAM(value uint8) {
 		$4000-$FFFF $4000 $0000-$3FFF のミラーリング
 	*/
 
-	addr := p.address.get()
+	address := p.address.get()
 	p.incrementVRAMAddress()
 
 	switch {
-	case addr <= 0x1FFF:
+	case address <= 0x1FFF:
 		if p.Mapper.GetIsCharacterRAM() {
-			// @TODO キャラクタRAMの対応
-			// p.CHR_ROM[addr] = value
+			p.Mapper.WriteToCharacterROM(address, value)
+			// p.CHR_ROM[address] = value
 		}
-	case 0x2000 <= addr && addr <= 0x2FFF:
-		p.vram[p.mirrorVRAMAddress(addr)] = value
-	case 0x3000 <= addr && addr <= 0x3EFF:
-		// fmt.Printf("Error: unexpected vram write to $%04X\n", addr)
+	case 0x2000 <= address && address <= 0x2FFF:
+		p.vram[p.mirrorVRAMAddress(address)] = value
+	case 0x3000 <= address && address <= 0x3EFF:
+		// fmt.Printf("Error: unexpected vram write to $%04X\n", address)
 		return
-	case 0x3F00 <= addr && addr <= 0x3F1F:
+	case 0x3F00 <= address && address <= 0x3F1F:
 		// アドレスのミラーリング
-		if addr == 0x3F10 ||
-			 addr == 0x3F14 ||
-			 addr == 0x3F18 ||
-			 addr == 0x3FC {
-			addr -= 0x10
+		if address == 0x3F10 ||
+			 address == 0x3F14 ||
+			 address == 0x3F18 ||
+			 address == 0x3FC {
+			address -= 0x10
 		}
-		p.PaletteTable[addr - 0x3F00] = value
-	case 0x3F20 <= addr && addr <= 0x3FFF:
-		p.PaletteTable[(addr - 0x3F00)%32] = value
+		p.PaletteTable[address - 0x3F00] = value
+	case 0x3F20 <= address && address <= 0x3FFF:
+		p.PaletteTable[(address - 0x3F00)%32] = value
 	default:
-		panic(fmt.Sprintf("Unexpected write to mirrored space: %04X", addr))
+		panic(fmt.Sprintf("Unexpected write to mirrored space: %04X", address))
 	}
 }
 

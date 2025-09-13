@@ -51,6 +51,17 @@ func (u *UxROM) ReadCharacterROM(address uint16) uint8 {
 	return u.CharacterROM[address]
 }
 
+// MARK: キャラクタROMへの書き込み
+func (u *UxROM) WriteToCharacterROM(address uint16, data uint8) {}
+
+// MARK: プログラムRAMの読み取り
+func (u *UxROM) ReadProgramRAM(address uint16) uint8 {
+	panic("Error: unsupported read program RAM on UxROM")
+}
+
+// MARK: プログラムRAMへの書き込み
+func (u *UxROM) WriteToProgramRAM(address uint16, data uint8) {}
+
 // MARK: ミラーリングの取得
 func (u *UxROM) GetMirroring() Mirroring {
 	return u.Mirroring

@@ -22,6 +22,9 @@ type Mapper interface {
 	Init([]uint8)
 	ReadProgramROM(uint16) uint8
 	ReadCharacterROM(uint16) uint8
+	ReadProgramRAM(uint16) uint8
+	WriteToCharacterROM(uint16, uint8)
+	WriteToProgramRAM(uint16, uint8)
 	Write(uint16, uint8)
 
 	GetMapperInfo() string

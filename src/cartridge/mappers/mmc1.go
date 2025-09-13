@@ -1,5 +1,9 @@
 package mappers
 
+const (
+	PRG_RAM_SIZE uint = 8 * 1024 // 8kB
+)
+
 // MARK: MMC1 (マッパー1) の定義
 type MMC1 struct {
 	shiftRegister uint8
@@ -11,8 +15,9 @@ type MMC1 struct {
 	prgBank  uint8
 
 	IsCharacterRAM bool
-	ProgramROM   []uint8
-	CharacterROM []uint8
+	ProgramROM     []uint8
+	CharacterROM   []uint8
+	ProgramRAM     [PRG_RAM_SIZE]uint8
 }
 
 // MARK: マッパーの初期化
@@ -20,7 +25,7 @@ func (m *MMC1) Init(rom []uint8) {
 	m.shiftRegister = 0x10
 	m.shiftCount = 0
 
-	m.control = 0
+	m.control = 0x0C
 	m.chrBank0 = 0
 	m.chrBank1 = 0
 	m.prgBank = 0
@@ -29,12 +34,18 @@ func (m *MMC1) Init(rom []uint8) {
 	m.IsCharacterRAM = GetCharacterROMSize(rom) == 0
 	m.ProgramROM = programROM
 	m.CharacterROM = characterROM
+
+	// プログラムRAMの初期化
+	for i := range m.ProgramRAM {
+		m.ProgramRAM[i] = 0xFF
+	}
 }
 
 // MARK: ROMスペースへの書き込み
 func (m *MMC1) Write(address uint16, data uint8) {
 	if data&0x80 != 0 {
 		m.resetShiftRegister()
+		return
 	}
 
 	// 5bitのシフトレジスタの最上位ビットにdataを入れる
@@ -113,8 +124,8 @@ func (m *MMC1) ReadProgramROM(address uint16) uint8 {
 	}
 }
 
-// MARK: キャラクタROMの読み取り
-func (m *MMC1) ReadCharacterROM(adress uint16) uint8 {
+// MARK: キャラクタROMのアドレス計算
+func (m *MMC1) getCharacterROMAddress(address uint16) uint16 {
 	/*
 		4bit0
 		-----
@@ -132,23 +143,43 @@ func (m *MMC1) ReadCharacterROM(adress uint16) uint8 {
 	switch (m.control & 0x10) >> 4 {
 	case 0:
 		// 一度に8Bを切り替え
-		bank := m.chrBank0 & 0x1F
-		return m.CharacterROM[uint(adress)+(BANK_SIZE*uint(bank))]
+		bank := uint16(m.chrBank0 & 0x1F)
+		return address + (uint16(BANK_SIZE) * bank)
 	case 1:
 		// 二つの別々の4KBバンクを割り当て
-		bank := m.chrBank0 & 0x1F
+		bank := uint16(m.chrBank0 & 0x1F)
 
 		switch {
-		case adress <= 0x0000 && adress <= 0x0FFF:
-			return m.CharacterROM[uint(adress)+(BANK_SIZE*uint(bank))]
-		case adress <= 0x1000 && adress <= 0x1FFF:
-			return m.CharacterROM[uint(adress-0x1000)+(BANK_SIZE*uint(bank))]
+		case address <= 0x0000 && address <= 0x0FFF:
+			return address + (uint16(BANK_SIZE) * bank)
+		case address <= 0x1000 && address <= 0x1FFF:
+			return address - 0x1000 + (uint16(BANK_SIZE) * bank)
 		default:
 			panic("Error: unexpected character rom bank mode")
 		}
 	default:
 		panic("Error: unexpected character rom bank mode")
 	}
+}
+
+// MARK: キャラクタROMの読み取り
+func (m *MMC1) ReadCharacterROM(address uint16) uint8 {
+	return m.CharacterROM[m.getCharacterROMAddress(address)]
+}
+
+// MARK: キャラクタROMへの書き込み
+func (m *MMC1) WriteToCharacterROM(address uint16, data uint8) {
+	m.CharacterROM[m.getCharacterROMAddress(address)] = data
+}
+
+// MARK: プログラムRAMの読み取り
+func (m *MMC1) ReadProgramRAM(address uint16) uint8 {
+	return m.ProgramROM[address]
+}
+
+// MARK: プログラムRAMへの書き込み
+func (m *MMC1) WriteToProgramRAM(address uint16, data uint8) {
+	m.ProgramRAM[address-0x6000] = data
 }
 
 // MARK: シフトレジスタのリセット
