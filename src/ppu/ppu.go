@@ -1,7 +1,7 @@
 package ppu
 
 import (
-	"Famicom-emulator/cartridge"
+	"Famicom-emulator/cartridge/mappers"
 	"fmt"
 )
 
@@ -26,7 +26,7 @@ type PPU struct {
 	PaletteTable [PALETTE_TABLE_SIZE+1]uint8
 	vram [VRAM_SIZE]uint8
 	oam [OAM_DATA_SIZE]uint8
-	Mirroring cartridge.Mirroring
+	Mirroring mappers.Mirroring
 
 	control   ControlRegister // $2000
 	mask   MaskRegister    // $2001
@@ -43,7 +43,7 @@ type PPU struct {
 }
 
 // MARK: PPUの初期化メソッド
-func (p *PPU) Init(is_chr_ram bool, chr_rom []uint8, mirroring cartridge.Mirroring){
+func (p *PPU) Init(is_chr_ram bool, chr_rom []uint8, mirroring mappers.Mirroring){
 	p.isCHRRAM = is_chr_ram
 	p.CHR_ROM = chr_rom
 	p.Mirroring = mirroring
@@ -228,7 +228,7 @@ func (p *PPU) mirrorVRAMAddress(addr uint16) uint16 {
 	// ネームテーブルのミラーリングがVerticalの場合
 	// [ A ] [ B ] (一つのテーブルが 0x400 × 0x400，そのテーブルが 2 × 2)
 	// [ a ] [ b ]
-	if p.Mirroring == cartridge.MIRRORING_VERTICAL {
+	if p.Mirroring == mappers.MIRRORING_VERTICAL {
 		if nameTable == 2 || nameTable == 3 {
 			return vramIndex - 0x800
 		}
@@ -237,7 +237,7 @@ func (p *PPU) mirrorVRAMAddress(addr uint16) uint16 {
 	// ネームテーブルのミラーリングがHorizontalの場合
 	// [ A ] [ a ]
 	// [ B ] [ b ]
-	if p.Mirroring == cartridge.MIRRORING_HORIZONTAL {
+	if p.Mirroring == mappers.MIRRORING_HORIZONTAL {
 		switch nameTable {
 		case 2, 1:
 			return vramIndex - 0x400

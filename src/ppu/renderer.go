@@ -1,7 +1,7 @@
 package ppu
 
 import (
-	"Famicom-emulator/cartridge"
+	"Famicom-emulator/cartridge/mappers"
 	"fmt"
 )
 
@@ -195,22 +195,22 @@ func Render(ppu *PPU, frame *Frame) {
 func getNameTables(ppu *PPU) (*[]uint8, *[]uint8) {
 	var primaryNameTable []uint8
 	var secondaryNameTable []uint8
-	if (ppu.Mirroring == cartridge.MIRRORING_VERTICAL &&
+	if (ppu.Mirroring == mappers.MIRRORING_VERTICAL &&
 		(ppu.control.GetBaseNameTableAddress() == 0x2000 ||
 		ppu.control.GetBaseNameTableAddress() == 0x2800)) {
 		primaryNameTable = ppu.vram[0x000:0x400]
 		secondaryNameTable = ppu.vram[0x400:0x800]
-	} else if (ppu.Mirroring == cartridge.MIRRORING_HORIZONTAL &&
+	} else if (ppu.Mirroring == mappers.MIRRORING_HORIZONTAL &&
 		(ppu.control.GetBackgroundPatternTableAddress() == 0x2000 ||
 		ppu.control.GetBaseNameTableAddress() == 0x2400)) {
 		primaryNameTable = ppu.vram[0x000:0x400]
 		secondaryNameTable = ppu.vram[0x400:0x800]
-	} else if (ppu.Mirroring == cartridge.MIRRORING_VERTICAL &&
+	} else if (ppu.Mirroring == mappers.MIRRORING_VERTICAL &&
 		(ppu.control.GetBaseNameTableAddress() == 0x2400 ||
 		ppu.control.GetBaseNameTableAddress() == 0x2C00)) {
 		primaryNameTable = ppu.vram[0x400:0x800]
 		secondaryNameTable = ppu.vram[0x000:0x400]
-	} else if (ppu.Mirroring == cartridge.MIRRORING_HORIZONTAL &&
+	} else if (ppu.Mirroring == mappers.MIRRORING_HORIZONTAL &&
 		(ppu.control.GetBackgroundPatternTableAddress() == 0x2800 ||
 		ppu.control.GetBaseNameTableAddress() == 0x2C00)) {
 		primaryNameTable = ppu.vram[0x400:0x800]
