@@ -21,12 +21,10 @@ const (
 
 // MARK: PPUの定義
 type PPU struct {
-	isCHRRAM bool
-	CHR_ROM []uint8
+	Mapper mappers.Mapper
 	PaletteTable [PALETTE_TABLE_SIZE+1]uint8
 	vram [VRAM_SIZE]uint8
 	oam [OAM_DATA_SIZE]uint8
-	Mirroring mappers.Mirroring
 
 	control   ControlRegister // $2000
 	mask   MaskRegister    // $2001
@@ -43,10 +41,8 @@ type PPU struct {
 }
 
 // MARK: PPUの初期化メソッド
-func (p *PPU) Init(is_chr_ram bool, chr_rom []uint8, mirroring mappers.Mirroring){
-	p.isCHRRAM = is_chr_ram
-	p.CHR_ROM = chr_rom
-	p.Mirroring = mirroring
+func (p *PPU) Init(mapper mappers.Mapper){
+	p.Mapper = mapper
 	for addr := range p.vram { p.vram[addr] = 0x00 }
 	for addr := range p.oam { p.oam[addr] = 0x00 }
 	for addr := range p.PaletteTable { p.PaletteTable[addr] = 0x00 }
@@ -132,8 +128,9 @@ func (p *PPU) WriteVRAM(value uint8) {
 
 	switch {
 	case addr <= 0x1FFF:
-		if p.isCHRRAM {
-			p.CHR_ROM[addr] = value
+		if p.Mapper.GetIsCharacterRAM() {
+			// @TODO キャラクタRAMの対応
+			// p.CHR_ROM[addr] = value
 		}
 	case 0x2000 <= addr && addr <= 0x2FFF:
 		p.vram[p.mirrorVRAMAddress(addr)] = value
@@ -182,35 +179,34 @@ func (p *PPU) ReadVRAM() uint8 {
 		$4000-$FFFF $4000 $0000-$3FFF のミラーリング
 	*/
 
-	addr := p.address.get()
+	address := p.address.get()
 	p.incrementVRAMAddress()
 
 	switch {
-	case addr <= 0x1FFF:
+	case address <= 0x1FFF:
 		value := p.internalDataBuffer
-		p.internalDataBuffer = p.CHR_ROM[addr]
+		p.internalDataBuffer = p.Mapper.ReadCharacterROM(address)
 		return value
-	case 0x2000 <= addr && addr <= 0x2FFF:
+	case 0x2000 <= address && address <= 0x2FFF:
 		// 一回遅れで値は反映されるため，内部バッファを更新し，元のバッファ値を返す
 		value := p.internalDataBuffer
-		p.internalDataBuffer = p.vram[p.mirrorVRAMAddress(addr)]
+		p.internalDataBuffer = p.vram[p.mirrorVRAMAddress(address)]
 		return value
-		// fmt.Println("@TODO read from VRAM")
-	case 0x3000 <= addr && addr <= 0x3EFF:
-		panic(fmt.Sprintf("addr space 0x3000..0x3eff is not expected to read, requested: %04X", addr))
-	case 0x3F00 <= addr && addr <= 0x3F1F:
+	case 0x3000 <= address && address <= 0x3EFF:
+		panic(fmt.Sprintf("Error: address space 0x3000..0x3eff is not expected to read, requested: %04X", address))
+	case 0x3F00 <= address && address <= 0x3F1F:
 		// アドレスのミラーリング
-		if addr == 0x3F10 ||
-			 addr == 0x3F14 ||
-			 addr == 0x3F18 ||
-			 addr == 0x3FC {
-			addr -= 0x10
+		if address == 0x3F10 ||
+			 address == 0x3F14 ||
+			 address == 0x3F18 ||
+			 address == 0x3FC {
+			address -= 0x10
 		}
-		return p.PaletteTable[addr - 0x3F00]
-	case 0x3F20 <= addr && addr <= 0x3FFF:
-		return p.PaletteTable[(addr - 0x3F00)%32]
+		return p.PaletteTable[address - 0x3F00]
+	case 0x3F20 <= address && address <= 0x3FFF:
+		return p.PaletteTable[(address - 0x3F00)%32]
 	default:
-		panic(fmt.Sprintf("Unexpected read to mirrored space: %04X", addr))
+		panic(fmt.Sprintf("Error: unexpected read to mirrored space: %04X", address))
 	}
 }
 
@@ -225,10 +221,12 @@ func (p *PPU) mirrorVRAMAddress(addr uint16) uint16 {
 	// ネームテーブルのインデックスを求める
 	nameTable := vramIndex / 0x400
 
+	mirroring := p.Mapper.GetMirroring()
+
 	// ネームテーブルのミラーリングがVerticalの場合
 	// [ A ] [ B ] (一つのテーブルが 0x400 × 0x400，そのテーブルが 2 × 2)
 	// [ a ] [ b ]
-	if p.Mirroring == mappers.MIRRORING_VERTICAL {
+	if mirroring == mappers.MIRRORING_VERTICAL {
 		if nameTable == 2 || nameTable == 3 {
 			return vramIndex - 0x800
 		}
@@ -237,7 +235,7 @@ func (p *PPU) mirrorVRAMAddress(addr uint16) uint16 {
 	// ネームテーブルのミラーリングがHorizontalの場合
 	// [ A ] [ a ]
 	// [ B ] [ b ]
-	if p.Mirroring == mappers.MIRRORING_HORIZONTAL {
+	if mirroring == mappers.MIRRORING_HORIZONTAL {
 		switch nameTable {
 		case 2, 1:
 			return vramIndex - 0x400
@@ -260,6 +258,7 @@ func (p *PPU) GetNMI() *uint8 {
 	}
 }
 
+// MARK: スプライト0ヒットの判定
 func (p *PPU) isSpriteZeroHit(cycles uint) bool {
 	x := uint(p.oam[3])
 	y := uint(p.oam[0])
