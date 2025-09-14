@@ -77,6 +77,7 @@ type SweepUnit struct {
 	data      SweepUnitData
 	frequency uint16
 	counter   uint8
+	mute bool
 }
 
 // MARK: スイープの初期化メソッド
@@ -85,6 +86,7 @@ func (su *SweepUnit) Init() {
 	su.data.Init(0, 0, 0, false)
 	su.frequency = 0
 	su.counter = 0
+	su.mute = true
 }
 
 // MARK: スイープの周波数を取得するメソッド
@@ -98,10 +100,16 @@ func (su *SweepUnit) getFrequency() float32 {
 // MARK: スイープのリセット
 func (su *SweepUnit) reset() {
 	su.counter = 0
+	su.mute = false
+}
+
+// MARK: スイープユニットによるチャンネルの無効化
+func (su *SweepUnit) isMuted() bool {
+	return su.mute
 }
 
 // MARK: スイープのサイクルを進めるメソッド
-func (su *SweepUnit) tick(lengthCounter *LengthCounter) {
+func (su *SweepUnit) tick(lengthCounter *LengthCounter, isNot bool) {
 	su.counter++
 
 	if su.counter < su.data.timerCount+1 {
@@ -115,10 +123,19 @@ func (su *SweepUnit) tick(lengthCounter *LengthCounter) {
 	}
 
 	if su.data.direction == 0 { // 上
-		su.frequency = su.frequency + (su.frequency >> su.data.shift)
+		su.frequency += (su.frequency >> su.data.shift)
 	} else { // 下
-		su.frequency = su.frequency - (su.frequency >> su.data.shift)
+		diff := su.frequency >> su.data.shift
+		if isNot {
+			// 1の補数を使用する(Ch1)場合
+			su.frequency -= diff
+		} else {
+			// 2の補数を使用する(Ch2)場合
+			su.frequency -= (diff + 1)
+		}
 	}
+
+	su.mute = su.frequency < 0x08 || su.frequency > 0x7FF
 
 	if su.frequency < 0x08 || su.frequency > 0x7FF {
 		lengthCounter.counter = 0

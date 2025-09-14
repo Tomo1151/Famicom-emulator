@@ -85,7 +85,7 @@ func (a *APU) Init() {
 	a.Ch1Register.Init()
 	a.Ch1Buffer = &RingBuffer{}
 	a.Ch1Buffer.Init()
-	a.Ch1Channel, a.Ch1Receiver = initSquareChannel(&squareWave1, a.Ch1Buffer)
+	a.Ch1Channel, a.Ch1Receiver = initSquareChannel(1, &squareWave1, a.Ch1Buffer)
 	a.Ch1LengthCount = 0
 
 	// CH2
@@ -93,7 +93,7 @@ func (a *APU) Init() {
 	a.Ch2Register.Init()
 	a.Ch2Buffer = &RingBuffer{}
 	a.Ch2Buffer.Init()
-	a.Ch2Channel, a.Ch2Receiver = initSquareChannel(&squareWave2, a.Ch2Buffer)
+	a.Ch2Channel, a.Ch2Receiver = initSquareChannel(2, &squareWave2, a.Ch2Buffer)
 	a.Ch2LengthCount = 0
 
 	// CH3
@@ -406,6 +406,12 @@ func (a *APU) ReadStatus() uint8 {
 
 // MARK: ステータスレジスタの書き込みメソッド
 func (a *APU) WriteStatus(data uint8) {
+	// 更新前の状態を保存
+	wasCh1Enabled := a.Status.is1chEnabled()
+	wasCh2Enabled := a.Status.is2chEnabled()
+	wasCh3Enabled := a.Status.is3chEnabled()
+	wasCh4Enabled := a.Status.is4chEnabled()
+
 	a.Status.update(data)
 
 	// 各チャンネルの状態によってミュートにする
@@ -428,6 +434,24 @@ func (a *APU) WriteStatus(data uint8) {
 	a.Ch5Channel <- DPCMWaveEvent{
 		eventType: DPCM_WAVE_ENABLED,
 		enabled: a.Status.is5chEnabled(),
+	}
+
+	// disableされた時に長さカウンタも落とす (halt)
+	if wasCh1Enabled && !a.Status.is1chEnabled() {
+		a.Ch1LengthCount = 0
+		squareWave1.lengthCounter.counter = 0
+	}
+	if wasCh2Enabled && !a.Status.is2chEnabled() {
+		a.Ch2LengthCount = 0
+		squareWave2.lengthCounter.counter = 0
+	}
+	if wasCh3Enabled && !a.Status.is3chEnabled() {
+		a.Ch3LengthCount = 0
+		triangleWave.lengthCounter.counter = 0
+	}
+	if wasCh4Enabled && !a.Status.is4chEnabled() {
+		a.Ch4LengthCount = 0
+		noiseWave.lengthCounter.counter = 0
 	}
 }
 
@@ -488,7 +512,7 @@ func (a *APU) initAudioDevice() {
 }
 
 // MARK: 1ch/2chの初期化メソッド
-func initSquareChannel(wave *SquareWave, buffer *RingBuffer) (chan SquareWaveEvent, chan ChannelEvent) {
+func initSquareChannel(channelNumber uint, wave *SquareWave, buffer *RingBuffer) (chan SquareWaveEvent, chan ChannelEvent) {
 	ch1Channel := make(chan SquareWaveEvent, 100)
 	sendChannel := make(chan ChannelEvent, 100)
 
@@ -501,6 +525,7 @@ func initSquareChannel(wave *SquareWave, buffer *RingBuffer) (chan SquareWaveEve
 
 	// SquareWave構造体を初期化
 	*wave = SquareWave{
+		channelNumber: channelNumber,
 		freq:   44100.0,
 		phase:  0.0,
 		channel: ch1Channel,

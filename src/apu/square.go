@@ -20,6 +20,7 @@ type SquareWaveEventType uint
 
 // MARK: 矩形波データの構造体
 type SquareWave struct {
+	channelNumber uint
 	freq          float32
 	phase         float32
 	channel       chan SquareWaveEvent
@@ -93,7 +94,7 @@ func (sw *SquareWave) generatePCM() {
 						sw.sweepUnit.frequency = *event.frequency
 					}
 				case SQUARE_WAVE_SWEEP_TICK: // SWEEP TICKイベント
-					sw.sweepUnit.tick(&sw.lengthCounter)
+					sw.sweepUnit.tick(&sw.lengthCounter, *(&sw.channelNumber) == 1)
 				case SQUARE_WAVE_RESET: // RESETイベント
 					sw.envelope.reset()
 					sw.lengthCounter.reset()
@@ -130,7 +131,7 @@ func (sw *SquareWave) generatePCM() {
 				sample = -MAX_VOLUME // 負の波形
 			}
 
-			if !sw.enabled || sw.lengthCounter.isMuted() {
+			if !sw.enabled || sw.lengthCounter.isMuted() || sw.sweepUnit.isMuted() {
 				sample = 0.0
 			}
 
