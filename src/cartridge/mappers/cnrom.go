@@ -72,5 +72,5 @@ func (c *CNROM) GetCharacterROM() []uint8 {
 
 // MARK: マッパー名の取得
 func (c *CNROM) GetMapperInfo() string {
-	return "CNROM (Mapper 2)"
+	return "CNROM (Mapper 3)"
 }

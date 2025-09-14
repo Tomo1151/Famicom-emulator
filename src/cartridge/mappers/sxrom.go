@@ -217,5 +217,5 @@ func (s *SxROM) GetCharacterROM() []uint8 {
 
 // MARK: マッパー名の取得
 func (s *SxROM) GetMapperInfo() string {
-	return "MMC1 (Mapper 1)"
+	return "MMC1 SxROM (Mapper 1)"
 }
