@@ -52,7 +52,9 @@ func (u *UxROM) ReadCharacterROM(address uint16) uint8 {
 }
 
 // MARK: キャラクタROMへの書き込み
-func (u *UxROM) WriteToCharacterROM(address uint16, data uint8) {}
+func (u *UxROM) WriteToCharacterROM(address uint16, data uint8) {
+	u.CharacterROM[address] = data
+}
 
 // MARK: プログラムRAMの読み取り
 func (u *UxROM) ReadProgramRAM(address uint16) uint8 {

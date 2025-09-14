@@ -55,6 +55,8 @@ func (c *Cartridge) GetMapper(mapperNo uint8) mappers.Mapper {
 		return &mappers.MMC1{}
 	case 2:
 		return &mappers.UxROM{}
+	case 3:
+		return &mappers.CNROM{}
 	default:
 		return &mappers.NROM{}
 	}
