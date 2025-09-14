@@ -45,6 +45,7 @@ type NoiseWaveEvent struct {
 	envelopeData      *EnvelopeData
 	lengthCounterData *LengthCounterData
 	enabled           bool
+	changed           bool
 }
 
 // MARK: 矩形波データ
@@ -63,6 +64,11 @@ func (nw *NoiseWave) generatePCM() {
 				switch event.eventType {
 				case NOISE_WAVE_ENABLED:
 					nw.enabled = event.enabled // ENABLEDイベント
+
+					// disableされた時に長さカウンタも落とす (halt)
+					if event.changed {
+						nw.lengthCounter.counter = 0
+					}
 				case NOISE_WAVE_NOTE: // NOTEイベント
 					if event.note != nil {
 						nw.note = *event.note

@@ -46,6 +46,7 @@ type SquareWaveEvent struct {
 	sweepUnitData     *SweepUnitData
 	frequency         *uint16
 	enabled           bool
+	changed 					bool
 }
 
 // MARK: 矩形波データ
@@ -66,6 +67,11 @@ func (sw *SquareWave) generatePCM() {
 				switch event.eventType {
 				case SQUARE_WAVE_ENABLED: // ENABLEDイベント
 					sw.enabled = event.enabled
+
+					// disableされた時に長さカウンタも落とす (halt)
+					if event.changed {
+						sw.lengthCounter.counter = 0
+					}
 				case SQUARE_WAVE_NOTE: // NOTEイベント
 					if event.note != nil {
 						sw.note = *event.note

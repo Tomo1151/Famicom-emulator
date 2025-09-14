@@ -411,6 +411,7 @@ func (a *APU) WriteStatus(data uint8) {
 	wasCh2Enabled := a.Status.is2chEnabled()
 	wasCh3Enabled := a.Status.is3chEnabled()
 	wasCh4Enabled := a.Status.is4chEnabled()
+	wasCh5Enabled := a.Status.is5chEnabled()
 
 	a.Status.update(data)
 
@@ -418,41 +419,34 @@ func (a *APU) WriteStatus(data uint8) {
 	a.Ch1Channel <- SquareWaveEvent{
 		eventType: SQUARE_WAVE_ENABLED,
 		enabled: a.Status.is1chEnabled(),
+		changed: wasCh1Enabled && !a.Status.is1chEnabled(),
 	}
 	a.Ch2Channel <- SquareWaveEvent{
 		eventType: SQUARE_WAVE_ENABLED,
 		enabled: a.Status.is2chEnabled(),
+		changed: wasCh2Enabled && !a.Status.is2chEnabled(),
 	}
 	a.Ch3Channel <- TriangleWaveEvent{
 		eventType: TRIANGLE_WAVE_ENABLED,
 		enabled: a.Status.is3chEnabled(),
+		changed: wasCh3Enabled && !a.Status.is3chEnabled(),
 	}
 	a.Ch4Channel <- NoiseWaveEvent{
 		eventType: NOISE_WAVE_ENABLED,
 		enabled: a.Status.is4chEnabled(),
+		changed: wasCh4Enabled && !a.Status.is4chEnabled(),
 	}
 	a.Ch5Channel <- DPCMWaveEvent{
 		eventType: DPCM_WAVE_ENABLED,
 		enabled: a.Status.is5chEnabled(),
+		changed: wasCh5Enabled && !a.Status.is5chEnabled(),
 	}
 
 	// disableされた時に長さカウンタも落とす (halt)
-	if wasCh1Enabled && !a.Status.is1chEnabled() {
-		a.Ch1LengthCount = 0
-		squareWave1.lengthCounter.counter = 0
-	}
-	if wasCh2Enabled && !a.Status.is2chEnabled() {
-		a.Ch2LengthCount = 0
-		squareWave2.lengthCounter.counter = 0
-	}
-	if wasCh3Enabled && !a.Status.is3chEnabled() {
-		a.Ch3LengthCount = 0
-		triangleWave.lengthCounter.counter = 0
-	}
-	if wasCh4Enabled && !a.Status.is4chEnabled() {
-		a.Ch4LengthCount = 0
-		noiseWave.lengthCounter.counter = 0
-	}
+	if wasCh1Enabled && !a.Status.is1chEnabled() { a.Ch1LengthCount = 0 }
+	if wasCh2Enabled && !a.Status.is2chEnabled() { a.Ch2LengthCount = 0 }
+	if wasCh3Enabled && !a.Status.is3chEnabled() { a.Ch3LengthCount = 0 }
+	if wasCh4Enabled && !a.Status.is4chEnabled() { a.Ch4LengthCount = 0 }
 }
 
 

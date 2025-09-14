@@ -39,6 +39,7 @@ type TriangleWaveEvent struct {
 	lengthCounterData *LengthCounterData
 	linearCounterData *LinearCounterData
 	enabled           bool
+	changed           bool
 }
 
 // MARK: 三角波データ
@@ -57,6 +58,11 @@ func (tw *TriangleWave) generatePCM() {
 				switch event.eventType {
 				case TRIANGLE_WAVE_ENABLED: // ENABLEDイベント
 					tw.enabled = event.enabled
+
+					// disableされた時に長さカウンタも落とす (halt)
+					if event.changed {
+						tw.lengthCounter.counter = 0
+					}
 				case TRIANGLE_WAVE_NOTE: // NOTEイベント
 					if event.note != nil {
 						tw.note = *event.note

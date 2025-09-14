@@ -25,6 +25,7 @@ type DPCMWaveEvent struct {
 	eventType DPCMWaveEventType
 	note      *DPCMNote
 	enabled   bool
+	changed   bool
 }
 
 var dpcmWave DPCMWave
