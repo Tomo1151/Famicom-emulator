@@ -52,7 +52,7 @@ func (c *Cartridge) GetMapper(mapperNo uint8) mappers.Mapper {
 	case 0:
 		return &mappers.NROM{}
 	case 1:
-		return &mappers.MMC1{}
+		return &mappers.SxROM{}
 	case 2:
 		return &mappers.UxROM{}
 	case 3:

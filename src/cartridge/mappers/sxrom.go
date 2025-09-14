@@ -4,8 +4,8 @@ const (
 	PRG_RAM_SIZE uint = 8 * 1024 // 8kB
 )
 
-// MARK: MMC1 (マッパー1) の定義
-type MMC1 struct {
+// MARK: MMC1 SxROM (マッパー1) の定義
+type SxROM struct {
 	shiftRegister uint8
 	shiftCount    uint8
 
@@ -21,56 +21,56 @@ type MMC1 struct {
 }
 
 // MARK: マッパーの初期化
-func (m *MMC1) Init(rom []uint8) {
-	m.shiftRegister = 0x10
-	m.shiftCount = 0
+func (s *SxROM) Init(rom []uint8) {
+	s.shiftRegister = 0x10
+	s.shiftCount = 0
 
-	m.control = 0x0C
-	m.chrBank0 = 0
-	m.chrBank1 = 0
-	m.prgBank = 0
+	s.control = 0x0C
+	s.chrBank0 = 0
+	s.chrBank1 = 0
+	s.prgBank = 0
 
 	programROM, characterROM := GetROMs(rom)
-	m.IsCharacterRAM = GetCharacterROMSize(rom) == 0
-	m.ProgramROM = programROM
-	m.CharacterROM = characterROM
+	s.IsCharacterRAM = GetCharacterROMSize(rom) == 0
+	s.ProgramROM = programROM
+	s.CharacterROM = characterROM
 
 	// プログラムRAMの初期化
-	for i := range m.ProgramRAM {
-		m.ProgramRAM[i] = 0xFF
+	for i := range s.ProgramRAM {
+		s.ProgramRAM[i] = 0xFF
 	}
 }
 
 // MARK: ROMスペースへの書き込み
-func (m *MMC1) Write(address uint16, data uint8) {
+func (s *SxROM) Write(address uint16, data uint8) {
 	if data&0x80 != 0 {
-		m.resetShiftRegister()
+		s.resetShiftRegister()
 		return
 	}
 
 	// 5bitのシフトレジスタの最上位ビットにdataを入れる
-	m.shiftRegister >>= 1
-	m.shiftRegister |= ((data & 0x01) << 4)
-	m.shiftCount++
+	s.shiftRegister >>= 1
+	s.shiftRegister |= ((data & 0x01) << 4)
+	s.shiftCount++
 
 	// 5回目の書き込み時のみアドレスによって返すバンクの変更を行う (前4回はその準備)
-	if m.shiftCount == 5 {
+	if s.shiftCount == 5 {
 		switch {
 		case PRG_ROM_START <= address && address <= 0x9FFF:
-			m.control = m.shiftRegister
+			s.control = s.shiftRegister
 		case 0xA000 <= address && address <= 0xBFFF:
-			m.chrBank0 = m.shiftRegister
+			s.chrBank0 = s.shiftRegister
 		case 0xC000 <= address && address <= 0xDFFF:
-			m.chrBank1 = m.shiftRegister
+			s.chrBank1 = s.shiftRegister
 		case 0xE000 <= address && address <= PRG_ROM_END:
-			m.prgBank = m.shiftRegister
+			s.prgBank = s.shiftRegister
 		}
-		m.resetShiftRegister()
+		s.resetShiftRegister()
 	}
 }
 
 // MARK: プログラムROMの読み取り
-func (m *MMC1) ReadProgramROM(address uint16) uint8 {
+func (s *SxROM) ReadProgramROM(address uint16) uint8 {
 	/*
 		4bit0
 		-----
@@ -86,36 +86,36 @@ func (m *MMC1) ReadProgramROM(address uint16) uint8 {
 	*/
 
 	// 最後のバンク番号
-	bankMax := uint(len(m.ProgramROM)) / BANK_SIZE
+	bankMax := uint(len(s.ProgramROM)) / BANK_SIZE
 
 	romBaseAddress := uint(address - PRG_ROM_START)
 
-	switch (m.control & 0x0C) >> 2 {
+	switch (s.control & 0x0C) >> 2 {
 	case 0, 1:
 		// バンク番号の下位ビットを無視，32KBを$8000~に割り当て
-		bank := m.prgBank & 0x1E
-		return m.ProgramROM[romBaseAddress+(BANK_SIZE*uint(bank))]
+		bank := s.prgBank & 0x1E
+		return s.ProgramROM[romBaseAddress+(BANK_SIZE*uint(bank))]
 	case 2:
 		// 最初のバンクを$8000~に固定，16KBバンクを$C000~に割り当て
-		bank := m.prgBank & 0x1F
+		bank := s.prgBank & 0x1F
 
 		switch {
 		case PRG_ROM_START <= address && address <= 0xBFFF:
-			return m.ProgramROM[romBaseAddress]
+			return s.ProgramROM[romBaseAddress]
 		case 0xC000 <= address && address <= PRG_ROM_END:
-			return m.ProgramROM[uint(address-0xC000)+(BANK_SIZE*uint(bank))]
+			return s.ProgramROM[uint(address-0xC000)+(BANK_SIZE*uint(bank))]
 		default:
 			panic("Error: unexpected program rom bank mode")
 		}
 	case 3:
 		// 最後のバンクを$C000~に固定，16KBバンクを$8000~に割り当て
-		bank := m.prgBank & 0x1F
+		bank := s.prgBank & 0x1F
 
 		switch {
 		case PRG_ROM_START <= address && address <= 0xBFFF:
-			return m.ProgramROM[romBaseAddress+(BANK_SIZE*uint(bank))]
+			return s.ProgramROM[romBaseAddress+(BANK_SIZE*uint(bank))]
 		case 0xC000 <= address && address <= PRG_ROM_END:
-			return m.ProgramROM[uint(address-0xC000)+(BANK_SIZE*(bankMax-1))]
+			return s.ProgramROM[uint(address-0xC000)+(BANK_SIZE*(bankMax-1))]
 		default:
 			panic("Error: unexpected program rom bank mode")
 		}
@@ -125,7 +125,7 @@ func (m *MMC1) ReadProgramROM(address uint16) uint8 {
 }
 
 // MARK: キャラクタROMのアドレス計算
-func (m *MMC1) getCharacterROMAddress(address uint16) uint16 {
+func (s *SxROM) getCharacterROMAddress(address uint16) uint16 {
 	/*
 		4bit0
 		-----
@@ -140,14 +140,14 @@ func (m *MMC1) getCharacterROMAddress(address uint16) uint16 {
 		+----- キャラクタROM バンクモード (0: 一度に8KBを切り替え / 1: 2角別々の4KBバンクを割り当て
 	*/
 
-	switch (m.control & 0x10) >> 4 {
+	switch (s.control & 0x10) >> 4 {
 	case 0:
 		// 一度に8Bを切り替え
-		bank := uint16(m.chrBank0 & 0x1F)
+		bank := uint16(s.chrBank0 & 0x1F)
 		return address + (uint16(BANK_SIZE) * bank)
 	case 1:
 		// 二つの別々の4KBバンクを割り当て
-		bank := uint16(m.chrBank0 & 0x1F)
+		bank := uint16(s.chrBank0 & 0x1F)
 
 		switch {
 		case address <= 0x0000 && address <= 0x0FFF:
@@ -163,34 +163,34 @@ func (m *MMC1) getCharacterROMAddress(address uint16) uint16 {
 }
 
 // MARK: キャラクタROMの読み取り
-func (m *MMC1) ReadCharacterROM(address uint16) uint8 {
-	return m.CharacterROM[m.getCharacterROMAddress(address)]
+func (s *SxROM) ReadCharacterROM(address uint16) uint8 {
+	return s.CharacterROM[s.getCharacterROMAddress(address)]
 }
 
 // MARK: キャラクタROMへの書き込み
-func (m *MMC1) WriteToCharacterROM(address uint16, data uint8) {
-	m.CharacterROM[m.getCharacterROMAddress(address)] = data
+func (s *SxROM) WriteToCharacterROM(address uint16, data uint8) {
+	s.CharacterROM[s.getCharacterROMAddress(address)] = data
 }
 
 // MARK: プログラムRAMの読み取り
-func (m *MMC1) ReadProgramRAM(address uint16) uint8 {
-	return m.ProgramROM[address]
+func (s *SxROM) ReadProgramRAM(address uint16) uint8 {
+	return s.ProgramROM[address]
 }
 
 // MARK: プログラムRAMへの書き込み
-func (m *MMC1) WriteToProgramRAM(address uint16, data uint8) {
-	m.ProgramRAM[address-0x6000] = data
+func (s *SxROM) WriteToProgramRAM(address uint16, data uint8) {
+	s.ProgramRAM[address-0x6000] = data
 }
 
 // MARK: シフトレジスタのリセット
-func (m *MMC1) resetShiftRegister() {
-	m.shiftRegister = 0x10
-	m.shiftCount = 0
+func (s *SxROM) resetShiftRegister() {
+	s.shiftRegister = 0x10
+	s.shiftCount = 0
 }
 
 // MARK: ミラーリングの取得
-func (m *MMC1) GetMirroring() Mirroring {
-	switch m.control & 0x03 {
+func (s *SxROM) GetMirroring() Mirroring {
+	switch s.control & 0x03 {
 	case 2:
 		return MIRRORING_VERTICAL
 	case 3:
@@ -201,21 +201,21 @@ func (m *MMC1) GetMirroring() Mirroring {
 }
 
 // MARK: キャラクタRAMを使用するかどうかを取得
-func (m *MMC1) GetIsCharacterRAM() bool {
-	return m.IsCharacterRAM
+func (s *SxROM) GetIsCharacterRAM() bool {
+	return s.IsCharacterRAM
 }
 
 // MARK: プログラムROMの取得
-func (m *MMC1) GetProgramROM() []uint8 {
-	return m.ProgramROM
+func (s *SxROM) GetProgramROM() []uint8 {
+	return s.ProgramROM
 }
 
 // MARK: キャラクタROMの取得
-func (m *MMC1) GetCharacterROM() []uint8 {
-	return m.CharacterROM
+func (s *SxROM) GetCharacterROM() []uint8 {
+	return s.CharacterROM
 }
 
 // MARK: マッパー名の取得
-func (m *MMC1) GetMapperInfo() string {
+func (s *SxROM) GetMapperInfo() string {
 	return "MMC1 (Mapper 1)"
 }
