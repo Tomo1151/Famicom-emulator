@@ -2,6 +2,10 @@ package mappers
 
 import "fmt"
 
+const (
+	TXROM_PRG_BANK_SIZE = 8 * 1024 // 8kB
+)
+
 // MARK: MMC3 TxROM (マッパー4) の定義
 type TxROM struct {
 	bank uint8
@@ -96,7 +100,7 @@ func (t *TxROM) ReadProgramROM(address uint16) uint8 {
 		$C000~$DFFF: (-2)   R6
 		$E000~$FFFF: (-1)  (-1)
 	*/
-	bankMax := uint(len(t.ProgramROM)) / BANK_SIZE
+	bankMax := uint(len(t.ProgramROM)) / TXROM_PRG_BANK_SIZE
 
 	mode := t.bank & 0x40
 
@@ -109,37 +113,35 @@ func (t *TxROM) ReadProgramROM(address uint16) uint8 {
 	case 0:
 		switch {
 		case PRG_ROM_START <= address && address <= 0x9FFF:
-			return t.ProgramROM[uint(address - PRG_ROM_START) + r6Bank * BANK_SIZE]
+			return t.ProgramROM[uint(address - PRG_ROM_START) + r6Bank * TXROM_PRG_BANK_SIZE]
 		case 0xA000 <= address && address <= 0xBFFF:
-			return t.ProgramROM[uint(address - 0xA000) + r7Bank * BANK_SIZE]
+			return t.ProgramROM[uint(address - 0xA000) + r7Bank * TXROM_PRG_BANK_SIZE]
 		case 0xC000 <= address && address <= 0xDFFF:
-			return t.ProgramROM[uint(address - 0xC000) + lastBank2 * BANK_SIZE]
+			return t.ProgramROM[uint(address - 0xC000) + lastBank2 * TXROM_PRG_BANK_SIZE]
 		case 0xE000 <= address && address <= PRG_ROM_END:
-			return t.ProgramROM[uint(address - 0xE000) + lastBank1 * BANK_SIZE]
-		default:
-			panic(fmt.Sprintf("Error: unexpected program rom read: $%04X", address))
-		}
-	case 1:
-		switch {
-		case PRG_ROM_START <= address && address <= 0x9FFF:
-			return t.ProgramROM[uint(address - PRG_ROM_START) + lastBank2 * BANK_SIZE]
-		case 0xA000 <= address && address <= 0xBFFF:
-			return t.ProgramROM[uint(address - 0xA000) + r7Bank * BANK_SIZE]
-		case 0xC000 <= address && address <= 0xDFFF:
-			return t.ProgramROM[uint(address - 0xC000) + r6Bank * BANK_SIZE]
-		case 0xE000 <= address && address <= PRG_ROM_END:
-			return t.ProgramROM[uint(address - 0xE000) + lastBank1 * BANK_SIZE]
+			return t.ProgramROM[uint(address - 0xE000) + lastBank1 * TXROM_PRG_BANK_SIZE]
 		default:
 			panic(fmt.Sprintf("Error: unexpected program rom read: $%04X", address))
 		}
 	default:
-		panic(fmt.Sprintf("Error: unexpected read mode %02X", mode))
+		switch {
+		case PRG_ROM_START <= address && address <= 0x9FFF:
+			return t.ProgramROM[uint(address - PRG_ROM_START) + lastBank2 * TXROM_PRG_BANK_SIZE]
+		case 0xA000 <= address && address <= 0xBFFF:
+			return t.ProgramROM[uint(address - 0xA000) + r7Bank * TXROM_PRG_BANK_SIZE]
+		case 0xC000 <= address && address <= 0xDFFF:
+			return t.ProgramROM[uint(address - 0xC000) + r6Bank * TXROM_PRG_BANK_SIZE]
+		case 0xE000 <= address && address <= PRG_ROM_END:
+			return t.ProgramROM[uint(address - 0xE000) + lastBank1 * TXROM_PRG_BANK_SIZE]
+		default:
+			panic(fmt.Sprintf("Error: unexpected program rom read: $%04X", address))
+		}
 	}
 }
 
 // MARK: キャラクタROMのアドレス計算
 func (t *TxROM) getCharacterROMAddress(address uint16) uint {
-		/*
+	/*
 		mode          0    1
 		$0000~$03FF: R0   R2
 		$0400~$07FF:      R3
@@ -182,7 +184,7 @@ func (t *TxROM) getCharacterROMAddress(address uint16) uint {
 		default:
 			panic(fmt.Sprintf("Error: unexpected character rom address: $%04X", address))
 		}
-	case 1:
+	default:
 		switch {
 		case CHR_BANK_START <= address && address <= 0x03FF:
 			return uint(address - CHR_BANK_START) + r2Bank * CHR_BANK_SIZE
@@ -199,8 +201,6 @@ func (t *TxROM) getCharacterROMAddress(address uint16) uint {
 		default:
 			panic(fmt.Sprintf("Error: unexpected character rom address: $%04X", address))
 		}
-	default:
-		panic(fmt.Sprintf("Error: unexpected read mode %02X", mode))
 	}
 }
 
