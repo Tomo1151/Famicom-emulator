@@ -46,10 +46,8 @@ func (b *Bus) InitWithCartridge(cartridge *cartridge.Cartridge, callback func(*p
 		b.wram[addr] = 0x00
 	}
 	b.cartridge = *cartridge
-	b.canvas = &ppu.Canvas{}
-	b.canvas.Init()
 	b.ppu = ppu.PPU{}
-	b.ppu.Init(b.canvas, b.cartridge.Mapper)
+	b.ppu.Init(b.cartridge.Mapper)
 	b.apu = apu.APU{}
 	b.apu.Init()
 	b.joypad1 = &joypad.JoyPad{}
@@ -57,6 +55,8 @@ func (b *Bus) InitWithCartridge(cartridge *cartridge.Cartridge, callback func(*p
 	b.joypad2 = &joypad.JoyPad{}
 	b.joypad2.Init()
 	b.callback = callback
+	b.canvas = &ppu.Canvas{}
+	b.canvas.Init()
 }
 
 // MARK: NMIを取得
@@ -78,7 +78,7 @@ func (b *Bus) Tick(cycles uint) {
 
 	// PPUはCPUの3倍のクロック周波数
 	for range [3]int{} {
-		b.ppu.Tick(cycles)
+		b.ppu.Tick(b.canvas, cycles)
 	}
 
 	// APUと同期
