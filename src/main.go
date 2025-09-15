@@ -72,7 +72,6 @@ func main() {
 		}
 		lastFrameTime = time.Now()
 
-		ppu.Render(p, c)
 		texture.Update(nil, unsafe.Pointer(&c.Buffer[0]), int(c.Width*3))
 		renderer.Clear()
 		renderer.Copy(texture, nil, nil)

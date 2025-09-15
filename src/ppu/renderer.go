@@ -161,9 +161,159 @@ func RenderNameTable(ppu *PPU, canvas *Canvas, nameTable *[]uint8, viewport Rect
 	}
 }
 
-func RenderScanlineBackground(ppu *PPU, canvas *Canvas, scanline uint16) {}
-func RenderScanlineSprite(ppu *PPU, canvas *Canvas, scanline uint16) {}
-func RenderScanline(ppu *PPU, canvas *Canvas, scanline uint16) {}
+func RenderScanlineBackground(ppu *PPU, canvas *Canvas, scanline uint16) {
+	// BGが無効であれば描画をしない
+	if !ppu.mask.BackgroundEnable { return }
+
+	// スクロール値を取得
+	scrollX := uint(ppu.scroll.ScrollX)
+	scrollY := uint(ppu.scroll.ScrollY)
+
+	// 描画するY座標を計算
+	globalY := scrollY + uint(scanline)
+	actualY := globalY % TILE_SIZE // タイル内の何行目か
+
+	// 画面の左端から右端まで
+	for x := range SCREEN_WIDTH {
+		// 描画するX座標を計算
+		globalX := scrollX + x
+
+		// 描画対象のネームテーブルを決定
+		nameTable := getNameTableForPixel(ppu, globalX, globalY)
+
+		// ネームテーブル内のタイル座標を計算
+		tileX := (globalX / TILE_SIZE) % 32
+		tileY := (globalY / TILE_SIZE) % 30
+
+		// タイルのインデックスを取得
+		tileIndex := uint16((nameTable)[tileY*32+tileX])
+
+		// 属性テーブルからパレット情報を取得
+		attributeTable := (nameTable)[0x3C0:0x400]
+		palette := getBGPalette(ppu, &attributeTable, tileX, tileY)
+
+		// パターンテーブルからタイルのピクセルデータを取得
+		bank := ppu.control.GetBackgroundPatternTableAddress()
+		tileBasePointer := bank + tileIndex * uint16(TILE_SIZE * 2)
+
+		// 実際のY座標に対応するタイルデータを2バイト取得
+		upper := ppu.Mapper.ReadCharacterROM(tileBasePointer + uint16(actualY))
+		lower := ppu.Mapper.ReadCharacterROM(tileBasePointer + uint16(actualY) + uint16(TILE_SIZE))
+
+		// 実際のY座標に対応するピクセルを計算
+		actualX := (TILE_SIZE-1) - (globalX % TILE_SIZE)
+
+		// そのピクセルの色を確定
+		value := (lower >> uint8(actualX) & 1) << 1 | (upper >> uint8(actualX) & 1)
+
+		// Canvasに描画
+		canvas.setPixelAt(x, uint(scanline), PALETTE[palette[value]])
+	}
+}
+
+// @FIXME 実装し直す
+func RenderScanlineSprite(ppu *PPU, canvas *Canvas, scanline uint16) {
+    if !ppu.mask.SpriteEnable {
+        return
+    }
+
+    spriteHeight := ppu.control.GetSpriteSize()
+    var secondaryOAM [8][4]uint8 // 1スキャンラインに描画するスプライト(最大8つ)
+    spriteCount := 0
+
+    // 1. スプライト評価 (OAMから現在のスキャンラインにあるスプライトを探す)
+    for i := 0; i < len(ppu.oam)/4; i++ {
+        spriteY := uint16(ppu.oam[i*4])
+
+        // スプライトが現在のスキャンラインに収まっているかチェック
+        if scanline >= spriteY && scanline < spriteY+uint16(spriteHeight) {
+            if spriteCount < 8 {
+                secondaryOAM[spriteCount][0] = ppu.oam[i*4+0] // Y
+                secondaryOAM[spriteCount][1] = ppu.oam[i*4+1] // Tile Index
+                secondaryOAM[spriteCount][2] = ppu.oam[i*4+2] // Attributes
+                secondaryOAM[spriteCount][3] = ppu.oam[i*4+3] // X
+                spriteCount++
+            } else {
+                // 9つ目以降のスプライトが見つかったらオーバーフローフラグを立てる
+                ppu.status.SetSpriteOverflow(true)
+                break
+            }
+        }
+    }
+
+    // 2. スプライト描画 (セカンダリOAMのスプライトを描画)
+    // OAMのインデックスが小さいものが優先される(手前に描画)ため、逆順にループする
+    for i := spriteCount - 1; i >= 0; i-- {
+        sprite := secondaryOAM[i]
+        spriteY := uint16(sprite[0])
+        tileIndex := uint16(sprite[1])
+        attributes := sprite[2]
+        spriteX := uint(sprite[3])
+
+        flipV := (attributes >> 7) & 1 == 1
+        flipH := (attributes >> 6) & 1 == 1
+        paletteIndex := attributes & 0b11
+        spritePalette := getSpritePalette(ppu, paletteIndex)
+
+        // スプライトタイルの何行目を描画するか
+        var fineY uint16
+        if flipV {
+            fineY = (spriteY + uint16(spriteHeight-1)) - scanline
+        } else {
+            fineY = scanline - spriteY
+        }
+
+        var bank uint16
+        if spriteHeight == 8 { // 8x8モード
+            bank = ppu.control.GetSpritePatternTableAddress()
+        } else { // 8x16モード
+            bank = (tileIndex & 1) * 0x1000
+            tileIndex &= 0xFE
+        }
+
+        // 8x16モードでタイルの下半分の場合
+        if fineY >= 8 {
+            tileIndex++
+            fineY -= 8
+        }
+
+        tileBasePtr := bank + tileIndex*16
+        upper := ppu.Mapper.ReadCharacterROM(tileBasePtr + fineY)
+        lower := ppu.Mapper.ReadCharacterROM(tileBasePtr + fineY + 8)
+
+        for x := 0; x < 8; x++ {
+            var value uint8
+            if flipH {
+                value = (lower&1)<<1 | (upper & 1)
+                upper >>= 1
+                lower >>= 1
+            } else {
+                value = ((lower>>7)&1)<<1 | ((upper>>7) & 1)
+                upper <<= 1
+                lower <<= 1
+            }
+
+            if value == 0 {
+                continue
+            }
+
+            pixelX := spriteX + uint(x)
+            if pixelX >= SCREEN_WIDTH {
+                continue
+            }
+
+            // 背景が透明な場合のみ描画
+            // @TODO: 優先度(Attributeのbit5)の処理を追加
+            rgb := PALETTE[spritePalette[value]]
+            canvas.setPixelAt(pixelX, uint(scanline), rgb)
+        }
+    }
+}
+
+func RenderScanline(ppu *PPU, canvas *Canvas, scanline uint16) {
+	RenderScanlineBackground(ppu, canvas, scanline)
+	RenderScanlineSprite(ppu, canvas, scanline)
+}
 
 func Render(ppu *PPU, canvas *Canvas) {
 	scrollX := uint(ppu.scroll.ScrollX)
@@ -255,7 +405,61 @@ func getNameTables(ppu *PPU) (*[]uint8, *[]uint8, *[]uint8, *[]uint8) {
 	return nameTables[0], nameTables[1], nameTables[2], nameTables[3]
 }
 
+func getNameTableForPixel(ppu *PPU, x uint, y uint) []uint8 {
+	mirroring := ppu.Mapper.GetMirroring()
+	baseNameTableAddress := ppu.control.GetBaseNameTableAddress()
+	primaryNameTable := ppu.vram[0x000:0x400]
+	secondaryNameTable := ppu.vram[0x400:0x800]
 
+	// 4画面を繋げたうちどの画面にピクセルがあるかを判定
+	isRight := (x % (SCREEN_WIDTH*2)) >= SCREEN_WIDTH
+	isBottom := (y % (SCREEN_HEIGHT*2)) >= SCREEN_HEIGHT
+
+	var vNameTableIndex uint
+	if !isBottom && !isRight {
+		vNameTableIndex = 0 // 左上
+	} else if !isBottom && isRight {
+		vNameTableIndex = 1 // 右上
+	} else if isBottom && !isRight {
+		vNameTableIndex = 2 // 左下
+	} else {
+		vNameTableIndex = 3 // 右下
+	}
+
+	// 基準ネームテーブルアドレスとミラーリングから実際に使用するテーブルを判定
+	var nameTableIndex uint
+	switch baseNameTableAddress {
+	case 0x2000:
+		nameTableIndex = 0
+	case 0x2400:
+		nameTableIndex = 1
+	case 0x2800:
+		nameTableIndex = 2
+	case 0x2C00:
+		nameTableIndex = 3
+	}
+
+	// 仮想のテーブルインデックスと基準アドレスから最終的なテーブルのインデックスを計算
+	index := (vNameTableIndex + nameTableIndex) % 4
+
+	switch mirroring {
+	case mappers.MIRRORING_VERTICAL:
+		if index == 0 || index == 2 {
+			return primaryNameTable
+		} else {
+			return secondaryNameTable
+		}
+	case mappers.MIRRORING_HORIZONTAL:
+		if index == 0 || index == 1 {
+			return primaryNameTable
+		} else {
+			return secondaryNameTable
+		}
+	default:
+		// @FIXME FourScreenの対応
+		return primaryNameTable
+	}
+}
 
 func DumpCanvasWithASCII(canvas Canvas) {
 	for y := range CANVAS_HEIGHT-1 {

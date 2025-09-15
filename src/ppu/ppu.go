@@ -288,12 +288,13 @@ func (p *PPU) Tick(canvas *Canvas, cycles uint) bool {
 		// サイクル数を0に戻す
 		p.cycles -= SCANLINE_END
 
-		// スキャンラインを進める
-		p.scanline++
-
-		if p.scanline < SCANLINE_POSTRENDER {
+		// 可視領域のスキャンラインを描画
+		if SCANLINE_START <= p.scanline && p.scanline < SCANLINE_POSTRENDER {
 			RenderScanline(p, canvas, p.scanline)
 		}
+
+		// スキャンラインを進める
+		p.scanline++
 
 		// VBlankに突入
 		if p.scanline == SCANLINE_VBLANK {
