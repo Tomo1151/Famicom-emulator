@@ -90,9 +90,12 @@ func RenderSprite(ppu *PPU, frame *Frame) {
 		spritePalette := getSpritePalette(ppu, palleteIndex)
 
 		bank := ppu.control.GetSpritePatternTableAddress()
-		characterROM := ppu.Mapper.GetCharacterROM()
 		tileBasePtr :=(bank+tileIndex*16)
-		tile := characterROM[tileBasePtr:tileBasePtr+16]
+
+		var tile [TILE_SIZE*2]uint8
+		for j := range TILE_SIZE*2 {
+			tile[j] = ppu.Mapper.ReadCharacterROM(tileBasePtr+uint16(j))
+		}
 
 		for y := range TILE_SIZE {
 			upper := tile[y]
@@ -133,8 +136,10 @@ func RenderNameTable(ppu *PPU, frame *Frame, nameTable *[]uint8, viewport Rect, 
 		tileBasePtr := (bank+tileIndex*16)
 		palette := getBGPalette(ppu, &attrributeTable, tileX, tileY)
 
-		characterROM := ppu.Mapper.GetCharacterROM()
-		tile := characterROM[tileBasePtr:tileBasePtr+16]
+		var tile [TILE_SIZE*2]uint8
+		for j := range TILE_SIZE*2 {
+			tile[j] = ppu.Mapper.ReadCharacterROM(tileBasePtr+uint16(j))
+		}
 
 		for y := range TILE_SIZE {
 			upper := tile[y]
