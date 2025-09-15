@@ -26,9 +26,10 @@ type Bus struct {
 	ppu ppu.PPU // PPU
 	apu apu.APU // APU
 	joypad1 *joypad.JoyPad // ポインタに変更
-	// joypad2 joypad.JoyPad // コントローラ (2P)
+	joypad2 *joypad.JoyPad // コントローラ (2P)
 	cycles uint // CPUサイクル
-	callback func(*ppu.PPU, *joypad.JoyPad)
+	callback func(*ppu.PPU, *ppu.Canvas, *joypad.JoyPad, *joypad.JoyPad)
+	canvas *ppu.Canvas
 }
 
 
@@ -40,7 +41,7 @@ func (b *Bus) Init() {
 }
 
 // MARK: Busの初期化メソッド (カートリッジ有り)
-func (b *Bus) InitWithCartridge(cartridge *cartridge.Cartridge, callback func(*ppu.PPU, *joypad.JoyPad)) {
+func (b *Bus) InitWithCartridge(cartridge *cartridge.Cartridge, callback func(*ppu.PPU, *ppu.Canvas, *joypad.JoyPad, *joypad.JoyPad)) {
 	for addr := range b.wram {
 		b.wram[addr] = 0x00
 	}
@@ -51,7 +52,11 @@ func (b *Bus) InitWithCartridge(cartridge *cartridge.Cartridge, callback func(*p
 	b.apu.Init()
 	b.joypad1 = &joypad.JoyPad{}
 	b.joypad1.Init()
+	b.joypad2 = &joypad.JoyPad{}
+	b.joypad2.Init()
 	b.callback = callback
+	b.canvas = &ppu.Canvas{}
+	b.canvas.Init()
 }
 
 // MARK: NMIを取得
@@ -81,7 +86,7 @@ func (b *Bus) Tick(cycles uint) {
 
 	nmiAfter := b.ppu.NMI
 	if nmiBefore == nil && nmiAfter != nil {
-		b.callback(&b.ppu, b.joypad1)
+		b.callback(&b.ppu, b.canvas, b.joypad1, b.joypad2)
 	}
 }
 

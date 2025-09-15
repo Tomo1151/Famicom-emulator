@@ -28,9 +28,6 @@ func main() {
 		log.Fatalf("Cartridge loading error: %v", err)
 	}
 
-	canvas := ppu.Canvas{}
-	canvas.Init()
-
 	if err := sdl.Init(sdl.INIT_VIDEO); err != nil {
 		panic(err)
 	}
@@ -65,7 +62,7 @@ func main() {
 
 	// BusのNMIコールバックで描画とイベント処理
 	bus := bus.Bus{}
-	bus.InitWithCartridge(&cart, func(p *ppu.PPU, j *joypad.JoyPad) {
+	bus.InitWithCartridge(&cart, func(p *ppu.PPU, c *ppu.Canvas, j0 *joypad.JoyPad, j1 *joypad.JoyPad) {
 
 		now := time.Now()
 		elapsed := now.Sub(lastFrameTime)
@@ -75,8 +72,8 @@ func main() {
 		}
 		lastFrameTime = time.Now()
 
-		ppu.Render(p, &canvas)
-		texture.Update(nil, unsafe.Pointer(&canvas.Buffer[0]), int(canvas.Width*3))
+		ppu.Render(p, c)
+		texture.Update(nil, unsafe.Pointer(&c.Buffer[0]), int(c.Width*3))
 		renderer.Clear()
 		renderer.Copy(texture, nil, nil)
 		renderer.Present()
@@ -93,21 +90,21 @@ func main() {
 				// キー入力をJoypadに反映
 				switch e.Keysym.Sym {
 				case sdl.K_k:
-					j.SetButtonPressed(joypad.JOYPAD_BUTTON_A_POSITION, e.State == sdl.PRESSED)
+					j0.SetButtonPressed(joypad.JOYPAD_BUTTON_A_POSITION, e.State == sdl.PRESSED)
 				case sdl.K_j:
-					j.SetButtonPressed(joypad.JOYPAD_BUTTON_B_POSITION, e.State == sdl.PRESSED)
+					j0.SetButtonPressed(joypad.JOYPAD_BUTTON_B_POSITION, e.State == sdl.PRESSED)
 				case sdl.K_w:
-					j.SetButtonPressed(joypad.JOYPAD_BUTTON_UP_POSITION, e.State == sdl.PRESSED)
+					j0.SetButtonPressed(joypad.JOYPAD_BUTTON_UP_POSITION, e.State == sdl.PRESSED)
 				case sdl.K_s:
-					j.SetButtonPressed(joypad.JOYPAD_BUTTON_DOWN_POSITION, e.State == sdl.PRESSED)
+					j0.SetButtonPressed(joypad.JOYPAD_BUTTON_DOWN_POSITION, e.State == sdl.PRESSED)
 				case sdl.K_a:
-					j.SetButtonPressed(joypad.JOYPAD_BUTTON_LEFT_POSITION, e.State == sdl.PRESSED)
+					j0.SetButtonPressed(joypad.JOYPAD_BUTTON_LEFT_POSITION, e.State == sdl.PRESSED)
 				case sdl.K_d:
-					j.SetButtonPressed(joypad.JOYPAD_BUTTON_RIGHT_POSITION, e.State == sdl.PRESSED)
+					j0.SetButtonPressed(joypad.JOYPAD_BUTTON_RIGHT_POSITION, e.State == sdl.PRESSED)
 				case sdl.K_RETURN, sdl.K_KP_ENTER:
-					j.SetButtonPressed(joypad.JOYPAD_BUTTON_START_POSITION, e.State == sdl.PRESSED)
+					j0.SetButtonPressed(joypad.JOYPAD_BUTTON_START_POSITION, e.State == sdl.PRESSED)
 				case sdl.K_BACKSPACE:
-					j.SetButtonPressed(joypad.JOYPAD_BUTTON_SELECT_POSITION, e.State == sdl.PRESSED)
+					j0.SetButtonPressed(joypad.JOYPAD_BUTTON_SELECT_POSITION, e.State == sdl.PRESSED)
 				}
 			}
 		}
