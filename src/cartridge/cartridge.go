@@ -49,14 +49,16 @@ func (c *Cartridge) Load(raw []uint8) error {
 // MARK: マッパーオブジェクトの取得
 func (c *Cartridge) GetMapper(mapperNo uint8) mappers.Mapper {
 	switch mapperNo {
-	case 0:
+	case 0x00:
 		return &mappers.NROM{}
-	case 1:
+	case 0x01:
 		return &mappers.SxROM{}
-	case 2:
+	case 0x02:
 		return &mappers.UxROM{}
-	case 3:
+	case 0x03:
 		return &mappers.CNROM{}
+	case 0x04:
+		return &mappers.TxROM{}
 	default:
 		return &mappers.NROM{}
 	}
