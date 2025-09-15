@@ -161,6 +161,10 @@ func RenderNameTable(ppu *PPU, canvas *Canvas, nameTable *[]uint8, viewport Rect
 	}
 }
 
+func RenderScanlineBackground(ppu *PPU, canvas *Canvas, scanline uint16) {}
+func RenderScanlineSprite(ppu *PPU, canvas *Canvas, scanline uint16) {}
+func RenderScanline(ppu *PPU, canvas *Canvas, scanline uint16) {}
+
 func Render(ppu *PPU, canvas *Canvas) {
 	scrollX := uint(ppu.scroll.ScrollX)
 	scrollY := uint(ppu.scroll.ScrollY)

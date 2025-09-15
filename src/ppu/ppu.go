@@ -291,6 +291,10 @@ func (p *PPU) Tick(canvas *Canvas, cycles uint) bool {
 		// スキャンラインを進める
 		p.scanline++
 
+		if p.scanline < SCANLINE_POSTRENDER {
+			RenderScanline(p, canvas, p.scanline)
+		}
+
 		// VBlankに突入
 		if p.scanline == SCANLINE_VBLANK {
 			p.status.SetVBlankStatus(true)
