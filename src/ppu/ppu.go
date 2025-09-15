@@ -38,10 +38,12 @@ type PPU struct {
 	oamAddress uint8 // OAM書き込みのポインタ
 
 	NMI *uint8
+
+	canvas *Canvas // レンダリング先
 }
 
 // MARK: PPUの初期化メソッド
-func (p *PPU) Init(mapper mappers.Mapper){
+func (p *PPU) Init(canvas *Canvas, mapper mappers.Mapper){
 	p.Mapper = mapper
 	for addr := range p.vram { p.vram[addr] = 0x00 }
 	for addr := range p.oam { p.oam[addr] = 0x00 }
