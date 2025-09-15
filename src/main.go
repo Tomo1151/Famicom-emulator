@@ -28,8 +28,8 @@ func main() {
 		log.Fatalf("Cartridge loading error: %v", err)
 	}
 
-	frame := ppu.Frame{}
-	frame.Init()
+	canvas := ppu.Canvas{}
+	canvas.Init()
 
 	if err := sdl.Init(sdl.INIT_VIDEO); err != nil {
 		panic(err)
@@ -75,8 +75,8 @@ func main() {
 		}
 		lastFrameTime = time.Now()
 
-		ppu.Render(p, &frame)
-		texture.Update(nil, unsafe.Pointer(&frame.Buffer[0]), int(frame.Width*3))
+		ppu.Render(p, &canvas)
+		texture.Update(nil, unsafe.Pointer(&canvas.Buffer[0]), int(canvas.Width*3))
 		renderer.Clear()
 		renderer.Copy(texture, nil, nil)
 		renderer.Present()

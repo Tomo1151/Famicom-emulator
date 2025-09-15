@@ -8,15 +8,15 @@ import (
 const (
 	SCREEN_WIDTH  uint = 256
 	SCREEN_HEIGHT uint = 240
-	FRAME_WIDTH   uint = SCREEN_WIDTH * 2
-	FRAME_HEIGHT  uint = 240
+	CANVAS_WIDTH   uint = SCREEN_WIDTH * 2
+	CANVAS_HEIGHT  uint = 240
 	TILE_SIZE     uint = 8
 )
 
-type Frame struct {
+type Canvas struct {
 	Width  uint
 	Height uint
-	Buffer [uint(FRAME_WIDTH) * uint(FRAME_HEIGHT)*3]byte
+	Buffer [uint(CANVAS_WIDTH) * uint(CANVAS_HEIGHT)*3]byte
 }
 
 type Rect struct {
@@ -26,18 +26,18 @@ type Rect struct {
 	y2 uint
 }
 
-func (f *Frame) Init() {
-	f.Width = FRAME_WIDTH
-	f.Height = FRAME_HEIGHT
+func (c *Canvas) Init() {
+	c.Width = CANVAS_WIDTH
+	c.Height = CANVAS_HEIGHT
 }
 
-func (f *Frame) setPixelAt(x uint, y uint, palette [3]uint8) {
-	if x >= f.Width || y >= f.Height { return }
+func (c *Canvas) setPixelAt(x uint, y uint, palette [3]uint8) {
+	if x >= c.Width || y >= c.Height { return }
 
-	basePtr := (y * FRAME_WIDTH + x) * 3
-	f.Buffer[basePtr+0] = palette[0]  // R
-	f.Buffer[basePtr+1] = palette[1]  // G
-	f.Buffer[basePtr+2] = palette[2]  // B
+	basePtr := (y * CANVAS_WIDTH + x) * 3
+	c.Buffer[basePtr+0] = palette[0]  // R
+	c.Buffer[basePtr+1] = palette[1]  // G
+	c.Buffer[basePtr+2] = palette[2]  // B
 }
 
 func getBGPalette(ppu *PPU, attrributeTable *[]uint8, tileColumn uint, tileRow uint) [4]uint8 {
@@ -79,7 +79,7 @@ func getSpritePalette(ppu *PPU, paletteIndex uint8) [4]uint8 {
 }
 
 
-func RenderSprite(ppu *PPU, frame *Frame) {
+func RenderSprite(ppu *PPU, canvas *Canvas) {
 	for i := len(ppu.oam) - 4; i >= 0; i -= 4 {
 		tileIndex := uint16(ppu.oam[i + 1])
 		tileX := uint(ppu.oam[i + 3])
@@ -111,13 +111,13 @@ func RenderSprite(ppu *PPU, frame *Frame) {
 				rgb := PALETTE[spritePalette[value]]
 
 				if !flipH && !flipV {
-					frame.setPixelAt(tileX + uint(x), tileY + y, rgb)
+					canvas.setPixelAt(tileX + uint(x), tileY + y, rgb)
 				} else if flipH && !flipV {
-					frame.setPixelAt(tileX + TILE_SIZE-1 - uint(x), tileY + y, rgb)
+					canvas.setPixelAt(tileX + TILE_SIZE-1 - uint(x), tileY + y, rgb)
 				} else if !flipH && flipV {
-					frame.setPixelAt(tileX + uint(x), tileY + TILE_SIZE-1 - y, rgb)
+					canvas.setPixelAt(tileX + uint(x), tileY + TILE_SIZE-1 - y, rgb)
 				} else if flipH && flipV {
-					frame.setPixelAt(tileX + TILE_SIZE-1 - uint(x), tileY + TILE_SIZE-1 - y, rgb)
+					canvas.setPixelAt(tileX + TILE_SIZE-1 - uint(x), tileY + TILE_SIZE-1 - y, rgb)
 				}
 			}
 		}
@@ -125,7 +125,7 @@ func RenderSprite(ppu *PPU, frame *Frame) {
 	}
 }
 
-func RenderNameTable(ppu *PPU, frame *Frame, nameTable *[]uint8, viewport Rect, shiftX int, shiftY int) {
+func RenderNameTable(ppu *PPU, canvas *Canvas, nameTable *[]uint8, viewport Rect, shiftX int, shiftY int) {
 	bank := ppu.control.GetBackgroundPatternTableAddress()
 	attrributeTable := (*nameTable)[0x3C0:0x400]
 
@@ -154,14 +154,14 @@ func RenderNameTable(ppu *PPU, frame *Frame, nameTable *[]uint8, viewport Rect, 
 				pixelY := tileY * TILE_SIZE + uint(y)
 
 				if pixelX >= viewport.x1 && pixelX < viewport.x2 && pixelY >= viewport.y1 && pixelY < viewport.y2 {
-					frame.setPixelAt(uint(shiftX + int(pixelX)), uint(shiftY + int(pixelY)), PALETTE[palette[value]])
+					canvas.setPixelAt(uint(shiftX + int(pixelX)), uint(shiftY + int(pixelY)), PALETTE[palette[value]])
 				}
 			}
 		}
 	}
 }
 
-func Render(ppu *PPU, frame *Frame) {
+func Render(ppu *PPU, canvas *Canvas) {
 	scrollX := uint(ppu.scroll.ScrollX)
 	scrollY := uint(ppu.scroll.ScrollY)
 
@@ -170,7 +170,7 @@ func Render(ppu *PPU, frame *Frame) {
 	// 左上
 	RenderNameTable(
 		ppu,
-		frame,
+		canvas,
 		nameTable0,
 		Rect{scrollX, scrollY, SCREEN_WIDTH, SCREEN_HEIGHT},
 		-int(scrollX),
@@ -180,7 +180,7 @@ func Render(ppu *PPU, frame *Frame) {
 	// 右上
 	RenderNameTable(
 		ppu,
-		frame,
+		canvas,
 		nameTable1,
 		Rect{0, scrollY, scrollX, SCREEN_HEIGHT},
 		int(SCREEN_WIDTH - scrollX),
@@ -190,7 +190,7 @@ func Render(ppu *PPU, frame *Frame) {
 	// 左下
 	RenderNameTable(
 		ppu,
-		frame,
+		canvas,
 		nameTable2,
 		Rect{scrollY, 0, SCREEN_WIDTH, scrollY},
 		-int(scrollX),
@@ -200,15 +200,15 @@ func Render(ppu *PPU, frame *Frame) {
 	// 右下
 	RenderNameTable(
 		ppu,
-		frame,
+		canvas,
 		nameTable3,
 		Rect{0, 0, scrollX, scrollY},
 		int(SCREEN_WIDTH - scrollX),
 		int(SCREEN_HEIGHT - scrollY),
 	)
 
-	// RenderBackground(ppu, frame)
-	RenderSprite(ppu, frame)
+	// RenderBackground(ppu, canvas)
+	RenderSprite(ppu, canvas)
 }
 
 func getNameTables(ppu *PPU) (*[]uint8, *[]uint8, *[]uint8, *[]uint8) {
@@ -253,10 +253,10 @@ func getNameTables(ppu *PPU) (*[]uint8, *[]uint8, *[]uint8, *[]uint8) {
 
 
 
-func DumpFrame(frame Frame) {
-	for y := range FRAME_HEIGHT-1 {
-		for x := range FRAME_WIDTH-1 {
-			color := frame.Buffer[y*FRAME_WIDTH+x]
+func DumpCanvasWithASCII(canvas Canvas) {
+	for y := range CANVAS_HEIGHT-1 {
+		for x := range CANVAS_WIDTH-1 {
+			color := canvas.Buffer[y*CANVAS_WIDTH+x]
 
 			switch color {
 			case 0:
