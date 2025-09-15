@@ -4,9 +4,11 @@ const (
 	BANK_SIZE         uint = 16 * 1024 // 16kB
 	PRG_ROM_PAGE_SIZE uint = 16 * 1024 // 16kB
 	CHR_ROM_PAGE_SIZE uint = 8 * 1024  // 8kB
+	PRG_RAM_SIZE      uint = 8 * 1024  // 8kB
 
 	PRG_ROM_START uint16 = 0x8000
 	PRG_ROM_END   uint16 = 0xFFFF
+	PRG_RAM_START uint16 = 0x6000
 )
 
 type Mirroring uint8

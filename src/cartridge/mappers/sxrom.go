@@ -1,9 +1,5 @@
 package mappers
 
-const (
-	PRG_RAM_SIZE uint = 8 * 1024 // 8kB
-)
-
 // MARK: MMC1 SxROM (マッパー1) の定義
 type SxROM struct {
 	shiftRegister uint8
@@ -174,12 +170,12 @@ func (s *SxROM) WriteToCharacterROM(address uint16, data uint8) {
 
 // MARK: プログラムRAMの読み取り
 func (s *SxROM) ReadProgramRAM(address uint16) uint8 {
-	return s.ProgramROM[address]
+	return s.ProgramRAM[address-PRG_RAM_START]
 }
 
 // MARK: プログラムRAMへの書き込み
 func (s *SxROM) WriteToProgramRAM(address uint16, data uint8) {
-	s.ProgramRAM[address-0x6000] = data
+	s.ProgramRAM[address-PRG_RAM_START] = data
 }
 
 // MARK: シフトレジスタのリセット
