@@ -153,6 +153,16 @@ func (p *PPU) WriteVRAM(value uint8) {
 	}
 }
 
+// MARK: PPUコントロールレジスタの読み取り
+func (p *PPU) ReadPPUControl() uint8 {
+	return p.control.ToByte()
+}
+
+// MARK: PPUマスクレジスタの読み取り
+func (p *PPU) ReadPPUMask() uint8 {
+	return p.mask.ToByte()
+}
+
 // MARK: PPUステータスレジスタの読み取り
 func (p *PPU) ReadPPUStatus() uint8 {
 	status := p.status.ToByte()

@@ -112,9 +112,9 @@ func (b *Bus) ReadByteFrom(address uint16) uint8 {
 		ptr := address & 0b00000111_11111111 // 11bitにマスク
 		return b.wram[ptr]
 	case address == 0x2000: // PPU_CTRL
-		panic("Error: attempt to read from PPU Control register")
+		return b.ppu.ReadPPUControl()
 	case address == 0x2001: // PPU_MASK
-		panic("Error: attempt to read from PPU Mask register")
+		return b.ppu.ReadPPUMask()
 	case address == 0x2002: // PPU_STATUS
 		return b.ppu.ReadPPUStatus()
 	case address == 0x2003: // OAM_ADDR
@@ -136,10 +136,7 @@ func (b *Bus) ReadByteFrom(address uint16) uint8 {
 	case address == 0x4015: // APU
 		return b.apu.ReadStatus()
 	case address == 0x4016: // JOYPAD (1P)
-		result := b.joypad1.Read()
-		// fmt.Printf("JOYPAD Read: state=0x%02X, index=%d, result=0x%02X\n", 
-			// b.joypad1.State, b.joypad1.ButtonIndex, result)
-		return result
+		return b.joypad1.Read()
 	case address == 0x4017: // JOYPAD (2P)
 		return 0x00
 	case 0x6000 <= address && address <= 0x7FFF: // プログラムRAM
