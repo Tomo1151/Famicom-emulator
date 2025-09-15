@@ -192,7 +192,7 @@ func Render(ppu *PPU, canvas *Canvas) {
 		ppu,
 		canvas,
 		nameTable2,
-		Rect{scrollY, 0, SCREEN_WIDTH, scrollY},
+		Rect{scrollX, 0, SCREEN_WIDTH, scrollY},
 		-int(scrollX),
 		int(SCREEN_HEIGHT - scrollY),
 	)
