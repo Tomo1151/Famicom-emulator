@@ -60,13 +60,13 @@ func GetROMs(rom []uint8) ([]uint8, []uint8) {
 // MARK: シンプルなミラーリングの取得
 func GetSimpleMirroring(rom []uint8) Mirroring {
 	isFourScreen := (rom[6] & 0b1000) != 0
-	isMIRRORING_VERTICAL := (rom[6] & 0b0001) != 0
+	isVertical := (rom[6] & 0b0001) != 0
 
 	var mirroring Mirroring
 
 	if isFourScreen {
 		mirroring = MIRRORING_FOUR_SCREEN
-	} else if isMIRRORING_VERTICAL {
+	} else if isVertical {
 		mirroring = MIRRORING_VERTICAL
 	} else {
 		mirroring = MIRRORING_HORIZONTAL
