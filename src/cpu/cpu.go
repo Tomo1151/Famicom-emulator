@@ -105,13 +105,7 @@ func (c *CPU) Step() {
 
 // MARK: ループ実行
 func (c *CPU) Run() {
-	for {
-		nmi := c.Bus.GetNMIStatus()
-		if nmi != nil {
-			c.interrupt(NMI)
-		}
-		c.Step()
-	}
+	c.RunWithCallback(func(c *CPU){})
 }
 
 func (c *CPU) RunWithCallback(callback func(c *CPU)) {
@@ -119,6 +113,11 @@ func (c *CPU) RunWithCallback(callback func(c *CPU)) {
 		nmi := c.Bus.GetNMIStatus()
 		if nmi != nil {
 			c.interrupt(NMI)
+		}
+
+		apuIrq := c.Bus.GetAPUIRQ()
+		if apuIrq {
+			c.handleAPUInterrupt()
 		}
 		callback(c)
 		c.Step()
@@ -138,6 +137,18 @@ func (c *CPU) interrupt(interrupt Interrupt) {
 
 	c.Bus.Tick(uint(interrupt.CPUCycles))
 	c.Registers.PC = c.ReadWordFrom(interrupt.VectorAddress) // 割り込みベク
+}
+
+// MARK: APU IRQのハンドリング
+func (c *CPU) handleAPUInterrupt() {
+		if c.Registers.P.Interrupt {
+		return
+	}
+
+	c.pushWord(c.Registers.PC + 1)
+	c.Registers.P.Break = true
+	c.pushByte(c.Registers.P.ToByte())
+	c.Registers.PC = c.ReadWordFrom(0xFFFE)
 }
 
 

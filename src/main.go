@@ -115,6 +115,5 @@ func main() {
 
 	c := cpu.CPU{}
 	c.InitWithCartridge(bus, true)
-
 	c.Run()
 }

@@ -1,7 +1,7 @@
 package ppu
 
 import (
-	"Famicom-emulator/cartridge"
+	"Famicom-emulator/cartridge/mappers"
 	"fmt"
 )
 
@@ -90,8 +90,9 @@ func RenderSprite(ppu *PPU, frame *Frame) {
 		spritePalette := getSpritePalette(ppu, palleteIndex)
 
 		bank := ppu.control.GetSpritePatternTableAddress()
+		characterROM := ppu.Mapper.GetCharacterROM()
 		tileBasePtr :=(bank+tileIndex*16)
-		tile := ppu.CHR_ROM[tileBasePtr:tileBasePtr+16]
+		tile := characterROM[tileBasePtr:tileBasePtr+16]
 
 		for y := range TILE_SIZE {
 			upper := tile[y]
@@ -129,9 +130,11 @@ func RenderNameTable(ppu *PPU, frame *Frame, nameTable *[]uint8, viewport Rect, 
 		tileIndex := uint16((*nameTable)[i])
 		tileX := uint(i % 32)
 		tileY := uint(i / 32)
-		tileBasePtr :=(bank+tileIndex*16)
-		tile := ppu.CHR_ROM[tileBasePtr:tileBasePtr+16]
+		tileBasePtr := (bank+tileIndex*16)
 		palette := getBGPalette(ppu, &attrributeTable, tileX, tileY)
+
+		characterROM := ppu.Mapper.GetCharacterROM()
+		tile := characterROM[tileBasePtr:tileBasePtr+16]
 
 		for y := range TILE_SIZE {
 			upper := tile[y]
@@ -195,22 +198,24 @@ func Render(ppu *PPU, frame *Frame) {
 func getNameTables(ppu *PPU) (*[]uint8, *[]uint8) {
 	var primaryNameTable []uint8
 	var secondaryNameTable []uint8
-	if (ppu.Mirroring == cartridge.MIRRORING_VERTICAL &&
+	mirroring := ppu.Mapper.GetMirroring()
+
+	if (mirroring == mappers.MIRRORING_VERTICAL &&
 		(ppu.control.GetBaseNameTableAddress() == 0x2000 ||
 		ppu.control.GetBaseNameTableAddress() == 0x2800)) {
 		primaryNameTable = ppu.vram[0x000:0x400]
 		secondaryNameTable = ppu.vram[0x400:0x800]
-	} else if (ppu.Mirroring == cartridge.MIRRORING_HORIZONTAL &&
+	} else if (mirroring == mappers.MIRRORING_HORIZONTAL &&
 		(ppu.control.GetBackgroundPatternTableAddress() == 0x2000 ||
 		ppu.control.GetBaseNameTableAddress() == 0x2400)) {
 		primaryNameTable = ppu.vram[0x000:0x400]
 		secondaryNameTable = ppu.vram[0x400:0x800]
-	} else if (ppu.Mirroring == cartridge.MIRRORING_VERTICAL &&
+	} else if (mirroring == mappers.MIRRORING_VERTICAL &&
 		(ppu.control.GetBaseNameTableAddress() == 0x2400 ||
 		ppu.control.GetBaseNameTableAddress() == 0x2C00)) {
 		primaryNameTable = ppu.vram[0x400:0x800]
 		secondaryNameTable = ppu.vram[0x000:0x400]
-	} else if (ppu.Mirroring == cartridge.MIRRORING_HORIZONTAL &&
+	} else if (mirroring == mappers.MIRRORING_HORIZONTAL &&
 		(ppu.control.GetBackgroundPatternTableAddress() == 0x2800 ||
 		ppu.control.GetBaseNameTableAddress() == 0x2C00)) {
 		primaryNameTable = ppu.vram[0x400:0x800]
