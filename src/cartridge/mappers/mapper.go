@@ -76,9 +76,9 @@ func GetSimpleMirroring(rom []uint8) Mirroring {
 }
 
 // MARK: カートリッジのバイナリからプログラムROMのスタートアドレスを取得
-func GetProgramROMStartAddress(rom []uint8) uint16 {
+func GetProgramROMStartAddress(rom []uint8) uint {
 	skipTrainer := (rom[6] & 0b100) != 0
-	var trainerOffset uint16
+	var trainerOffset uint
 	if skipTrainer {
 		trainerOffset = 512
 	} else {
@@ -88,16 +88,16 @@ func GetProgramROMStartAddress(rom []uint8) uint16 {
 }
 
 // MARK: カートリッジのバイナリからプログラムROMのサイズを取得
-func GetProgramROMSize(rom []uint8) uint16 {
-	return uint16(rom[4]) * uint16(PRG_ROM_PAGE_SIZE)
+func GetProgramROMSize(rom []uint8) uint {
+	return uint(rom[4]) * PRG_ROM_PAGE_SIZE
 }
 
 // MARK: カートリッジのバイナリからキャラクタROMのスタートアドレスを取得
-func GetCharacterROMStartAddress(programROMStart uint16, programROMSize uint16) uint16 {
+func GetCharacterROMStartAddress(programROMStart uint, programROMSize uint) uint {
 	return programROMStart + programROMSize
 }
 
 // MARK: カートリッジのバイナリからキャラクタROMのサイズを取得
-func GetCharacterROMSize(rom []uint8) uint16 {
-	return uint16(rom[5]) * uint16(CHR_ROM_PAGE_SIZE)
+func GetCharacterROMSize(rom []uint8) uint {
+	return uint(rom[5]) * CHR_ROM_PAGE_SIZE
 }
