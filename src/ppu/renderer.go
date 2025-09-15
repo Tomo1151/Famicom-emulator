@@ -165,71 +165,90 @@ func Render(ppu *PPU, frame *Frame) {
 	scrollX := uint(ppu.scroll.ScrollX)
 	scrollY := uint(ppu.scroll.ScrollY)
 
-	var primary, secondary = getNameTables(ppu)
+	var nameTable0, nameTable1, nameTable2, nameTable3 = getNameTables(ppu)
 
+	// 左上
 	RenderNameTable(
 		ppu,
 		frame,
-		primary,
+		nameTable0,
 		Rect{scrollX, scrollY, SCREEN_WIDTH, SCREEN_HEIGHT},
 		-int(scrollX),
 		-int(scrollY),
 	)
 
-	if scrollX > 0 {
-		RenderNameTable(
-			ppu,
-			frame,
-			secondary,
-			Rect{0, 0, scrollX, SCREEN_HEIGHT},
-			int(SCREEN_WIDTH - scrollX),
-			0,
-		)
-	} else if scrollY > 0 {
-		RenderNameTable(
-			ppu,
-			frame,
-			secondary,
-			Rect{0, 0, SCREEN_WIDTH, scrollY},
-			0,
-			int(SCREEN_HEIGHT - scrollY),
-		)
-	}
+	// 右上
+	RenderNameTable(
+		ppu,
+		frame,
+		nameTable1,
+		Rect{0, scrollY, scrollX, SCREEN_HEIGHT},
+		int(SCREEN_WIDTH - scrollX),
+		-int(scrollY),
+	)
+
+	// 左下
+	RenderNameTable(
+		ppu,
+		frame,
+		nameTable2,
+		Rect{scrollY, 0, SCREEN_WIDTH, scrollY},
+		-int(scrollX),
+		int(SCREEN_HEIGHT - scrollY),
+	)
+
+	// 右下
+	RenderNameTable(
+		ppu,
+		frame,
+		nameTable3,
+		Rect{0, 0, scrollX, scrollY},
+		int(SCREEN_WIDTH - scrollX),
+		int(SCREEN_HEIGHT - scrollY),
+	)
 
 	// RenderBackground(ppu, frame)
 	RenderSprite(ppu, frame)
 }
 
-func getNameTables(ppu *PPU) (*[]uint8, *[]uint8) {
-	var primaryNameTable []uint8
-	var secondaryNameTable []uint8
+func getNameTables(ppu *PPU) (*[]uint8, *[]uint8, *[]uint8, *[]uint8) {
+	var nameTables [4](*[]uint8)
+	primaryNameTable := ppu.vram[0x000:0x400]
+	secondaryNameTable := ppu.vram[0x400:0x800]
 	mirroring := ppu.Mapper.GetMirroring()
 
 	if (mirroring == mappers.MIRRORING_VERTICAL &&
 		(ppu.control.GetBaseNameTableAddress() == 0x2000 ||
 		ppu.control.GetBaseNameTableAddress() == 0x2800)) {
-		primaryNameTable = ppu.vram[0x000:0x400]
-		secondaryNameTable = ppu.vram[0x400:0x800]
+		nameTables[0] = &primaryNameTable
+		nameTables[1] = &secondaryNameTable
+		nameTables[2] = &primaryNameTable
+		nameTables[3] = &secondaryNameTable
 	} else if (mirroring == mappers.MIRRORING_HORIZONTAL &&
-		(ppu.control.GetBackgroundPatternTableAddress() == 0x2000 ||
+		(ppu.control.GetBaseNameTableAddress() == 0x2000 ||
 		ppu.control.GetBaseNameTableAddress() == 0x2400)) {
-		primaryNameTable = ppu.vram[0x000:0x400]
-		secondaryNameTable = ppu.vram[0x400:0x800]
+		nameTables[0] = &primaryNameTable
+		nameTables[1] = &primaryNameTable
+		nameTables[2] = &secondaryNameTable
+		nameTables[3] = &secondaryNameTable
 	} else if (mirroring == mappers.MIRRORING_VERTICAL &&
 		(ppu.control.GetBaseNameTableAddress() == 0x2400 ||
 		ppu.control.GetBaseNameTableAddress() == 0x2C00)) {
-		primaryNameTable = ppu.vram[0x400:0x800]
-		secondaryNameTable = ppu.vram[0x000:0x400]
+		nameTables[0] = &secondaryNameTable
+		nameTables[1] = &primaryNameTable
+		nameTables[2] = &secondaryNameTable
+		nameTables[3] = &primaryNameTable
 	} else if (mirroring == mappers.MIRRORING_HORIZONTAL &&
-		(ppu.control.GetBackgroundPatternTableAddress() == 0x2800 ||
+		(ppu.control.GetBaseNameTableAddress() == 0x2800 ||
 		ppu.control.GetBaseNameTableAddress() == 0x2C00)) {
-		primaryNameTable = ppu.vram[0x400:0x800]
-		secondaryNameTable = ppu.vram[0x000:0x400]
+		nameTables[0] = &secondaryNameTable
+		nameTables[1] = &secondaryNameTable
+		nameTables[2] = &primaryNameTable
+		nameTables[3] = &primaryNameTable
 	} else {
-		primaryNameTable = ppu.vram[0x000:0x400]
-		secondaryNameTable = ppu.vram[0x400:0x800]
+		panic("Error: unexpected name table pattern")
 	}
-	return &primaryNameTable, &secondaryNameTable
+	return nameTables[0], nameTables[1], nameTables[2], nameTables[3]
 }
 
 
