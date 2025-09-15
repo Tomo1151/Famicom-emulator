@@ -242,7 +242,7 @@ func (b *Bus) WriteByteAt(address uint16, data uint8) {
 		}
 		// DMA転送には513PPU tick掛かる
 		for range 513 {
-			b.Tick(1)
+			b.ppu.Tick(b.canvas, 1)
 		}
 		b.ppu.DMATransfer(&buffer)
 	case address == 0x4015: // APU
