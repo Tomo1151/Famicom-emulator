@@ -6,11 +6,17 @@ import (
 )
 
 const (
-	SCREEN_WIDTH  uint = 256
-	SCREEN_HEIGHT uint = 240
-	CANVAS_WIDTH   uint = SCREEN_WIDTH * 2
-	CANVAS_HEIGHT  uint = 240
-	TILE_SIZE     uint = 8
+	SCREEN_WIDTH    uint = 256
+	SCREEN_HEIGHT   uint = 240
+	CANVAS_WIDTH    uint = SCREEN_WIDTH * 2
+	CANVAS_HEIGHT   uint = 240
+	OAM_SPRITE_SIZE uint = 4
+	OAM_SPRITE_X    uint = 3
+	OAM_SPRITE_Y    uint = 0
+	OAM_SPRITE_TILE uint = 1
+	OAM_SPRITE_ATTR uint = 2
+	SPRITE_MAX      uint = 8
+	TILE_SIZE       uint = 8
 )
 
 type Canvas struct {
@@ -211,104 +217,144 @@ func RenderScanlineBackground(ppu *PPU, canvas *Canvas, scanline uint16) {
 	}
 }
 
-// @FIXME 実装し直す
 func RenderScanlineSprite(ppu *PPU, canvas *Canvas, scanline uint16) {
-    if !ppu.mask.SpriteEnable {
-        return
-    }
+	// スプライトが無効であれば描画しない
+	if !ppu.mask.SpriteEnable { return }
 
-    spriteHeight := ppu.control.GetSpriteSize()
-    var secondaryOAM [8][4]uint8 // 1スキャンラインに描画するスプライト(最大8つ)
-    spriteCount := 0
+	// スプライトサイズの取得 (8 / 16)
+	spriteHeight := ppu.control.GetSpriteSize()
+	spriteCount, sprites := FindScanlineSprite(ppu, spriteHeight, scanline)
 
-    // 1. スプライト評価 (OAMから現在のスキャンラインにあるスプライトを探す)
-    for i := 0; i < len(ppu.oam)/4; i++ {
-        spriteY := uint16(ppu.oam[i*4])
+	// スプライトの描画
+	for i := range spriteCount {
+		// 逆順に評価する (重なり順のため)
+		index := (spriteCount-1) - i
 
-        // スプライトが現在のスキャンラインに収まっているかチェック
-        if scanline >= spriteY && scanline < spriteY+uint16(spriteHeight) {
-            if spriteCount < 8 {
-                secondaryOAM[spriteCount][0] = ppu.oam[i*4+0] // Y
-                secondaryOAM[spriteCount][1] = ppu.oam[i*4+1] // Tile Index
-                secondaryOAM[spriteCount][2] = ppu.oam[i*4+2] // Attributes
-                secondaryOAM[spriteCount][3] = ppu.oam[i*4+3] // X
-                spriteCount++
-            } else {
-                // 9つ目以降のスプライトが見つかったらオーバーフローフラグを立てる
-                ppu.status.SetSpriteOverflow(true)
-                break
-            }
-        }
-    }
+		/*
+			タイル属性
+			bit 76543210
+					VHP...CC
 
-    // 2. スプライト描画 (セカンダリOAMのスプライトを描画)
-    // OAMのインデックスが小さいものが優先される(手前に描画)ため、逆順にループする
-    for i := spriteCount - 1; i >= 0; i-- {
-        sprite := secondaryOAM[i]
-        spriteY := uint16(sprite[0])
-        tileIndex := uint16(sprite[1])
-        attributes := sprite[2]
-        spriteX := uint(sprite[3])
+			V: 垂直反転
+			H: 水平反転
+			P: 優先度 (0:前面, 1:背面)
+			C: パレット
+		*/
 
-        flipV := (attributes >> 7) & 1 == 1
-        flipH := (attributes >> 6) & 1 == 1
-        paletteIndex := attributes & 0b11
-        spritePalette := getSpritePalette(ppu, paletteIndex)
+		// 描画するスプライトを取得
+		sprite := sprites[index]
+		spriteY := uint16(sprite[OAM_SPRITE_Y])
+		spriteX := uint16(sprite[OAM_SPRITE_X])
+		tileIndex := uint16(sprite[OAM_SPRITE_TILE])
+		attributes := sprite[OAM_SPRITE_ATTR]
 
-        // スプライトタイルの何行目を描画するか
-        var fineY uint16
-        if flipV {
-            fineY = (spriteY + uint16(spriteHeight-1)) - scanline
-        } else {
-            fineY = scanline - spriteY
-        }
+		flipV := (attributes >> 7) & 1 == 1
+		flipH := (attributes >> 6) & 1 == 1
+		paletteIndex := attributes & 0b11
+		palette := getSpritePalette(ppu, paletteIndex)
 
-        var bank uint16
-        if spriteHeight == 8 { // 8x8モード
-            bank = ppu.control.GetSpritePatternTableAddress()
-        } else { // 8x16モード
-            bank = (tileIndex & 1) * 0x1000
-            tileIndex &= 0xFE
-        }
+		// スプライトの何行目を描画するかを判定
+		var tileY uint16
+		if flipV {
+			tileY = (spriteY + uint16(spriteHeight-1)) - scanline
+		} else {
+			tileY = scanline - spriteY
+		}
 
-        // 8x16モードでタイルの下半分の場合
-        if fineY >= 8 {
-            tileIndex++
-            fineY -= 8
-        }
+		var bank uint16
+		if spriteHeight == 8 {
+			/*
+				8x8モード
+			*/
+			bank = ppu.control.GetSpritePatternTableAddress()
+		} else {
+			/*
+				8x16モード
 
-        tileBasePtr := bank + tileIndex*16
-        upper := ppu.Mapper.ReadCharacterROM(tileBasePtr + fineY)
-        lower := ppu.Mapper.ReadCharacterROM(tileBasePtr + fineY + 8)
+				タイル選択は8x16モードの時のみ特殊 (8x8のときはタイルの番号)
+				bit 76543210
+						TTTTTTTP
 
-        for x := 0; x < 8; x++ {
-            var value uint8
-            if flipH {
-                value = (lower&1)<<1 | (upper & 1)
-                upper >>= 1
-                lower >>= 1
-            } else {
-                value = ((lower>>7)&1)<<1 | ((upper>>7) & 1)
-                upper <<= 1
-                lower <<= 1
-            }
+				P: パターンテーブル選択。0:$0000, 1:$1000
+				T: スプライト上半分のタイル ID を 2*T とし、下半分を 2*T+1 とする
+			*/
+			bank = (tileIndex & 0x01) * 0x1000
+			tileIndex &= 0xFE
 
-            if value == 0 {
-                continue
-            }
+			// 下半分のとき
+			if tileY >= uint16(TILE_SIZE) {
+				tileIndex++
+				tileY -= uint16(TILE_SIZE)
+			}
+		}
 
-            pixelX := spriteX + uint(x)
-            if pixelX >= SCREEN_WIDTH {
-                continue
-            }
+		// キャラクタROMからタイルデータを取得
+		tileBasePointer := bank + tileIndex * uint16(TILE_SIZE*2)
+		upper := ppu.Mapper.ReadCharacterROM(tileBasePointer + tileY)
+		lower := ppu.Mapper.ReadCharacterROM(tileBasePointer + tileY + uint16(TILE_SIZE))
 
-            // 背景が透明な場合のみ描画
-            // @TODO: 優先度(Attributeのbit5)の処理を追加
-            rgb := PALETTE[spritePalette[value]]
-            canvas.setPixelAt(pixelX, uint(scanline), rgb)
-        }
-    }
+		// タイルデータを描画
+		for x := range TILE_SIZE {
+			var value uint8
+			if flipH {
+				// 水平反転の場合
+				value = (lower & 1) << 1 | (upper & 1)
+				upper >>= 1
+				lower >>= 1
+			} else {
+				// 反転がない場合
+				value = ((lower>>7) & 1) << 1 | ((upper >> 7) & 1)
+				upper <<= 1
+				lower <<= 1
+			}
+
+			// 透明ピクセルは描画しない
+			if value == 0 { continue }
+
+			actualX := uint(spriteX) + uint(x)
+
+			// 画面外のピクセルは描画しない
+			if actualX >= SCREEN_WIDTH { continue }
+
+			canvas.setPixelAt(actualX, uint(scanline), PALETTE[palette[value]])
+		}
+	}
 }
+
+func FindScanlineSprite(ppu *PPU, spriteHeight uint8, scanline uint16) (uint,  *[SPRITE_MAX][OAM_SPRITE_SIZE]uint8) {
+	var sprites [SPRITE_MAX][OAM_SPRITE_SIZE]uint8 // 1スキャンラインに配置するスプライト (8個まで)
+
+	var spriteCount uint = 0
+	for i := range len(ppu.oam) / 4 {
+		index := uint(i*4)
+		/*
+			struct Sprite{
+					U8 y;
+					U8 tile;
+					U8 attr;
+					U8 x;
+			};
+		*/
+		spriteY := uint16(ppu.oam[index]) // OAM各スプライトの0バイト目がY座標
+
+		// スプライトが現在のスキャンラインに収まっているかをチェックする
+		if scanline >= spriteY && scanline < spriteY + uint16(spriteHeight) {
+			if spriteCount < SPRITE_MAX {
+				sprites[spriteCount][OAM_SPRITE_Y] = ppu.oam[index+OAM_SPRITE_Y] // Y座標
+				sprites[spriteCount][OAM_SPRITE_TILE] = ppu.oam[index+OAM_SPRITE_TILE] // タイル選択
+				sprites[spriteCount][OAM_SPRITE_ATTR] = ppu.oam[index+OAM_SPRITE_ATTR] // 属性
+				sprites[spriteCount][OAM_SPRITE_X] = ppu.oam[index+OAM_SPRITE_X] // X座標
+				spriteCount++
+			} else {
+				// 最大表示数を超えたらフラグを立てて抜ける
+				ppu.status.SetSpriteOverflow(true)
+				break
+			}
+		}
+	}
+	return spriteCount, &sprites
+}
+
 
 func RenderScanline(ppu *PPU, canvas *Canvas, scanline uint16) {
 	RenderScanlineBackground(ppu, canvas, scanline)
