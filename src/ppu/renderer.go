@@ -18,6 +18,11 @@ const (
 	TILE_SIZE       uint = 8
 )
 
+const (
+	PIXEL_TYPE_BACKGROUND PixelType = 0
+	PIXEL_TYPE_SPRITE     PixelType = 1
+)
+
 // MARK: Canvasの定義
 type Canvas struct {
 	Width  uint
@@ -41,19 +46,30 @@ func (c *Canvas) setPixelAt(x uint, y uint, palette [3]uint8) {
 	c.Buffer[basePtr+2] = palette[2]  // B
 }
 
-// MARK: キャンバスの指定した座標が透明ピクセルかを判別
-func (c *Canvas) isBgTransparentAt(ppu *PPU, x uint, y uint) bool {
-	basePtr := (y * CANVAS_WIDTH + x) * 3
-	isBgTransparent := c.Buffer[basePtr+0] == PALETTE[ppu.PaletteTable[0]][0] && c.Buffer[basePtr+1] == PALETTE[ppu.PaletteTable[0]][1] && c.Buffer[basePtr+2] == PALETTE[ppu.PaletteTable[0]][2]
-	return isBgTransparent
+// MARK: PixelTypeの定義
+type PixelType byte
+
+// MARK: Pixelの定義
+type Pixel struct {
+	Type PixelType
+	priority uint8
+	value [3]uint8
 }
 
-// MARK: Rectの定義
-type Rect struct {
-	x1 uint
-	y1 uint
-	x2 uint
-	y2 uint
+// MARK: Rendererの定義
+type Renderer struct {
+	lineBuffer [SCREEN_WIDTH]Pixel
+}
+
+// MARK: レンダラーの初期化
+func (r *Renderer) Init() {
+	for i := range r.lineBuffer {
+		r.lineBuffer[i] = Pixel{
+			PIXEL_TYPE_BACKGROUND,
+			0x00,
+			[3]uint8{0x00, 0x00, 0x00},
+		}
+	}
 }
 
 // MARK: BG面のカラーパレットを取得
@@ -97,8 +113,8 @@ func getSpritePalette(ppu *PPU, paletteIndex uint8) [4]uint8 {
 }
 
 
-// MARK: 指定したスキャンラインのBG面を描画
-func RenderScanlineBackground(ppu *PPU, canvas *Canvas, scanline uint16) {
+// MARK: 指定したスキャンラインのBG面を評価
+func CalculateScanlineBackground(ppu *PPU, canvas *Canvas, scanline uint16) {
 	// BGが無効であれば描画をしない
 	if !ppu.mask.BackgroundEnable { return }
 
@@ -143,13 +159,18 @@ func RenderScanlineBackground(ppu *PPU, canvas *Canvas, scanline uint16) {
 		// そのピクセルの色を確定
 		value := (lower >> uint8(actualX) & 1) << 1 | (upper >> uint8(actualX) & 1)
 
+		// ラインバッファに登録
+		ppu.renderer.lineBuffer[x].Type  = PIXEL_TYPE_BACKGROUND
+		ppu.renderer.lineBuffer[x].value = PALETTE[palette[value]]
+		ppu.renderer.lineBuffer[x].priority = 0x00
+
 		// Canvasに描画
-		canvas.setPixelAt(x, uint(scanline), PALETTE[palette[value]])
+		// canvas.setPixelAt(x, uint(scanline), PALETTE[palette[value]])
 	}
 }
 
-// MARK: 指定したスキャンラインのスプライトを描画
-func RenderScanlineSprite(ppu *PPU, canvas *Canvas, scanline uint16) {
+// MARK: 指定したスキャンラインのスプライトを評価
+func CalculateScanlineSprite(ppu *PPU, canvas *Canvas, scanline uint16) {
 	// スプライトが無効であれば描画しない
 	if !ppu.mask.SpriteEnable { return }
 
@@ -249,8 +270,15 @@ func RenderScanlineSprite(ppu *PPU, canvas *Canvas, scanline uint16) {
 			// 画面外のピクセルは描画しない
 			if actualX >= SCREEN_WIDTH { continue }
 
-			if priority == 0 || canvas.isBgTransparentAt(ppu, actualX, uint(scanline)) {
-				canvas.setPixelAt(actualX, uint(scanline), PALETTE[palette[value]])
+			// 描画ピクセルの背景が透明かどうか
+			isBgTransparent := ppu.renderer.lineBuffer[actualX].value == PALETTE[ppu.PaletteTable[0]]
+
+			// スプライトの優先度が0または背景が透明であれば描画
+			// @FIXME BG面より優先されないスプライトに，OAM上の順番が後ろが重なった時にBG面が最優先になるようにする (SMB3のパックンフラワー等)
+			if priority == 0 || isBgTransparent {
+				ppu.renderer.lineBuffer[actualX].Type = PIXEL_TYPE_SPRITE
+				ppu.renderer.lineBuffer[actualX].value = PALETTE[palette[value]]
+				ppu.renderer.lineBuffer[actualX].priority = priority
 			}
 		}
 	}
@@ -293,11 +321,21 @@ func FindScanlineSprite(ppu *PPU, spriteHeight uint8, scanline uint16) (uint,  *
 
 // MARK: 指定したスキャンラインを描画
 func RenderScanline(ppu *PPU, canvas *Canvas, scanline uint16) {
-	RenderScanlineBackground(ppu, canvas, scanline)
-	RenderScanlineSprite(ppu, canvas, scanline)
+	for x := range SCREEN_WIDTH {
+		ppu.renderer.lineBuffer[x].Type = PIXEL_TYPE_BACKGROUND
+		ppu.renderer.lineBuffer[x].value = PALETTE[ppu.PaletteTable[0]]
+		ppu.renderer.lineBuffer[x].priority = 0x00
+	}
+
+	CalculateScanlineBackground(ppu, canvas, scanline)
+	CalculateScanlineSprite(ppu, canvas, scanline)
+
+	for x := range SCREEN_WIDTH {
+		canvas.setPixelAt(x, uint(scanline), ppu.renderer.lineBuffer[x].value)
+	}
 }
 
-// MARK: 指定した座標のネームテーブルを取得
+// MARK: 指定したピクセルで使用するネームテーブルを取得
 func getNameTableForPixel(ppu *PPU, x uint, y uint) []uint8 {
 	mirroring := ppu.Mapper.GetMirroring()
 	baseNameTableAddress := ppu.control.GetBaseNameTableAddress()

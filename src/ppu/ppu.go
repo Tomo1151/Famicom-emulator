@@ -38,6 +38,8 @@ type PPU struct {
 	oamAddress uint8 // OAM書き込みのポインタ
 
 	NMI *uint8
+
+	renderer *Renderer // レンダラー
 }
 
 // MARK: PPUの初期化メソッド
@@ -59,6 +61,9 @@ func (p *PPU) Init(mapper mappers.Mapper){
 	p.internalDataBuffer = 0x00
 
 	p.NMI = nil
+
+	p.renderer = &Renderer{}
+	p.renderer.Init()
 }
 
 // MARK: PPUアドレスレジスタへの書き込み
