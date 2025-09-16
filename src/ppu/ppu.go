@@ -271,7 +271,7 @@ func (p *PPU) GetNMI() *uint8 {
 // MARK: スプライト0ヒットの判定
 func (p *PPU) isSpriteZeroHit(cycles uint) bool {
 	x := uint(p.oam[3])
-	y := uint(p.oam[0])
+	y := uint(p.oam[0]) + 6 // スプライト0ヒットが反映されるまでのラグ
 	return p.mask.SpriteEnable && y == uint(p.scanline) && x <= cycles
 }
 
