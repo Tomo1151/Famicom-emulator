@@ -277,6 +277,15 @@ func (p *PPU) GetNMI() *uint8 {
 func (p *PPU) isSpriteZeroHit(cycles uint) bool {
 	x := uint(p.oam[3])
 	y := uint(p.oam[0]) + 6 // スプライト0ヒットが反映されるまでのラグ
+
+	/*
+		@NOTE
+		参考：https://www.nesdev.org/wiki/PPU_rendering
+		> Sprite 0 hit acts as if the image starts at cycle 2 (which is the same cycle that the shifters shift for the first time), so the sprite 0 flag will be raised at this point at the earliest. Actual pixel output is delayed further due to internal render pipelining, and the first pixel is output during cycle 4.
+
+		@FIXME
+		スプライトの可視ピクセルを判定に加える，現在はそれをしておらず，SMBのコイン下半分のスプライトに合わせているため +6 になっているが，これが +4 になるはず
+	*/
 	return p.mask.SpriteEnable && y == uint(p.scanline) && x <= cycles
 }
 
@@ -292,6 +301,9 @@ func (p *PPU) Tick(canvas *Canvas, cycles uint) bool {
 
 		// サイクル数を0に戻す
 		p.cycles -= SCANLINE_END
+
+		// マッパーによるIRQの判定
+		p.Mapper.GenerateScanlineIRQ(p.scanline, p.mask.BackgroundEnable || p.mask.SpriteEnable)
 
 		// 可視領域のスキャンラインを描画
 		if SCANLINE_START <= p.scanline && p.scanline < SCANLINE_POSTRENDER {

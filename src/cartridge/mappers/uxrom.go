@@ -64,6 +64,12 @@ func (u *UxROM) ReadProgramRAM(address uint16) uint8 {
 // MARK: プログラムRAMへの書き込み
 func (u *UxROM) WriteToProgramRAM(address uint16, data uint8) {}
 
+// MARK: スキャンラインによってIRQを発生させる
+func (u *UxROM) GenerateScanlineIRQ(scanline uint16, backgroundEnable bool) {}
+
+// MARK: IRQ状態の取得
+func (u *UxROM) GetIRQ() bool { return false }
+
 // MARK: ミラーリングの取得
 func (u *UxROM) GetMirroring() Mirroring {
 	return u.Mirroring

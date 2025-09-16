@@ -110,16 +110,24 @@ func (c *CPU) Run() {
 
 func (c *CPU) RunWithCallback(callback func(c *CPU)) {
 	for {
+		// NMIが発生したら処理をする
 		nmi := c.Bus.GetNMIStatus()
 		if nmi != nil {
 			c.interrupt(NMI)
 		}
 
 		apuIrq := c.Bus.GetAPUIRQ()
-		if apuIrq {
-			c.handleAPUInterrupt()
+		mapperIrq := c.Bus.GetMapperIRQ()
+
+		// APUまたはマッパーでIRQが発生していて割込み禁止フラグが立っていないならIRQを処理
+		if !c.Registers.P.Interrupt && (apuIrq || mapperIrq) {
+			c.interrupt(IRQ)
 		}
+
+		// コールバックを実行
 		callback(c)
+
+		// CPUの処理を進める
 		c.Step()
 	}
 }
@@ -129,6 +137,7 @@ func (c *CPU) interrupt(interrupt Interrupt) {
 	// 現在のPCを退避
 	c.pushWord(c.Registers.PC)
 
+	// ステータスレジスタをスタックにプッシュ
 	status := c.Registers.P
 	status.Break = interrupt.BFlagMask & 0b0001_0000 == 1
 	status.Reserved = interrupt.BFlagMask & 0b0010_0000 == 1
@@ -136,21 +145,8 @@ func (c *CPU) interrupt(interrupt Interrupt) {
 	c.Registers.P.Interrupt = true
 
 	c.Bus.Tick(uint(interrupt.CPUCycles))
-	c.Registers.PC = c.ReadWordFrom(interrupt.VectorAddress) // 割り込みベク
+	c.Registers.PC = c.ReadWordFrom(interrupt.VectorAddress) // 割り込みベクタ
 }
-
-// MARK: APU IRQのハンドリング
-func (c *CPU) handleAPUInterrupt() {
-		if c.Registers.P.Interrupt {
-		return
-	}
-
-	c.pushWord(c.Registers.PC + 1)
-	c.Registers.P.Break = true
-	c.pushByte(c.Registers.P.ToByte())
-	c.Registers.PC = c.ReadWordFrom(0xFFFE)
-}
-
 
 // MARK: ワーキングメモリの参照 (1byte)
 func (c *CPU) ReadByteFrom(address uint16) uint8 {

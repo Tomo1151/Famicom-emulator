@@ -1,9 +1,12 @@
 package mappers
 
-import "fmt"
+import (
+	"fmt"
+)
 
 const (
 	TXROM_PRG_BANK_SIZE = 8 * 1024 // 8kB
+	SCANLINE_POSTRENDER = 240
 )
 
 // MARK: MMC3 TxROM (マッパー4) の定義
@@ -14,6 +17,8 @@ type TxROM struct {
 	irqLatch uint8
 	irqReload bool
 	irqEnable bool
+	irqCounter uint8
+	IRQ bool
 
 	IsCharacterRAM bool
 	Mirroring Mirroring
@@ -76,14 +81,17 @@ func (t *TxROM) Write(address uint16, data uint8) {
 			if address & 0x01 == 0 {
 			// IRQ ラッチ ($C000~$DFFE, 偶数)
 			t.irqLatch = data
+			t.irqCounter = data
 		} else {
 			// IRQ リロード ($C001~$DFFF, 奇数)
 			t.irqReload = true
+			t.irqCounter = 0
 		}
 	case 0xE000 <= address && address <= PRG_ROM_END:
 		if address & 0x01 == 0 {
 			// IRQ 無効化 ($E000~$FFFE, 偶数)
 			t.irqEnable = false
+			t.IRQ = false
 		} else {
 			// IRQ 有効化 ($E001~$FFFD, 奇数)
 			t.irqEnable = true
@@ -222,6 +230,32 @@ func (t *TxROM) ReadProgramRAM(address uint16) uint8 {
 // MARK: プログラムRAMへの書き込み
 func (t *TxROM) WriteToProgramRAM(address uint16, data uint8) {
 	t.ProgramRAM[address-PRG_RAM_START] = data
+}
+
+// MARK: スキャンラインによってIRQを発生させる
+func (t *TxROM) GenerateScanlineIRQ(scanline uint16, renderEnable bool) {
+	if scanline <= SCANLINE_POSTRENDER && renderEnable {
+		// リロードフラグが立っているか、カウンタが0なら、カウンタをラッチ値でリロード
+		if t.irqReload || t.irqCounter == 0 {
+			t.irqCounter = t.irqLatch
+			t.irqReload = false
+		} else {
+			// そうでなければカウンタをデクリメント
+			t.irqCounter--
+		}
+
+		// カウンタが0になり、かつIRQが有効ならIRQを発生
+		if t.irqCounter == 0 && t.irqEnable {
+			t.IRQ = true
+		}
+	}
+}
+
+// MARK: IRQ状態の取得
+func (t *TxROM) GetIRQ() bool {
+	value := t.IRQ
+	t.IRQ = false
+	return value
 }
 
 // MARK: ミラーリングの取得

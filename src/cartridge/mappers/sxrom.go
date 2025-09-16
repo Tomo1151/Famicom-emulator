@@ -184,6 +184,12 @@ func (s *SxROM) resetShiftRegister() {
 	s.shiftCount = 0
 }
 
+// MARK: スキャンラインによってIRQを発生させる
+func (s *SxROM) GenerateScanlineIRQ(scanline uint16, backgroundEnable bool) {}
+
+// MARK: IRQ状態の取得
+func (s *SxROM) GetIRQ() bool { return false }
+
 // MARK: ミラーリングの取得
 func (s *SxROM) GetMirroring() Mirroring {
 	switch s.control & 0x03 {

@@ -29,6 +29,9 @@ type Mapper interface {
 	WriteToProgramRAM(uint16, uint8)
 	Write(uint16, uint8)
 
+	GenerateScanlineIRQ(uint16, bool)
+	GetIRQ() bool
+
 	GetMapperInfo() string
 	GetIsCharacterRAM() bool
 	GetMirroring() Mirroring

@@ -69,6 +69,11 @@ func (b *Bus) GetAPUIRQ() bool {
 	return b.apu.Status.GetFrameIRQ()
 }
 
+// MARK: マッパーのIRQを取得
+func (b *Bus) GetMapperIRQ() bool {
+	return b.cartridge.Mapper.GetIRQ()
+}
+
 
 // MARK: サイクルを進める
 func (b *Bus) Tick(cycles uint) {

@@ -50,6 +50,12 @@ func (c *CNROM) ReadProgramRAM(address uint16) uint8 {
 // MARK: プログラムRAMへの書き込み
 func (c *CNROM) WriteToProgramRAM(address uint16, data uint8) {}
 
+// MARK: スキャンラインによってIRQを発生させる
+func (c *CNROM) GenerateScanlineIRQ(scanline uint16, backgroundEnable bool) {}
+
+// MARK: IRQ状態の取得
+func (c *CNROM) GetIRQ() bool { return false }
+
 // MARK: ミラーリングの取得
 func (c *CNROM) GetMirroring() Mirroring {
 	return c.Mirroring
