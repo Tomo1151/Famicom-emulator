@@ -463,6 +463,9 @@ func (p *PPU) CalculateScanlineBackground(canvas *Canvas, scanline uint16) {
 
 	// 画面の左端から右端まで
 	for x := range SCREEN_WIDTH {
+		// 左端のBG面描画フラグが無効であれば描画しない
+		if !p.mask.LeftmostBackgroundEnable && x < TILE_SIZE { continue }
+
 		// 描画するX座標を計算
 		globalX := scrollX + x
 
@@ -601,6 +604,9 @@ func (p *PPU) CalculateScanlineSprite(canvas *Canvas, scanline uint16) {
 
 			// 画面外のピクセルは描画しない
 			if actualX >= SCREEN_WIDTH { continue }
+
+			// 左端のスプライト描画フラグが無効であれば描画しない
+			if !p.mask.LeftmostSpriteEnable && actualX < TILE_SIZE { continue }
 
 			// 描画ピクセルの背景が透明かどうか
 			isBgTransparent := p.lineBuffer[actualX].value == PALETTE[p.PaletteTable[0]]
