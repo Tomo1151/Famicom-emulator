@@ -6,6 +6,7 @@ import (
 	"Famicom-emulator/cpu"
 	"Famicom-emulator/joypad"
 	"Famicom-emulator/ppu"
+	"fmt"
 	"log"
 	"os"
 	"time"
@@ -17,7 +18,7 @@ import (
 const SCALE_FACTOR = 3
 
 func main() {
-	filedata, err := os.ReadFile("../rom/SuperMarioBros.nes")
+	filedata, err := os.ReadFile("../rom/SuperMarioBros3.nes")
 	if err != nil {
 		log.Fatalf("Error occured in 'os.ReadFile()'")
 	}
@@ -28,7 +29,7 @@ func main() {
 		log.Fatalf("Cartridge loading error: %v", err)
 	}
 
-	if err := sdl.Init(sdl.INIT_VIDEO); err != nil {
+	if err := sdl.Init(sdl.INIT_VIDEO | sdl.INIT_GAMECONTROLLER); err != nil {
 		panic(err)
 	}
 	defer sdl.Quit()
@@ -39,6 +40,13 @@ func main() {
 		panic(err)
 	}
 	defer window.Destroy()
+
+	controller := sdl.GameControllerOpen(0)
+	if controller == nil {
+		fmt.Println("No controller detected")
+	} else {
+		fmt.Println("Controller opened:", controller.Name())
+	}
 
 	renderer, err := sdl.CreateRenderer(window, -1, sdl.RENDERER_ACCELERATED)
 	if err != nil {
@@ -86,25 +94,11 @@ func main() {
 				if e.Keysym.Sym == sdl.K_ESCAPE && e.State == sdl.PRESSED {
 					os.Exit(0)
 				}
-				// キー入力をJoypadに反映
-				switch e.Keysym.Sym {
-				case sdl.K_k:
-					j0.SetButtonPressed(joypad.JOYPAD_BUTTON_A_POSITION, e.State == sdl.PRESSED)
-				case sdl.K_j:
-					j0.SetButtonPressed(joypad.JOYPAD_BUTTON_B_POSITION, e.State == sdl.PRESSED)
-				case sdl.K_w:
-					j0.SetButtonPressed(joypad.JOYPAD_BUTTON_UP_POSITION, e.State == sdl.PRESSED)
-				case sdl.K_s:
-					j0.SetButtonPressed(joypad.JOYPAD_BUTTON_DOWN_POSITION, e.State == sdl.PRESSED)
-				case sdl.K_a:
-					j0.SetButtonPressed(joypad.JOYPAD_BUTTON_LEFT_POSITION, e.State == sdl.PRESSED)
-				case sdl.K_d:
-					j0.SetButtonPressed(joypad.JOYPAD_BUTTON_RIGHT_POSITION, e.State == sdl.PRESSED)
-				case sdl.K_RETURN, sdl.K_KP_ENTER:
-					j0.SetButtonPressed(joypad.JOYPAD_BUTTON_START_POSITION, e.State == sdl.PRESSED)
-				case sdl.K_BACKSPACE:
-					j0.SetButtonPressed(joypad.JOYPAD_BUTTON_SELECT_POSITION, e.State == sdl.PRESSED)
-				}
+				handleKeyPress(e, j0)
+			case *sdl.ControllerButtonEvent:
+				handleButtonPress(e, j0)
+			case *sdl.ControllerAxisEvent:
+				handleAxisMotion(e, j0)
 			}
 		}
 	})
@@ -112,4 +106,73 @@ func main() {
 	c := cpu.CPU{}
 	c.InitWithCartridge(bus, true)
 	c.Run()
+}
+
+// @FIXME コントローラーがstateを上書きしてどちらかしか効かない
+// キーボードの状態を検知
+func handleKeyPress(e *sdl.KeyboardEvent, j *joypad.JoyPad) {
+	switch e.Keysym.Sym {
+	case sdl.K_k:
+		j.SetButtonPressed(joypad.JOYPAD_BUTTON_A_POSITION, e.State == sdl.PRESSED)
+	case sdl.K_j:
+		j.SetButtonPressed(joypad.JOYPAD_BUTTON_B_POSITION, e.State == sdl.PRESSED)
+	case sdl.K_w:
+		j.SetButtonPressed(joypad.JOYPAD_BUTTON_UP_POSITION, e.State == sdl.PRESSED)
+	case sdl.K_s:
+		j.SetButtonPressed(joypad.JOYPAD_BUTTON_DOWN_POSITION, e.State == sdl.PRESSED)
+	case sdl.K_a:
+		j.SetButtonPressed(joypad.JOYPAD_BUTTON_LEFT_POSITION, e.State == sdl.PRESSED)
+	case sdl.K_d:
+		j.SetButtonPressed(joypad.JOYPAD_BUTTON_RIGHT_POSITION, e.State == sdl.PRESSED)
+	case sdl.K_RETURN, sdl.K_KP_ENTER:
+		j.SetButtonPressed(joypad.JOYPAD_BUTTON_START_POSITION, e.State == sdl.PRESSED)
+	case sdl.K_BACKSPACE:
+		j.SetButtonPressed(joypad.JOYPAD_BUTTON_SELECT_POSITION, e.State == sdl.PRESSED)
+	}
+}
+
+// コントローラーのボタン状態を検知
+func handleButtonPress(e *sdl.ControllerButtonEvent, j *joypad.JoyPad) {
+	pressed := e.State == sdl.PRESSED
+	switch e.Button {
+	case joypad.JOYCON_R_BUTTON_A, joypad.JOYCON_R_BUTTON_X:
+		j.SetButtonPressed(joypad.JOYPAD_BUTTON_A_POSITION, pressed)
+	case joypad.JOYCON_R_BUTTON_B, joypad.JOYCON_R_BUTTON_Y:
+		j.SetButtonPressed(joypad.JOYPAD_BUTTON_B_POSITION, pressed)
+	case joypad.JOYCON_R_BUTTON_PLUS:
+		j.SetButtonPressed(joypad.JOYPAD_BUTTON_START_POSITION, pressed)
+	case joypad.JOYCON_R_BUTTON_HOME:
+		j.SetButtonPressed(joypad.JOYPAD_BUTTON_SELECT_POSITION, pressed)
+	}
+}
+
+// コントローラーのスティック状態を検知
+func handleAxisMotion(e *sdl.ControllerAxisEvent, j *joypad.JoyPad) {
+	const threshold = 8000 // デッドゾーン
+
+	switch e.Axis {
+    case 0: // X軸 (左スティック左右)
+			if e.Value < -threshold {
+				j.SetButtonPressed(joypad.JOYPAD_BUTTON_LEFT_POSITION, true)
+				j.SetButtonPressed(joypad.JOYPAD_BUTTON_RIGHT_POSITION, false)
+			} else if e.Value > threshold {
+				j.SetButtonPressed(joypad.JOYPAD_BUTTON_LEFT_POSITION, false)
+				j.SetButtonPressed(joypad.JOYPAD_BUTTON_RIGHT_POSITION, true)
+			} else {
+				j.SetButtonPressed(joypad.JOYPAD_BUTTON_LEFT_POSITION, false)
+				j.SetButtonPressed(joypad.JOYPAD_BUTTON_RIGHT_POSITION, false)
+			}
+
+    case 1: // Y軸 (左スティック上下)
+			if e.Value < -threshold {
+				j.SetButtonPressed(joypad.JOYPAD_BUTTON_UP_POSITION, true)
+				j.SetButtonPressed(joypad.JOYPAD_BUTTON_DOWN_POSITION, false)
+			} else if e.Value > threshold {
+				j.SetButtonPressed(joypad.JOYPAD_BUTTON_DOWN_POSITION, true)
+				j.SetButtonPressed(joypad.JOYPAD_BUTTON_UP_POSITION, false)
+			} else {
+				j.SetButtonPressed(joypad.JOYPAD_BUTTON_UP_POSITION, false)
+				j.SetButtonPressed(joypad.JOYPAD_BUTTON_DOWN_POSITION, false)
+			}
+	}
 }
