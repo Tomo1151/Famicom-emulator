@@ -15,9 +15,25 @@ import (
 	"github.com/veandco/go-sdl2/sdl"
 )
 
-const SCALE_FACTOR = 3
+// MARK: 定数定義
+const (
+	FRAME_PER_SECOND = 60
+	SCALE_FACTOR = 3
 
+	INPUT_MODE_KEYBOARD = 0
+	INPUT_MODE_JOYPAD   = 1
+)
+
+// MARK: InputStateの定義
+type InputState struct {
+	Left, Right, Up, Down bool
+	A, B, Start, Select   bool
+}
+
+// MARK: main関数
 func main() {
+	// ROMファイルのロード
+
 	// filedata, err := os.ReadFile("../rom/Kirby'sAdventure.nes")
 	// filedata, err := os.ReadFile("../rom/SuperMarioBros.nes")
 	filedata, err := os.ReadFile("../rom/SuperMarioBros3.nes")
@@ -25,17 +41,20 @@ func main() {
 		log.Fatalf("Error occured in 'os.ReadFile()'")
 	}
 
+	// カートリッジの作成と初期化
 	cart := cartridge.Cartridge{}
 	err = cart.Load(filedata)
 	if err != nil {
 		log.Fatalf("Cartridge loading error: %v", err)
 	}
 
+	// SDLの初期化
 	if err := sdl.Init(sdl.INIT_VIDEO | sdl.INIT_GAMECONTROLLER); err != nil {
 		panic(err)
 	}
 	defer sdl.Quit()
 
+	// ウィンドウの作成
 	window, err := sdl.CreateWindow("Famicom", sdl.WINDOWPOS_UNDEFINED, sdl.WINDOWPOS_UNDEFINED,
 		int32(ppu.SCREEN_WIDTH)*SCALE_FACTOR, int32(ppu.SCREEN_HEIGHT)*SCALE_FACTOR, sdl.WINDOW_SHOWN)
 	if err != nil {
@@ -43,6 +62,7 @@ func main() {
 	}
 	defer window.Destroy()
 
+	// 接続済みコントローラを検知
 	controller := sdl.GameControllerOpen(0)
 	if controller == nil {
 		fmt.Println("No controller detected")
@@ -50,12 +70,14 @@ func main() {
 		fmt.Println("Controller opened:", controller.Name())
 	}
 
+	// レンダラーの作成
 	renderer, err := sdl.CreateRenderer(window, -1, sdl.RENDERER_ACCELERATED)
 	if err != nil {
 		panic(err)
 	}
 	defer renderer.Destroy()
 
+	// テクスチャの作成
 	texture, err := renderer.CreateTexture(
 		sdl.PIXELFORMAT_RGB24,
 		sdl.TEXTUREACCESS_STREAMING,
@@ -64,6 +86,10 @@ func main() {
 		panic(err)
 	}
 	defer texture.Destroy()
+
+	// 入力データ
+	keyboardState := InputState{}
+	controllerState := InputState{}
 
 	// SDL2イベントポンプを取得
 	eventPump := sdl.PollEvent
@@ -74,15 +100,19 @@ func main() {
 	bus := bus.Bus{}
 	bus.InitWithCartridge(&cart, func(p *ppu.PPU, c *ppu.Canvas, j0 *joypad.JoyPad, j1 *joypad.JoyPad) {
 
+		// フレームレート調整 (60FPS)
 		now := time.Now()
 		elapsed := now.Sub(lastFrameTime)
-		const frameDuration = time.Second / 60
+		const frameDuration = time.Second / FRAME_PER_SECOND
 		if elapsed < frameDuration {
 			time.Sleep(frameDuration - elapsed)
 		}
 		lastFrameTime = time.Now()
 
+		// キャンバスのバッファを元にテクスチャの更新
 		texture.Update(nil, unsafe.Pointer(&c.Buffer[0]), int(c.Width*3))
+
+		// 再レンダリング
 		renderer.Clear()
 		renderer.Copy(texture, nil, nil)
 		renderer.Present()
@@ -96,12 +126,15 @@ func main() {
 				if e.Keysym.Sym == sdl.K_ESCAPE && e.State == sdl.PRESSED {
 					os.Exit(0)
 				}
-				handleKeyPress(e, j0)
+				handleKeyPress(e, &keyboardState)
 			case *sdl.ControllerButtonEvent:
-				handleButtonPress(e, j0)
+				handleButtonPress(e, &controllerState)
 			case *sdl.ControllerAxisEvent:
-				handleAxisMotion(e, j0)
+				handleAxisMotion(e, &controllerState)
 			}
+
+			// 操作結果を反映
+			updateJoyPad(j0, &keyboardState, &controllerState)
 		}
 	})
 
@@ -110,71 +143,92 @@ func main() {
 	c.Run()
 }
 
-// @FIXME コントローラーがstateを上書きしてどちらかしか効かない
-// キーボードの状態を検知
-func handleKeyPress(e *sdl.KeyboardEvent, j *joypad.JoyPad) {
+// MARK: キーボードの状態を検知
+func handleKeyPress(e *sdl.KeyboardEvent, c *InputState) {
+	pressed := e.State == sdl.PRESSED
 	switch e.Keysym.Sym {
 	case sdl.K_k:
-		j.SetButtonPressed(joypad.JOYPAD_BUTTON_A_POSITION, e.State == sdl.PRESSED)
+		c.A = pressed
 	case sdl.K_j:
-		j.SetButtonPressed(joypad.JOYPAD_BUTTON_B_POSITION, e.State == sdl.PRESSED)
+		c.B = pressed
 	case sdl.K_w:
-		j.SetButtonPressed(joypad.JOYPAD_BUTTON_UP_POSITION, e.State == sdl.PRESSED)
+		c.Up = pressed
 	case sdl.K_s:
-		j.SetButtonPressed(joypad.JOYPAD_BUTTON_DOWN_POSITION, e.State == sdl.PRESSED)
+		c.Down = pressed
 	case sdl.K_a:
-		j.SetButtonPressed(joypad.JOYPAD_BUTTON_LEFT_POSITION, e.State == sdl.PRESSED)
+		c.Left = pressed
 	case sdl.K_d:
-		j.SetButtonPressed(joypad.JOYPAD_BUTTON_RIGHT_POSITION, e.State == sdl.PRESSED)
+		c.Right = pressed
 	case sdl.K_RETURN, sdl.K_KP_ENTER:
-		j.SetButtonPressed(joypad.JOYPAD_BUTTON_START_POSITION, e.State == sdl.PRESSED)
+		c.Start = pressed
 	case sdl.K_BACKSPACE:
-		j.SetButtonPressed(joypad.JOYPAD_BUTTON_SELECT_POSITION, e.State == sdl.PRESSED)
+		c.Select = pressed
 	}
 }
 
-// コントローラーのボタン状態を検知
-func handleButtonPress(e *sdl.ControllerButtonEvent, j *joypad.JoyPad) {
+// MARK: コントローラーのボタン状態を検知
+func handleButtonPress(e *sdl.ControllerButtonEvent, c *InputState) {
 	pressed := e.State == sdl.PRESSED
 	switch e.Button {
 	case joypad.JOYCON_R_BUTTON_A, joypad.JOYCON_R_BUTTON_X:
-		j.SetButtonPressed(joypad.JOYPAD_BUTTON_A_POSITION, pressed)
+		c.A = pressed
 	case joypad.JOYCON_R_BUTTON_B, joypad.JOYCON_R_BUTTON_Y:
-		j.SetButtonPressed(joypad.JOYPAD_BUTTON_B_POSITION, pressed)
+		c.B = pressed
 	case joypad.JOYCON_R_BUTTON_PLUS:
-		j.SetButtonPressed(joypad.JOYPAD_BUTTON_START_POSITION, pressed)
+		c.Start = pressed
 	case joypad.JOYCON_R_BUTTON_HOME:
-		j.SetButtonPressed(joypad.JOYPAD_BUTTON_SELECT_POSITION, pressed)
+		c.Select = pressed
 	}
 }
 
-// コントローラーのスティック状態を検知
-func handleAxisMotion(e *sdl.ControllerAxisEvent, j *joypad.JoyPad) {
+// MARK: コントローラーのスティック状態を検知
+func handleAxisMotion(e *sdl.ControllerAxisEvent, c *InputState) {
 	const threshold = 8000 // デッドゾーン
-
 	switch e.Axis {
     case 0: // X軸 (左スティック左右)
 			if e.Value < -threshold {
-				j.SetButtonPressed(joypad.JOYPAD_BUTTON_LEFT_POSITION, true)
-				j.SetButtonPressed(joypad.JOYPAD_BUTTON_RIGHT_POSITION, false)
+				c.Left = true
+				c.Right = false
 			} else if e.Value > threshold {
-				j.SetButtonPressed(joypad.JOYPAD_BUTTON_LEFT_POSITION, false)
-				j.SetButtonPressed(joypad.JOYPAD_BUTTON_RIGHT_POSITION, true)
+				c.Left = false
+				c.Right = true
 			} else {
-				j.SetButtonPressed(joypad.JOYPAD_BUTTON_LEFT_POSITION, false)
-				j.SetButtonPressed(joypad.JOYPAD_BUTTON_RIGHT_POSITION, false)
+				c.Left = false
+				c.Right = false
 			}
-
     case 1: // Y軸 (左スティック上下)
 			if e.Value < -threshold {
-				j.SetButtonPressed(joypad.JOYPAD_BUTTON_UP_POSITION, true)
-				j.SetButtonPressed(joypad.JOYPAD_BUTTON_DOWN_POSITION, false)
+				c.Up = true
+				c.Down = false
 			} else if e.Value > threshold {
-				j.SetButtonPressed(joypad.JOYPAD_BUTTON_DOWN_POSITION, true)
-				j.SetButtonPressed(joypad.JOYPAD_BUTTON_UP_POSITION, false)
+				c.Up = false
+				c.Down = true
 			} else {
-				j.SetButtonPressed(joypad.JOYPAD_BUTTON_UP_POSITION, false)
-				j.SetButtonPressed(joypad.JOYPAD_BUTTON_DOWN_POSITION, false)
+				c.Up = false
+				c.Down = false
 			}
 	}
+}
+
+// MARK: JoyPadの状態を更新
+func updateJoyPad(j *joypad.JoyPad, k *InputState, c *InputState) {
+	// キーボードとコントローラの入力を統合
+	buttonA := k.A || c.A
+	buttonB := k.B || c.B
+	buttonStart := k.Start || c.Start
+	buttonSelect := k.Select || c.Select
+	buttonUp := k.Up || c.Up
+	buttonDown := k.Down || c.Down
+	buttonLeft := k.Left || c.Left
+	buttonRight := k.Right || c.Right
+
+	// JoyPadの状態を更新
+	j.SetButtonPressed(joypad.JOYPAD_BUTTON_A_POSITION, buttonA)
+	j.SetButtonPressed(joypad.JOYPAD_BUTTON_B_POSITION, buttonB)
+	j.SetButtonPressed(joypad.JOYPAD_BUTTON_START_POSITION, buttonStart)
+	j.SetButtonPressed(joypad.JOYPAD_BUTTON_SELECT_POSITION, buttonSelect)
+	j.SetButtonPressed(joypad.JOYPAD_BUTTON_UP_POSITION, buttonUp)
+	j.SetButtonPressed(joypad.JOYPAD_BUTTON_DOWN_POSITION, buttonDown)
+	j.SetButtonPressed(joypad.JOYPAD_BUTTON_LEFT_POSITION, buttonLeft)
+	j.SetButtonPressed(joypad.JOYPAD_BUTTON_RIGHT_POSITION, buttonRight)
 }
