@@ -75,7 +75,9 @@ func (p *PPU) Init(mapper mappers.Mapper){
 	p.v = InternalAddressRegiseter{}
 	p.v.Init()
 	p.x = InternalXRegister{}
+	p.x.Init()
 	p.w = InternalWRegister{}
+	p.w.Init()
 
 	p.oamAddress = 0
 	p.scanline = 0
@@ -100,7 +102,7 @@ func (p *PPU) WriteToPPUControlRegister(value uint8) {
 	p.control.update(value)
 
 	// tレジスタのネームテーブルビットを更新
-	// p.t.updateNameTable(value)
+	p.t.updateNameTable(value)
 
 	// VBlank中にGenerateNMIが立つタイミングでNMIを発生させる
 	if !prev && p.control.GenerateVBlankNMI() && p.status.IsInVBlank() {
@@ -122,6 +124,7 @@ func (p *PPU) WriteToOAMAddressRegister(addr uint8) {
 func (p *PPU) WriteToPPUInternalRegister(address uint16, data uint8) {
 	switch address {
 	case 0x2005: // PPU_SCROLL
+		if !p.w.latch { p.x.update(data) }
 		p.t.updateScroll(data, &p.w)
 	case 0x2006: // PPU_ADDR
 		beforeLatch := p.w.latch
@@ -149,7 +152,7 @@ func (p *PPU) DMATransfer(bytes *[256]uint8) {
 // MARK: VRAMアドレスをインクリメント
 func (p *PPU) incrementVRAMAddress() {
 	step := uint16(p.control.GetVRAMAddrIncrement())
-	p.t.SetFromWord((p.t.ToByte() + step) & PPU_REG_END)
+	p.v.SetFromWord((p.v.ToByte() + step) & PPU_REG_END)
 }
 
 // MARK: VRAMへの書き込み
@@ -163,7 +166,7 @@ func (p *PPU) WriteVRAM(value uint8) {
 		$4000-$FFFF $4000 $0000-$3FFF のミラーリング
 	*/
 
-	address := p.t.ToByte()
+	address := p.v.ToByte()
 	p.incrementVRAMAddress()
 
 	switch {
@@ -228,7 +231,7 @@ func (p *PPU) ReadVRAM() uint8 {
 		$4000-$FFFF $4000 $0000-$3FFF のミラーリング
 	*/
 
-	address := p.t.ToByte()
+	address := p.v.ToByte()
 	p.incrementVRAMAddress()
 
 	switch {
@@ -334,60 +337,32 @@ func (p *PPU) getScrollY() uint {
 }
 
 // MARK: 指定したピクセルで使用するネームテーブルを取得
-func (p *PPU) getNameTableForPixel(x uint, y uint) []uint8 {
+func (p *PPU) getNameTable() []uint8 {
 	mirroring := p.Mapper.GetMirroring()
-	baseNameTableAddress := p.control.GetBaseNameTableAddress()
+	baseNameTableAddress := p.v.ToByte()
+	nameTableIndex := (baseNameTableAddress >> 10) & 0b11
 	primaryNameTable := p.vram[0x000:0x400]
 	secondaryNameTable := p.vram[0x400:0x800]
 
-	// 4画面を繋げたうちどの画面にピクセルがあるかを判定
-	isRight := (x % (SCREEN_WIDTH*2)) >= SCREEN_WIDTH
-	isBottom := (y % (SCREEN_HEIGHT*2)) >= SCREEN_HEIGHT
-
-	var vNameTableIndex uint
-	if !isBottom && !isRight {
-		vNameTableIndex = 0 // 左上
-	} else if !isBottom && isRight {
-		vNameTableIndex = 1 // 右上
-	} else if isBottom && !isRight {
-		vNameTableIndex = 2 // 左下
-	} else {
-		vNameTableIndex = 3 // 右下
-	}
-
-	// 基準ネームテーブルアドレスとミラーリングから実際に使用するテーブルを判定
-	var nameTableIndex uint
-	switch baseNameTableAddress {
-	case 0x2000:
-		nameTableIndex = 0
-	case 0x2400:
-		nameTableIndex = 1
-	case 0x2800:
-		nameTableIndex = 2
-	case 0x2C00:
-		nameTableIndex = 3
-	}
-
-	// 仮想のテーブルインデックスと基準アドレスから最終的なテーブルのインデックスを計算
-	index := (vNameTableIndex + nameTableIndex) % 4
-
+	var table []uint8
 	switch mirroring {
 	case mappers.MIRRORING_VERTICAL:
-		if index == 0 || index == 2 {
-			return primaryNameTable
+		if nameTableIndex == 0 || nameTableIndex == 2 {
+			table = primaryNameTable
 		} else {
-			return secondaryNameTable
+			table = secondaryNameTable
 		}
 	case mappers.MIRRORING_HORIZONTAL:
-		if index == 0 || index == 1 {
-			return primaryNameTable
+		if nameTableIndex == 0 || nameTableIndex == 1 {
+			table = primaryNameTable
 		} else {
-			return secondaryNameTable
+			table = secondaryNameTable
 		}
 	default:
 		// @FIXME FourScreenの対応
 		return primaryNameTable
 	}
+	return table
 }
 
 // MARK: BG面のカラーパレットを取得
@@ -497,7 +472,7 @@ func (p *PPU) CalculateScanlineBackground(canvas *Canvas, scanline uint16) {
 		globalX := scrollX + x
 
 		// 描画対象のネームテーブルを決定
-		nameTable := p.getNameTableForPixel(globalX, globalY)
+		nameTable := p.getNameTable()
 
 		// ネームテーブル内のタイル座標を計算
 		tileX := (globalX / TILE_SIZE) % 32
@@ -673,13 +648,13 @@ func (p *PPU) Tick(canvas *Canvas, cycles uint) bool {
 
 			// 水平ビットのコピー (t -> v)
 			if p.cycles == 257 {
-				p.v.copyHorizontalBitsTo(&p.t)
+				p.t.copyHorizontalBitsTo(&p.v)
 			}
 		}
 
 		// プリレンダーラインでのみ垂直ビットをコピー (t -> v)
 		if isPreRenderLine && p.cycles >= 280 && p.cycles <= 304 {
-			p.v.copyVerticalBitsTo(&p.t)
+			p.t.copyVerticalBitsTo(&p.v)
 		}
 	}
 

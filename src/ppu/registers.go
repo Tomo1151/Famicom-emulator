@@ -390,8 +390,8 @@ func (iar *InternalAddressRegiseter) updateScroll(value uint8, w *InternalWRegis
 		iar.coarseX = (value & 0xF8) >> 3
 	} else {
 		// Yのスクロール値のセット
-		iar.coarseY = (iar.coarseY & 0b00001) | ((value & 0xF8) >> 2) // coarseYの下位1ビットを維持
 		iar.fineY = value & 0x07
+		iar.coarseY = (value & 0xF8) >> 3 // coarseYの下位1ビットを維持
 	}
 
 	// Wレジスタの反転
@@ -416,14 +416,14 @@ func (iar *InternalAddressRegiseter) updateAddress(value uint8, w *InternalWRegi
 		// 上位バイトの書き込み
 		// t: .CDEFGH ........ <- value: ..CDEFGH
 		// tのビット14はクリアされる
-		iar.fineY = (value >> 4) & 0x03 // fineYは2ビット分 (C,D)
-		iar.nameTable = (value >> 2) & 0x03 // nameTable (E,F)
-		iar.coarseY = (iar.coarseY & 0b00111) | ((value & 0x03) << 3) // coarseYの上位2ビット (G,H)
+		iar.fineY = (value >> 4) & 0x07
+		iar.nameTable = (value >> 2) & 0x03
+		iar.coarseY = (iar.coarseY & 0x07) | ((value & 0x03) << 3)
 	} else {
 		// 下位バイトの書き込み
 		// t: ....... ABCDEFGH <- value: ABCDEFGH
-		iar.coarseY = (iar.coarseY & 0b11000) | (value >> 5) // coarseYの下位3ビット (A,B,C)
-		iar.coarseX = value & 0x1F // coarseX (D,E,F,G,H)
+		iar.coarseY = (iar.coarseY & 0x18) | ((value >> 5) & 0x07)
+		iar.coarseX = value & 0x1F
 	}
 
 	// Wレジスタの反転
