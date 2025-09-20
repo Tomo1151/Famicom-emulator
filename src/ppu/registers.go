@@ -344,6 +344,7 @@ func (sr *StatusRegister) update(value uint8) {
 
 
 // MARK: スクロールレジスタ ($2005)
+// Deprecated: PPUに t/v/x/w 内部レジスタを持たせるように修正したため
 type ScrollRegister struct {
 	/*
 		書き込み1回目
@@ -390,6 +391,7 @@ func (sr *ScrollRegister) ResetLatch() {
 
 
 // MARK: アドレスレジスタ ($2006)
+// Deprecated: PPUに t/v/x/w 内部レジスタを持たせるように修正したため
 type AddrRegister struct {
 	upper uint8 // 上位ビット
 	lower uint8 // 下位ビット

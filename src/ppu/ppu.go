@@ -36,11 +36,18 @@ type PPU struct {
 	vram [VRAM_SIZE]uint8
 	oam [OAM_DATA_SIZE]uint8
 
+	// IOレジスタ
 	control   ControlRegister // $2000
 	mask   MaskRegister    // $2001
 	status StatusRegister  // $2002
-	scroll ScrollRegister  // $2005
-	address   AddrRegister    // $2006
+	// scroll ScrollRegister  // $2005
+	// address   AddrRegister    // $2006
+
+	// 内部レジスタ
+	v uint16 // current VRAM address
+	t uint16 // VRAM temporary register
+	x uint16 // x scroll
+	w bool // write latch
 
 	scanline uint16 // 現在描画中のスキャンライン
 	cycles uint // PPUサイクル
@@ -66,6 +73,12 @@ func (p *PPU) Init(mapper mappers.Mapper){
 	p.scroll.Init()
 	p.address.Init()
 
+	// 内部レジスタの初期化
+	p.v = 0x00
+	p.t = 0x00
+	p.x = 0x00
+	p.w = false
+
 	p.oamAddress = 0
 	p.scanline = 0
 	p.cycles = 0
@@ -81,11 +94,6 @@ func (p *PPU) Init(mapper mappers.Mapper){
 			PALETTE[p.PaletteTable[0]], // value (rgb palette)
 		}
 	}
-}
-
-// MARK: PPUアドレスレジスタへの書き込み
-func (p *PPU) WriteToPPUAddrRegister(value uint8) {
-	p.address.update(value)
 }
 
 // MARK: PPUコントロールレジスタ($2000)への書き込み
@@ -109,10 +117,15 @@ func (p *PPU) WriteToOAMAddressRegister(addr uint8) {
 	p.oamAddress = addr
 }
 
-// MARK: PPUスクロールレジスタ($2005)への書き込み
-func (p *PPU) WriteToPPUScrollRegister(data uint8) {
-	p.scroll.Write(data)
-}
+// // MARK: PPUスクロールレジスタ($2005)への書き込み
+// func (p *PPU) WriteToPPUScrollRegister(data uint8) {
+// 	p.scroll.Write(data)
+// }
+
+// // MARK: PPUアドレスレジスタ($2006)への書き込み
+// func (p *PPU) WriteToPPUAddrRegister(value uint8) {
+// 	p.address.update(value)
+// }
 
 // MARK: OAM DATA($4014) への書き込み
 func (p *PPU) WriteToOAMDataRegister(data uint8) {
