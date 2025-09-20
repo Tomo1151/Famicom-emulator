@@ -19,7 +19,7 @@ const (
 	PPU_REG_END    = 0x3FFF
 
 	// PPU_ADDRのアドレスマスク
-	PPU_ADDR_MIRROR_MASK = 0b111111_11111111
+	// PPU_ADDR_MIRROR_MASK = 0b111111_11111111
 	PPU_VRAM_MIRROR_MASK = 0b101111_11111111
 )
 
@@ -342,113 +342,210 @@ func (sr *StatusRegister) update(value uint8) {
 	sr.VBlankFlag     = (value & (1 << STATUS_REG_VBLANK_FLAG)) != 0
 }
 
-
-// MARK: スクロールレジスタ ($2005)
-// Deprecated: PPUに t/v/x/w 内部レジスタを持たせるように修正したため
-type ScrollRegister struct {
+// MARK: T/Vレジスタ (PPU 内部)
+type InternalAddressRegiseter struct {
 	/*
-		書き込み1回目
-		7  bit  0
-		---- ----
-		XXXX XXXX
-		|||| ||||
-		++++-++++- X scroll bits 7-0 (bit 8 in PPUCTRL bit 0)
+		yyy NN YYYYY XXXXX
+		||| || ||||| +++++-- タイルの画面内列番号 X (0-31)
+		||| || +++++-------- タイルの画面内行番号 Y (0-29)
+		||| ++-------------- nametable select
+		+++----------------- タイル内の Y 座標 (0-7)
+	*/
+	fineY uint8
+	nameTable uint8
+	coarseY uint8
+	coarseX uint8
+}
 
-		書き込み2回目
-		7  bit  0
-		---- ----
-		YYYY YYYY
-		|||| ||||
-		++++-++++- Y scroll bits 7-0 (bit 8 in PPUCTRL bit 1)
+// T/Vレジスタの初期化メソッド
+func (iar *InternalAddressRegiseter) Init() {
+	iar.updateNameTable(0x00)
+	iar.fineY = 0x00
+	iar.coarseX = 0x00
+	iar.coarseY = 0x00
+}
+
+// ネームテーブル位置の更新メソッド
+func (iar *InternalAddressRegiseter) updateNameTable(value uint8) {
+	/*
+		t: ...GH.. ........ <- value: ......GH
+	*/
+	iar.nameTable = value & 0x03
+}
+
+// スクロール値の更新メソッド
+func (iar *InternalAddressRegiseter) updateScroll(value uint8, w *InternalWRegister) {
+	/*
+		1回目の書き込み (w = 0) → X座標のセット
+		t: ....... ...ABCDE <- value: ABCDEFGH
+		w:                  <- 1
+
+		2回目の書き込み (w = 1) → Y座標のセット
+		t: FGH..AB CDE..... <- value: ABCDEFGH
+		w:                  <- 0
 	*/
 
-	ScrollX uint8 // スクロール値(X)
-	ScrollY uint8 // スクロール値(Y)
-	writeLatch bool // 現在のビットが上位ビットかどうか
-}
-
-// スクロールレジスタのコンストラクタ
-func (sr *ScrollRegister) Init() {
-	sr.ScrollX = 0x00
-	sr.ScrollY = 0x00
-	sr.writeLatch = false
-}
-
-// スクロールレジスタの書き込みメソッド (1度目はX, 2度目はYの値として書き込む)
-func (sr *ScrollRegister) Write(data uint8) {
-	if !sr.writeLatch {
-		sr.ScrollX = data
+	if !w.latch {
+		// Xのスクロール値のセット
+		iar.coarseX = (value & 0xF8) >> 3
 	} else {
-		sr.ScrollY = data
+		// Yのスクロール値のセット
+		iar.coarseY = (iar.coarseY & 0b00001) | ((value & 0xF8) >> 2) // coarseYの下位1ビットを維持
+		iar.fineY = value & 0x07
 	}
-	sr.writeLatch = !sr.writeLatch
+
+	// Wレジスタの反転
+	w.toggle()
 }
 
-// 書き込みラッチのリセットメソッド
-func (sr *ScrollRegister) ResetLatch() {
-	sr.writeLatch = false
-}
+func (iar *InternalAddressRegiseter) updateAddress(value uint8, w *InternalWRegister) {
+	/*
+		1回目の書き込み (w = 0) → 上位バイトのセット
+		t: .CDEFGH ........ <- d: ..CDEFGH
+					<unused>     <- d: AB......
+		t: Z...... ........ <- 0 (bit Z is cleared)
+		w:                  <- 1
 
+		2回目の書き込み (w = 1) → 下位バイトのセット
+		t: ....... ABCDEFGH <- d: ABCDEFGH
+		v: <...all bits...> <- t: <...all bits...>
+		w:                  <- 0
+	*/
 
-// MARK: アドレスレジスタ ($2006)
-// Deprecated: PPUに t/v/x/w 内部レジスタを持たせるように修正したため
-type AddrRegister struct {
-	upper uint8 // 上位ビット
-	lower uint8 // 下位ビット
-	writeLatch bool // 現在のビットが上位ビットかどうか
-}
-
-// アドレスレジスタのコンストラクタ
-func (ar *AddrRegister) Init() {
-	ar.upper = 0x00
-	ar.lower = 0x00
-	ar.writeLatch = true // Wレジスタ (書き込みが最初か2回目かを記憶する)
-}
-
-// アドレスレジスタにデータ(16bit)をセットするメソッド
-func (ar *AddrRegister) set(data uint16) {
-	ar.upper = uint8(data >> 8)
-	ar.lower = uint8(data & 0xFF)
-}
-
-// アドレスレジスタのデータ(16bit)を取得するメソッド
-func (ar *AddrRegister) get() uint16 {
-	return uint16(ar.upper) << 8 | uint16(ar.lower)
-}
-
-// １バイトずつ書き込むメソッド
-func (ar *AddrRegister) update(data uint8) {
-	// 1回目の書き込みは上位ビット, 2回目は下位ビット
-	if ar.writeLatch {
-		ar.upper = data
+	if !w.latch {
+		// 上位バイトの書き込み
+		// t: .CDEFGH ........ <- value: ..CDEFGH
+		// tのビット14はクリアされる
+		iar.fineY = (value >> 4) & 0x03 // fineYは2ビット分 (C,D)
+		iar.nameTable = (value >> 2) & 0x03 // nameTable (E,F)
+		iar.coarseY = (iar.coarseY & 0b00111) | ((value & 0x03) << 3) // coarseYの上位2ビット (G,H)
 	} else {
-		ar.lower = data
+		// 下位バイトの書き込み
+		// t: ....... ABCDEFGH <- value: ABCDEFGH
+		iar.coarseY = (iar.coarseY & 0b11000) | (value >> 5) // coarseYの下位3ビット (A,B,C)
+		iar.coarseX = value & 0x1F // coarseX (D,E,F,G,H)
 	}
 
-	// アドレスのミラーリング
-	if ar.get() > PPU_REG_END {
-		ar.set(ar.get() & PPU_ADDR_MIRROR_MASK)
-	}
-
-	// ビット位置を変更
-	ar.writeLatch = !ar.writeLatch
+	// Wレジスタの反転
+	w.toggle()
 }
 
-// アドレスをインクリメントするメソッド
-func (ar *AddrRegister) increment(step uint8) {
-	// 方向によって 1 or 32 増やす
-	current := ar.get()
-	result := current + uint16(step)
-
-	// アドレスのミラーリング
-	if result > PPU_REG_END {
-		ar.set(result & PPU_ADDR_MIRROR_MASK)
+// 水平方向のVRAMアドレスをインクリメントするメソッド
+func (iar *InternalAddressRegiseter) incrementCoarseX() {
+	// Coarse Xが31未満ならインクリメント
+	if iar.coarseX < 31 {
+		iar.coarseX++
 	} else {
-		ar.set(result)
+		// 31なら0に戻し、水平ネームテーブルを切り替える (ビット0を反転)
+		iar.coarseX = 0
+		iar.nameTable ^= 0b01
 	}
 }
 
-// 書き込みラッチのリセットメソッド
-func (ar *AddrRegister) ResetLatch() {
-	ar.writeLatch = true
+// 垂直方向のVRAMアドレスをインクリメントするメソッド
+func (iar *InternalAddressRegiseter) incrementY() {
+	// Fine Yが7未満ならインクリメント
+	if iar.fineY < 7 {
+		iar.fineY++
+	} else {
+		// 7なら0に戻し、Coarse Yをインクリメント
+		iar.fineY = 0
+		y := iar.coarseY
+		switch y {
+		case 29:
+			// 画面の最後のタイル行ならCoarse Yを0に戻し、垂直ネームテーブルを切り替える (ビット1を反転)
+			y = 0
+			iar.nameTable ^= 0b10
+		case 31:
+			// Coarse Yが31（属性テーブルなどの領域）に達した場合、0に戻す
+			y = 0
+		default:
+			// それ以外はインクリメント
+			y++
+		}
+		iar.coarseY = y
+	}
+}
+
+// 全てのビットを別のレジスタにコピーするメソッド
+func (iar *InternalAddressRegiseter) copyAllBitsTo(iar_to *InternalAddressRegiseter) {
+	iar_to.fineY = iar.fineY
+	iar_to.nameTable = iar.nameTable
+	iar_to.coarseX = iar.coarseX
+	iar_to.coarseY = iar.coarseY
+}
+
+// 水平方向のビットを別のレジスタにコピーするメソッド
+func (iar *InternalAddressRegiseter) copyHorizontalBitsTo(iar_to *InternalAddressRegiseter) {
+	// HBlank直前に使う
+	iar_to.nameTable = (iar_to.nameTable & 0b10) | (iar.nameTable & 0b01)
+	iar_to.coarseX = iar.coarseX
+}
+
+// 垂直方向のビットを別のレジスタにコピーするメソッド
+func (iar *InternalAddressRegiseter) copyVerticalBitsTo(iar_to *InternalAddressRegiseter) {
+	// VBlank直前に使う
+	iar_to.fineY = iar.fineY
+	iar_to.nameTable = (iar_to.nameTable & 0b01) | (iar.nameTable & 0b10)
+	iar_to.coarseY = iar.coarseY
+}
+
+// V/Tレジスタをuint16へ変換するメソッド
+func (iar *InternalAddressRegiseter) ToByte() uint16 {
+	var value uint16 = 0x00
+	value |= uint16(iar.fineY) << 12
+	value |= uint16(iar.nameTable) << 10
+	value |= uint16(iar.coarseY) << 5
+	value |= uint16(iar.coarseX)
+
+	return value
+}
+
+// uint16からV/Tレジスタオブジェクトに変換するメソッド
+func (iar *InternalAddressRegiseter) SetFromWord(value uint16) {
+	iar.fineY = uint8((value >> 12) & 0x07)
+	iar.nameTable = uint8((value >> 10) & 0x03)
+	iar.coarseY = uint8((value >> 5) & 0x1F)
+	iar.coarseX = uint8(value & 0x1F)
+}
+
+// MARK: Xレジスタ (PPU 内部)
+type InternalXRegister struct {
+	fineX uint8
+}
+
+// Xレジスタの初期化メソッド
+func (ixr *InternalXRegister) Init() {
+	ixr.update(0x00)
+}
+
+// Xレジスタの更新メソッド
+func (ixr *InternalXRegister) update(value uint8) {
+	/*
+		1回目の書き込み (w = 0) → X座標のセット
+		x: ....... .....FGH <- value: ABCDEFGH
+	*/
+	ixr.fineX &= ^uint8(0x07) // 元の値をクリア
+	ixr.fineX |= value & 0x07 // 下位3bitに書き込み
+}
+
+
+// MARK: Wレジスタ (PPU 内部)
+type InternalWRegister struct {
+	latch bool
+}
+
+// Wレジスタの初期化メソッド
+func (iwr *InternalWRegister) Init() {
+	iwr.reset()
+}
+
+// Wレジスタの反転メソッド
+func (iwr *InternalWRegister) toggle() {
+	iwr.latch = !iwr.latch
+}
+
+// Wレジスタの初期化メソッド
+func (iwr *InternalWRegister) reset() {
+	iwr.latch = false
 }

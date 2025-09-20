@@ -212,9 +212,9 @@ func (b *Bus) WriteByteAt(address uint16, data uint8) {
 	case address == 0x2004: // OAM_DATA
 		b.ppu.WriteToOAMDataRegister(data)
 	case address == 0x2005: // PPU_SCROLL
-		b.ppu.WriteToPPUScrollRegister(data)
+		b.ppu.WriteToPPUInternalRegister(address, data)
 	case address == 0x2006: // PPU_ADDR
-		b.ppu.WriteToPPUAddrRegister(data)
+		b.ppu.WriteToPPUInternalRegister(address, data)
 	case address == 0x2007: // PPU_DATA
 		b.ppu.WriteVRAM(data)
 	case 0x2008 <= address && address <= PPU_REG_END: // PPUレジスタのミラーリング

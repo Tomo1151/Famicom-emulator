@@ -40,14 +40,12 @@ type PPU struct {
 	control   ControlRegister // $2000
 	mask   MaskRegister    // $2001
 	status StatusRegister  // $2002
-	// scroll ScrollRegister  // $2005
-	// address   AddrRegister    // $2006
 
 	// 内部レジスタ
-	v uint16 // current VRAM address
-	t uint16 // VRAM temporary register
-	x uint16 // x scroll
-	w bool // write latch
+	t InternalAddressRegiseter // 一時的な VRAM アドレスレジスタ
+	v InternalAddressRegiseter // 現在の VRAM アドレスレジスタ
+	x InternalXRegister // x スクロール
+	w InternalWRegister // 書き込みラッチ
 
 	scanline uint16 // 現在描画中のスキャンライン
 	cycles uint // PPUサイクル
@@ -70,14 +68,14 @@ func (p *PPU) Init(mapper mappers.Mapper){
 	p.control.Init()
 	p.mask.Init()
 	p.status.Init()
-	p.scroll.Init()
-	p.address.Init()
 
 	// 内部レジスタの初期化
-	p.v = 0x00
-	p.t = 0x00
-	p.x = 0x00
-	p.w = false
+	p.t = InternalAddressRegiseter{}
+	p.t.Init()
+	p.v = InternalAddressRegiseter{}
+	p.v.Init()
+	p.x = InternalXRegister{}
+	p.w = InternalWRegister{}
 
 	p.oamAddress = 0
 	p.scanline = 0
@@ -101,6 +99,9 @@ func (p *PPU) WriteToPPUControlRegister(value uint8) {
 	prev := p.control.GenerateVBlankNMI()
 	p.control.update(value)
 
+	// tレジスタのネームテーブルビットを更新
+	// p.t.updateNameTable(value)
+
 	// VBlank中にGenerateNMIが立つタイミングでNMIを発生させる
 	if !prev && p.control.GenerateVBlankNMI() && p.status.IsInVBlank() {
 		*p.NMI = 0x01
@@ -117,15 +118,18 @@ func (p *PPU) WriteToOAMAddressRegister(addr uint8) {
 	p.oamAddress = addr
 }
 
-// // MARK: PPUスクロールレジスタ($2005)への書き込み
-// func (p *PPU) WriteToPPUScrollRegister(data uint8) {
-// 	p.scroll.Write(data)
-// }
+// MARK: PPU内部レジスタへ(T/V/X/W)の書き込み
+func (p *PPU) WriteToPPUInternalRegister(address uint16, data uint8) {
+	switch address {
+	case 0x2005: // PPU_SCROLL
+		p.t.updateScroll(data, &p.w)
+	case 0x2006: // PPU_ADDR
+		beforeLatch := p.w.latch
+		p.t.updateAddress(data, &p.w)
 
-// // MARK: PPUアドレスレジスタ($2006)への書き込み
-// func (p *PPU) WriteToPPUAddrRegister(value uint8) {
-// 	p.address.update(value)
-// }
+		if beforeLatch && !p.w.latch { p.t.copyAllBitsTo(&p.v) }
+	}
+}
 
 // MARK: OAM DATA($4014) への書き込み
 func (p *PPU) WriteToOAMDataRegister(data uint8) {
@@ -144,7 +148,8 @@ func (p *PPU) DMATransfer(bytes *[256]uint8) {
 
 // MARK: VRAMアドレスをインクリメント
 func (p *PPU) incrementVRAMAddress() {
-	p.address.increment(p.control.GetVRAMAddrIncrement())
+	step := uint16(p.control.GetVRAMAddrIncrement())
+	p.t.SetFromWord((p.t.ToByte() + step) & PPU_REG_END)
 }
 
 // MARK: VRAMへの書き込み
@@ -158,7 +163,7 @@ func (p *PPU) WriteVRAM(value uint8) {
 		$4000-$FFFF $4000 $0000-$3FFF のミラーリング
 	*/
 
-	address := p.address.get()
+	address := p.t.ToByte()
 	p.incrementVRAMAddress()
 
 	switch {
@@ -202,8 +207,7 @@ func (p *PPU) ReadPPUMask() uint8 {
 func (p *PPU) ReadPPUStatus() uint8 {
 	status := p.status.ToByte()
 	p.status.ClearVBlankStatus()
-	p.scroll.ResetLatch()
-	p.address.ResetLatch()
+	p.w.reset()
 	// @FIXME READ PPU STATUSした次のフレームはNMIを発生させない
 	return status
 }
@@ -224,7 +228,7 @@ func (p *PPU) ReadVRAM() uint8 {
 		$4000-$FFFF $4000 $0000-$3FFF のミラーリング
 	*/
 
-	address := p.address.get()
+	address := p.t.ToByte()
 	p.incrementVRAMAddress()
 
 	switch {
@@ -317,6 +321,16 @@ func (p *PPU) isSpriteZeroHit(cycles uint) bool {
 		スプライトの可視ピクセルを判定に加える，現在はそれをしておらず，SMBのコイン下半分のスプライトに合わせているため +6 になっているが，これが +4 になるはず
 	*/
 	return p.mask.SpriteEnable && y == uint(p.scanline) && x <= cycles
+}
+
+// MARK: X/VレジスタからXスクロール値を取得
+func (p *PPU) getScrollX() uint {
+	return uint(p.v.coarseX) * TILE_SIZE + uint(p.x.fineX)
+}
+
+// MARK: VレジスタからYスクロール値を取得
+func (p *PPU) getScrollY() uint {
+	return uint(p.v.coarseY) * TILE_SIZE + uint(p.v.fineY)
 }
 
 // MARK: 指定したピクセルで使用するネームテーブルを取得
@@ -467,8 +481,8 @@ func (p *PPU) CalculateScanlineBackground(canvas *Canvas, scanline uint16) {
 	if !p.mask.BackgroundEnable { return }
 
 	// スクロール値を取得
-	scrollX := uint(p.scroll.ScrollX)
-	scrollY := uint(p.scroll.ScrollY)
+	scrollX := p.getScrollX()
+	scrollY := p.getScrollY()
 
 	// 描画するY座標を計算
 	globalY := scrollY + uint(scanline)
@@ -639,6 +653,36 @@ func (p *PPU) CalculateScanlineSprite(canvas *Canvas, scanline uint16) {
 func (p *PPU) Tick(canvas *Canvas, cycles uint) bool {
 	// サイクルを進める
 	p.cycles += cycles
+
+	isRenderingEnabled := p.mask.BackgroundEnable || p.mask.SpriteEnable
+	isRenderLine := (SCANLINE_START <= p.scanline && p.scanline < SCANLINE_POSTRENDER)
+	isPreRenderLine := p.scanline == SCANLINE_PRERENDER
+
+	if isRenderingEnabled {
+		// レンダリング中のサイクル処理
+		if isRenderLine || isPreRenderLine {
+			// 8サイクル毎に水平アドレスをインクリメント
+			if p.cycles % 8 == 0 && p.cycles >= 8 && p.cycles <= 256 {
+				p.v.incrementCoarseX()
+			}
+
+			// スキャンラインの終わりに垂直アドレスをインクリメント
+			if p.cycles == 256 {
+				p.v.incrementY()
+			}
+
+			// 水平ビットのコピー (t -> v)
+			if p.cycles == 257 {
+				p.v.copyHorizontalBitsTo(&p.t)
+			}
+		}
+
+		// プリレンダーラインでのみ垂直ビットをコピー (t -> v)
+		if isPreRenderLine && p.cycles >= 280 && p.cycles <= 304 {
+			p.v.copyVerticalBitsTo(&p.t)
+		}
+	}
+
 
 	if p.cycles >= SCANLINE_END {
 		if p.isSpriteZeroHit(p.cycles) {
