@@ -63,6 +63,8 @@ type PPU struct {
 // MARK: PPUの初期化メソッド
 func (p *PPU) Init(mapper mappers.Mapper) {
 	p.Mapper = mapper
+
+	// VRAM/OAM/パレットの初期化
 	for addr := range p.vram {
 		p.vram[addr] = 0x00
 	}
@@ -186,17 +188,15 @@ func (p *PPU) WriteVRAM(value uint8) {
 	p.incrementVRAMAddress()
 
 	switch {
-	case address <= 0x1FFF:
+	case address <= 0x1FFF: // キャラクタROM
 		if p.Mapper.GetIsCharacterRAM() {
 			p.Mapper.WriteToCharacterROM(address, value)
-			// p.CHR_ROM[address] = value
 		}
-	case 0x2000 <= address && address <= 0x2FFF:
+	case 0x2000 <= address && address <= 0x2FFF: // VRAM
 		p.vram[p.mirrorVRAMAddress(address)] = value
-	case 0x3000 <= address && address <= 0x3EFF:
-		// fmt.Printf("Error: unexpected vram write to $%04X\n", address)
+	case 0x3000 <= address && address <= 0x3EFF: // ネームテーブル
 		return
-	case 0x3F00 <= address && address <= 0x3F1F:
+	case 0x3F00 <= address && address <= 0x3F1F: // パレット
 		// アドレスのミラーリング
 		if address == 0x3F10 ||
 			address == 0x3F14 ||
@@ -205,7 +205,7 @@ func (p *PPU) WriteVRAM(value uint8) {
 			address -= 0x10
 		}
 		p.PaletteTable[address-0x3F00] = value
-	case 0x3F20 <= address && address <= 0x3FFF:
+	case 0x3F20 <= address && address <= 0x3FFF: // パレット (ミラーリング)
 		p.PaletteTable[(address-0x3F00)%32] = value
 	default:
 		panic(fmt.Sprintf("Unexpected write to mirrored space: %04X", address))
@@ -251,18 +251,18 @@ func (p *PPU) ReadVRAM() uint8 {
 	p.incrementVRAMAddress()
 
 	switch {
-	case address <= 0x1FFF:
+	case address <= 0x1FFF: // キャラクタROM
 		value := p.internalDataBuffer
 		p.internalDataBuffer = p.Mapper.ReadCharacterROM(address)
 		return value
-	case 0x2000 <= address && address <= 0x2FFF:
+	case 0x2000 <= address && address <= 0x2FFF: // VRAM
 		// 一回遅れで値は反映されるため，内部バッファを更新し，元のバッファ値を返す
 		value := p.internalDataBuffer
 		p.internalDataBuffer = p.vram[p.mirrorVRAMAddress(address)]
 		return value
-	case 0x3000 <= address && address <= 0x3EFF:
+	case 0x3000 <= address && address <= 0x3EFF: // ネームテーブル
 		panic(fmt.Sprintf("Error: address space 0x3000..0x3eff is not expected to read, requested: %04X", address))
-	case 0x3F00 <= address && address <= 0x3F1F:
+	case 0x3F00 <= address && address <= 0x3F1F: // パレット
 		// アドレスのミラーリング
 		if address == 0x3F10 ||
 			address == 0x3F14 ||
@@ -271,7 +271,7 @@ func (p *PPU) ReadVRAM() uint8 {
 			address -= 0x10
 		}
 		return p.PaletteTable[address-0x3F00]
-	case 0x3F20 <= address && address <= 0x3FFF:
+	case 0x3F20 <= address && address <= 0x3FFF: // パレット (ミラーリング)
 		return p.PaletteTable[(address-0x3F00)%32]
 	default:
 		panic(fmt.Sprintf("Error: unexpected read to mirrored space: %04X", address))
@@ -426,6 +426,34 @@ func (p *PPU) FindScanlineSprite(spriteHeight uint8, scanline uint16) (uint, *[S
 	return spriteCount, &sprites
 }
 
+// MARK: スキャンライン開始時点のVレジスタからネームテーブルを取得
+func (p *PPU) getNameTable(v InternalAddressRegiseter) *[]uint8 {
+	nameTableIndex := v.nameTable
+	var nameTable []uint8
+
+	primaryNameTable := p.vram[0x000:0x400]
+	secondaryNameTable := p.vram[0x400:0x800]
+
+	mirroring := p.Mapper.GetMirroring()
+	switch mirroring {
+	case mappers.MIRRORING_VERTICAL:
+		if nameTableIndex == 0 || nameTableIndex == 2 {
+			nameTable = primaryNameTable
+		} else {
+			nameTable = secondaryNameTable
+		}
+	case mappers.MIRRORING_HORIZONTAL:
+		if nameTableIndex == 0 || nameTableIndex == 1 {
+			nameTable = primaryNameTable
+		} else {
+			nameTable = secondaryNameTable
+		}
+	default:
+		nameTable = primaryNameTable
+	}
+	return &nameTable
+}
+
 // MARK: 指定したスキャンラインのBG面を計算
 func (p *PPU) CalculateScanlineBackground(canvas *Canvas, scanline uint16) {
 	// BGが無効であれば描画をしない
@@ -434,7 +462,7 @@ func (p *PPU) CalculateScanlineBackground(canvas *Canvas, scanline uint16) {
 	}
 
 	// 現在のVレジスタの状態をバックアップ（ライン開始時点の値を使う）
-	tmpV := p.vLineStart
+	v := p.vLineStart
 
 	// 画面の左端から右端まで
 	fineX := uint(p.x.fineX) // ここからはローカルで進める。p.xは書き換えない
@@ -442,33 +470,12 @@ func (p *PPU) CalculateScanlineBackground(canvas *Canvas, scanline uint16) {
 		// 左端8pxの描画有無を判定（描画はしないが、アドレスの前進は必要）
 		if p.mask.LeftmostBackgroundEnable || x >= TILE_SIZE {
 			// 現在のピクセル位置でのタイル座標を計算
-			tileX := uint(tmpV.coarseX)
-			tileY := uint(tmpV.coarseY)
-			fineY := uint(tmpV.fineY)
+			tileX := uint(v.coarseX)
+			tileY := uint(v.coarseY)
+			fineY := uint(v.fineY)
 
 			// ネームテーブルの選択
-			nameTableIndex := tmpV.nameTable
-			var nameTable []uint8
-			primaryNameTable := p.vram[0x000:0x400]
-			secondaryNameTable := p.vram[0x400:0x800]
-
-			mirroring := p.Mapper.GetMirroring()
-			switch mirroring {
-			case mappers.MIRRORING_VERTICAL:
-				if nameTableIndex == 0 || nameTableIndex == 2 {
-					nameTable = primaryNameTable
-				} else {
-					nameTable = secondaryNameTable
-				}
-			case mappers.MIRRORING_HORIZONTAL:
-				if nameTableIndex == 0 || nameTableIndex == 1 {
-					nameTable = primaryNameTable
-				} else {
-					nameTable = secondaryNameTable
-				}
-			default:
-				nameTable = primaryNameTable
-			}
+			nameTable := *p.getNameTable(v)
 
 			// タイルのインデックスを取得
 			tileIndex := uint16(nameTable[tileY*32+tileX])
@@ -498,7 +505,7 @@ func (p *PPU) CalculateScanlineBackground(canvas *Canvas, scanline uint16) {
 		fineX++
 		if fineX%8 == 0 {
 			// タイル境界を越えたらタイルを進める
-			tmpV.incrementCoarseX()
+			v.incrementCoarseX()
 		}
 	}
 }
