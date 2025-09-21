@@ -35,8 +35,8 @@ func main() {
 	// ROMファイルのロード
 
 	// filedata, err := os.ReadFile("../rom/Kirby'sAdventure.nes")
-	// filedata, err := os.ReadFile("../rom/SuperMarioBros.nes")
-	filedata, err := os.ReadFile("../rom/SuperMarioBros3.nes")
+	filedata, err := os.ReadFile("../rom/SuperMarioBros.nes")
+	// filedata, err := os.ReadFile("../rom/SuperMarioBros3.nes")
 	if err != nil {
 		log.Fatalf("Error occured in 'os.ReadFile()'")
 	}

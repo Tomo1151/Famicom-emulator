@@ -152,7 +152,8 @@ func (p *PPU) DMATransfer(bytes *[256]uint8) {
 // MARK: VRAMアドレスをインクリメント
 func (p *PPU) incrementVRAMAddress() {
 	step := uint16(p.control.GetVRAMAddrIncrement())
-	p.v.SetFromWord((p.v.ToByte() + step) & PPU_REG_END)
+	newAddr := (p.v.ToByte() + step) & 0x3FFF // 14ビットでマスク
+	p.v.SetFromWord(newAddr)
 }
 
 // MARK: VRAMへの書き込み
@@ -326,45 +327,6 @@ func (p *PPU) isSpriteZeroHit(cycles uint) bool {
 	return p.mask.SpriteEnable && y == uint(p.scanline) && x <= cycles
 }
 
-// MARK: X/VレジスタからXスクロール値を取得
-func (p *PPU) getScrollX() uint {
-	return uint(p.v.coarseX) * TILE_SIZE + uint(p.x.fineX)
-}
-
-// MARK: VレジスタからYスクロール値を取得
-func (p *PPU) getScrollY() uint {
-	return uint(p.v.coarseY) * TILE_SIZE + uint(p.v.fineY)
-}
-
-// MARK: 指定したピクセルで使用するネームテーブルを取得
-func (p *PPU) getNameTable() []uint8 {
-	mirroring := p.Mapper.GetMirroring()
-	baseNameTableAddress := p.v.ToByte()
-	nameTableIndex := (baseNameTableAddress >> 10) & 0b11
-	primaryNameTable := p.vram[0x000:0x400]
-	secondaryNameTable := p.vram[0x400:0x800]
-
-	var table []uint8
-	switch mirroring {
-	case mappers.MIRRORING_VERTICAL:
-		if nameTableIndex == 0 || nameTableIndex == 2 {
-			table = primaryNameTable
-		} else {
-			table = secondaryNameTable
-		}
-	case mappers.MIRRORING_HORIZONTAL:
-		if nameTableIndex == 0 || nameTableIndex == 1 {
-			table = primaryNameTable
-		} else {
-			table = secondaryNameTable
-		}
-	default:
-		// @FIXME FourScreenの対応
-		return primaryNameTable
-	}
-	return table
-}
-
 // MARK: BG面のカラーパレットを取得
 func (p *PPU) getBGPalette(attrributeTable *[]uint8, tileColumn uint, tileRow uint) [4]uint8 {
 	attrTableIdx := tileRow / 4 * TILE_SIZE + tileColumn / 4
@@ -455,54 +417,79 @@ func (p *PPU) CalculateScanlineBackground(canvas *Canvas, scanline uint16) {
 	// BGが無効であれば描画をしない
 	if !p.mask.BackgroundEnable { return }
 
-	// スクロール値を取得
-	scrollX := p.getScrollX()
-	scrollY := p.getScrollY()
-
-	// 描画するY座標を計算
-	globalY := scrollY + uint(scanline)
-	actualY := globalY % TILE_SIZE // タイル内の何行目か
+	// 現在のVレジスタの状態をバックアップ
+	tmpV := p.v
 
 	// 画面の左端から右端まで
 	for x := range SCREEN_WIDTH {
 		// 左端のBG面描画フラグが無効であれば描画しない
 		if !p.mask.LeftmostBackgroundEnable && x < TILE_SIZE { continue }
 
-		// 描画するX座標を計算
-		globalX := scrollX + x
+		// 現在のピクセル位置でのタイル座標を計算
+		tileX := uint(tmpV.coarseX)
+		tileY := uint(tmpV.coarseY)
+		fineX := uint(p.x.fineX)
+		fineY := uint(tmpV.fineY)
 
-		// 描画対象のネームテーブルを決定
-		nameTable := p.getNameTable()
-
-		// ネームテーブル内のタイル座標を計算
-		tileX := (globalX / TILE_SIZE) % 32
-		tileY := (globalY / TILE_SIZE) % 30
+		// ネームテーブルの選択
+		nameTableIndex := tmpV.nameTable
+		var nameTable []uint8
+		
+		primaryNameTable := p.vram[0x000:0x400]
+		secondaryNameTable := p.vram[0x400:0x800]
+		
+		mirroring := p.Mapper.GetMirroring()
+		switch mirroring {
+		case mappers.MIRRORING_VERTICAL:
+			if nameTableIndex == 0 || nameTableIndex == 2 {
+				nameTable = primaryNameTable
+			} else {
+				nameTable = secondaryNameTable
+			}
+		case mappers.MIRRORING_HORIZONTAL:
+			if nameTableIndex == 0 || nameTableIndex == 1 {
+				nameTable = primaryNameTable
+			} else {
+				nameTable = secondaryNameTable
+			}
+		default:
+			nameTable = primaryNameTable
+		}
 
 		// タイルのインデックスを取得
-		tileIndex := uint16((nameTable)[tileY*32+tileX])
+		tileIndex := uint16(nameTable[tileY*32+tileX])
 
 		// 属性テーブルからパレット情報を取得
-		attributeTable := (nameTable)[0x3C0:0x400]
+		attributeTable := nameTable[0x3C0:0x400]
 		palette := p.getBGPalette(&attributeTable, tileX, tileY)
 
 		// パターンテーブルからタイルのピクセルデータを取得
 		bank := p.control.GetBackgroundPatternTableAddress()
 		tileBasePointer := bank + tileIndex * uint16(TILE_SIZE * 2)
 
-		// 実際のY座標に対応するタイルデータを2バイト取得
-		upper := p.Mapper.ReadCharacterROM(tileBasePointer + uint16(actualY))
-		lower := p.Mapper.ReadCharacterROM(tileBasePointer + uint16(actualY) + uint16(TILE_SIZE))
+		// タイルデータを2バイト取得
+		upper := p.Mapper.ReadCharacterROM(tileBasePointer + uint16(fineY))
+		lower := p.Mapper.ReadCharacterROM(tileBasePointer + uint16(fineY) + uint16(TILE_SIZE))
 
-		// 実際のY座標に対応するピクセルを計算
-		actualX := (TILE_SIZE-1) - (globalX % TILE_SIZE)
+		// ピクセル位置を計算（fineXを使用）
+		pixelIndex := (7 - fineX) % 8
 
 		// そのピクセルの色を確定
-		value := (lower >> uint8(actualX) & 1) << 1 | (upper >> uint8(actualX) & 1)
+		value := ((lower >> pixelIndex) & 1) << 1 | ((upper >> pixelIndex) & 1)
 
 		// ラインバッファに登録
 		p.lineBuffer[x].Type  = PIXEL_TYPE_BACKGROUND
 		p.lineBuffer[x].value = PALETTE[palette[value]]
 		p.lineBuffer[x].priority = 0x00
+
+		// 次のピクセルへ進む
+		fineX++
+		if fineX >= 8 {
+			fineX = 0
+			// 水平方向にタイルを進める
+			tmpV.incrementCoarseX()
+		}
+		p.x.fineX = uint8(fineX)
 	}
 }
 
@@ -633,22 +620,37 @@ func (p *PPU) Tick(canvas *Canvas, cycles uint) bool {
 	isRenderLine := (SCANLINE_START <= p.scanline && p.scanline < SCANLINE_POSTRENDER)
 	isPreRenderLine := p.scanline == SCANLINE_PRERENDER
 
+	// スプライト0ヒットの判定（適切なタイミングで）
+	if isRenderLine && p.isSpriteZeroHit(p.cycles) {
+		p.status.SetSpriteZeroHit(true)
+	}
+
 	if isRenderingEnabled {
 		// レンダリング中のサイクル処理
 		if isRenderLine || isPreRenderLine {
-			// 8サイクル毎に水平アドレスをインクリメント
-			if p.cycles % 8 == 0 && p.cycles >= 8 && p.cycles <= 256 {
-				p.v.incrementCoarseX()
+			// 1-256サイクル: 各タイルをフェッチする間に水平アドレスをインクリメント
+			if p.cycles >= 1 && p.cycles <= 256 {
+				// 8サイクル毎（タイルフェッチ完了時）に水平アドレスをインクリメント
+				if (p.cycles-1) % 8 == 7 {
+					p.v.incrementCoarseX()
+				}
 			}
 
-			// スキャンラインの終わりに垂直アドレスをインクリメント
+			// 256サイクル: 垂直アドレスをインクリメント
 			if p.cycles == 256 {
 				p.v.incrementY()
 			}
 
-			// 水平ビットのコピー (t -> v)
+			// 257サイクル: 水平ビットのコピー (t -> v)
 			if p.cycles == 257 {
 				p.t.copyHorizontalBitsTo(&p.v)
+			}
+
+			// 321-336サイクル: 次のスキャンライン準備のため水平アドレスをインクリメント
+			if p.cycles >= 321 && p.cycles <= 336 {
+				if (p.cycles-321) % 8 == 7 {
+					p.v.incrementCoarseX()
+				}
 			}
 		}
 
@@ -658,17 +660,12 @@ func (p *PPU) Tick(canvas *Canvas, cycles uint) bool {
 		}
 	}
 
-
 	if p.cycles >= SCANLINE_END {
-		if p.isSpriteZeroHit(p.cycles) {
-			p.status.SetSpriteZeroHit(true)
-		}
-
-		// サイクル数を0に戻す
-		p.cycles -= SCANLINE_END
+		// サイクル数をリセット
+		p.cycles = 0
 
 		// マッパーによるIRQの判定
-		p.Mapper.GenerateScanlineIRQ(p.scanline, p.mask.BackgroundEnable || p.mask.SpriteEnable)
+		p.Mapper.GenerateScanlineIRQ(p.scanline, isRenderingEnabled)
 
 		// 可視領域のスキャンラインを描画
 		if SCANLINE_START <= p.scanline && p.scanline < SCANLINE_POSTRENDER {
@@ -681,7 +678,6 @@ func (p *PPU) Tick(canvas *Canvas, cycles uint) bool {
 		// VBlankに突入
 		if p.scanline == SCANLINE_VBLANK {
 			p.status.SetVBlankStatus(true)
-			p.status.SetSpriteZeroHit(false)
 			if p.control.GenerateVBlankNMI() {
 				// NMIを設定
 				nmiValue := uint8(1)
@@ -689,8 +685,8 @@ func (p *PPU) Tick(canvas *Canvas, cycles uint) bool {
 			}
 		}
 
-		// プリレンダーラインに到達した時
-		if p.scanline >= SCANLINE_PRERENDER+1 {
+		// プリレンダーラインに到達した時（フレーム終了）
+		if p.scanline > SCANLINE_PRERENDER {
 			p.scanline = 0
 			p.NMI = nil
 			p.status.SetSpriteZeroHit(false)

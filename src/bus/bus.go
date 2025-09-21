@@ -82,8 +82,8 @@ func (b *Bus) Tick(cycles uint) {
 	nmiBefore := b.ppu.NMI
 
 	// PPUはCPUの3倍のクロック周波数
-	for range [3]int{} {
-		b.ppu.Tick(b.canvas, cycles)
+	for i := uint(0); i < cycles * 3; i++ {
+		b.ppu.Tick(b.canvas, 1)
 	}
 
 	// APUと同期
