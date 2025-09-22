@@ -18,9 +18,29 @@ type PixelType byte
 
 // MARK: Pixelの定義
 type Pixel struct {
-	Type     PixelType
-	priority uint8
-	value    [3]uint8
+	priority            uint8
+	backgroundValue     [3]uint8
+	spriteValue         [3]uint8
+	isBgTransparent     bool
+	isSpriteTransparent bool
+}
+
+func (p *Pixel) Value(ppu *PPU) [3]uint8 {
+	var color [3]uint8
+	if p.isBgTransparent && p.isSpriteTransparent {
+		color = PALETTE[ppu.PaletteTable[0]]
+	} else if p.isBgTransparent && !p.isSpriteTransparent {
+		color = p.spriteValue
+	} else if !p.isBgTransparent && p.isSpriteTransparent {
+		color = p.backgroundValue
+	} else {
+		if p.priority == 0 {
+			color = p.spriteValue
+		} else {
+			color = p.backgroundValue
+		}
+	}
+	return color
 }
 
 // MARK: Canvasの定義
@@ -55,6 +75,6 @@ func RenderScanlineToCanvas(ppu *PPU, canvas *Canvas, scanline uint16) {
 	ppu.CalculateScanlineSprite(canvas, scanline)
 
 	for x := range SCREEN_WIDTH {
-		canvas.setPixelAt(x, uint(scanline), ppu.lineBuffer[x].value)
+		canvas.setPixelAt(x, uint(scanline), ppu.lineBuffer[x].Value(ppu))
 	}
 }

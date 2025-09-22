@@ -103,9 +103,11 @@ func (p *PPU) Init(mapper mappers.Mapper) {
 	// ラインバッファの初期化
 	for i := range p.lineBuffer {
 		p.lineBuffer[i] = Pixel{
-			PIXEL_TYPE_BACKGROUND,      // type
 			0x00,                       // priority
-			PALETTE[p.PaletteTable[0]], // value (rgb palette)
+			PALETTE[p.PaletteTable[0]], // background value (rgb palette)
+			PALETTE[p.PaletteTable[0]], // sprite value (rgb palette)
+			true,                       // background transparent
+			true,                       // sprite transparent
 		}
 	}
 }
@@ -385,9 +387,10 @@ func (p *PPU) getSpritePalette(paletteIndex uint8) [4]uint8 {
 // MARK: ラインバッファをクリア
 func (p *PPU) ClearLineBuffer() {
 	for x := range p.lineBuffer {
-		p.lineBuffer[x].Type = PIXEL_TYPE_BACKGROUND
-		p.lineBuffer[x].value = PALETTE[p.PaletteTable[0]]
+		p.lineBuffer[x].backgroundValue = PALETTE[p.PaletteTable[0]]
+		p.lineBuffer[x].spriteValue = PALETTE[p.PaletteTable[0]]
 		p.lineBuffer[x].priority = 0x00
+		p.lineBuffer[x].isSpriteTransparent = true
 	}
 }
 
@@ -494,11 +497,12 @@ func (p *PPU) CalculateScanlineBackground(canvas *Canvas, scanline uint16) {
 			// ピクセル位置を計算（fineXを使用）
 			pixelIndex := (7 - (fineX % 8)) // 0..7
 			value := ((lower>>pixelIndex)&1)<<1 | ((upper >> pixelIndex) & 1)
+			color := PALETTE[palette[value]]
 
 			// ラインバッファに登録
-			p.lineBuffer[x].Type = PIXEL_TYPE_BACKGROUND
-			p.lineBuffer[x].value = PALETTE[palette[value]]
+			p.lineBuffer[x].backgroundValue = color
 			p.lineBuffer[x].priority = 0x00
+			p.lineBuffer[x].isBgTransparent = color == PALETTE[p.PaletteTable[0]]
 		}
 
 		// 次のピクセルへ進む（描画しない場合でも必ず進める）
@@ -607,6 +611,7 @@ func (p *PPU) CalculateScanlineSprite(canvas *Canvas, scanline uint16) {
 
 			// 透明ピクセルは描画しない
 			if value == 0 {
+				// @FIXME 飛ばすとOAMでの順番が若い透明なピクセルで上書きできない
 				continue
 			}
 
@@ -622,16 +627,11 @@ func (p *PPU) CalculateScanlineSprite(canvas *Canvas, scanline uint16) {
 				continue
 			}
 
-			// 描画ピクセルの背景が透明かどうか
-			isBgTransparent := p.lineBuffer[actualX].value == PALETTE[p.PaletteTable[0]]
-
 			// スプライトの優先度が0または背景が透明であれば描画
 			// @FIXME BG面より優先されないスプライトに，OAM上の順番が後ろが重なった時にBG面が最優先になるようにする (SMB3のパックンフラワー等)
-			if priority == 0 || isBgTransparent {
-				p.lineBuffer[actualX].Type = PIXEL_TYPE_SPRITE
-				p.lineBuffer[actualX].value = PALETTE[palette[value]]
-				p.lineBuffer[actualX].priority = priority
-			}
+			p.lineBuffer[actualX].spriteValue = PALETTE[palette[value]]
+			p.lineBuffer[actualX].priority = priority
+			p.lineBuffer[actualX].isSpriteTransparent = false
 		}
 	}
 }
