@@ -61,6 +61,7 @@ func main() {
 		fmt.Println("No controller detected")
 	} else {
 		fmt.Println("Controller opened:", controller.Name())
+		defer controller.Close()
 	}
 
 	// レンダラーの作成
