@@ -18,7 +18,7 @@ import (
 // MARK: 定数定義
 const (
 	FRAME_PER_SECOND = 60
-	SCALE_FACTOR = 3
+	SCALE_FACTOR     = 3
 
 	INPUT_MODE_KEYBOARD = 0
 	INPUT_MODE_JOYPAD   = 1
@@ -68,6 +68,7 @@ func main() {
 		fmt.Println("No controller detected")
 	} else {
 		fmt.Println("Controller opened:", controller.Name())
+		defer controller.Close()
 	}
 
 	// レンダラーの作成
@@ -185,28 +186,28 @@ func handleButtonPress(e *sdl.ControllerButtonEvent, c *InputState) {
 func handleAxisMotion(e *sdl.ControllerAxisEvent, c *InputState) {
 	const threshold = 8000 // デッドゾーン
 	switch e.Axis {
-    case 0: // X軸 (左スティック左右)
-			if e.Value < -threshold {
-				c.Left = true
-				c.Right = false
-			} else if e.Value > threshold {
-				c.Left = false
-				c.Right = true
-			} else {
-				c.Left = false
-				c.Right = false
-			}
-    case 1: // Y軸 (左スティック上下)
-			if e.Value < -threshold {
-				c.Up = true
-				c.Down = false
-			} else if e.Value > threshold {
-				c.Up = false
-				c.Down = true
-			} else {
-				c.Up = false
-				c.Down = false
-			}
+	case 0: // X軸 (左スティック左右)
+		if e.Value < -threshold {
+			c.Left = true
+			c.Right = false
+		} else if e.Value > threshold {
+			c.Left = false
+			c.Right = true
+		} else {
+			c.Left = false
+			c.Right = false
+		}
+	case 1: // Y軸 (左スティック上下)
+		if e.Value < -threshold {
+			c.Up = true
+			c.Down = false
+		} else if e.Value > threshold {
+			c.Up = false
+			c.Down = true
+		} else {
+			c.Up = false
+			c.Down = false
+		}
 	}
 }
 
