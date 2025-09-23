@@ -4,7 +4,10 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"os"
+	"path/filepath"
 	"reflect"
+	"strings"
 
 	"Famicom-emulator/cartridge/mappers"
 )
@@ -17,29 +20,54 @@ type Mirroring uint8
 
 const (
 	PRG_ROM_PAGE_SIZE uint = 16 * 1024 // 16kB
-	CHR_ROM_PAGE_SIZE uint = 8 * 1024 // 8kB
+	CHR_ROM_PAGE_SIZE uint = 8 * 1024  // 8kB
+
+	SAVE_DATA_DIR = "../rom/saves/"
 )
 
 // カートリッジ先頭のiNESタグ
-var	NES_TAG = []uint8{0x4E, 0x45, 0x53, 0x1A}
+var NES_TAG = []uint8{0x4E, 0x45, 0x53, 0x1A}
 
 // MARK: カートリッジの読み込み
-func (c *Cartridge) Load(raw []uint8) error {
-	if !reflect.DeepEqual(raw[0:4], NES_TAG) {
-		log.Fatalf("Error: invalid cartridge header '%v'", raw[0:4])
+func (c *Cartridge) Load(filename string) error {
+	ext := filepath.Ext(filename)
+	name := strings.TrimSuffix(filepath.Base(filename), ext)
+
+	// ゲームROMの読み込み
+	gamefile, err := os.ReadFile(filename)
+	if err != nil {
+		log.Fatalf("Error occured in 'os.ReadFile()'")
+		return fmt.Errorf("Couldn't read file: %s", filename)
+	}
+
+	// savesディレクトリがなければ作成
+	if _, err := os.Stat(SAVE_DATA_DIR); os.IsNotExist(err) {
+		os.Mkdir(SAVE_DATA_DIR, 0755)
+	}
+
+	// セーブデータの読み込み
+	savefile, err := os.ReadFile(SAVE_DATA_DIR + name + ".save")
+	if err != nil {
+		savefile = []byte{}
+	}
+
+	// NESタグの検証
+	if !reflect.DeepEqual(gamefile[0:4], NES_TAG) {
+		log.Fatalf("Error: invalid cartridge header '%v'", gamefile[0:4])
 		return errors.New("Invalid cartridge header")
 	}
 
-	mapperNo := (raw[7] & 0xF0) | (raw[6] >> 4)
-	iNESVer := (raw[7] >> 2) & 0b11
+	// iNESヘッダとマッパーの検証
+	mapperNo := (gamefile[7] & 0xF0) | (gamefile[6] >> 4)
+	iNESVer := (gamefile[7] >> 2) & 0b11
 	if iNESVer != 0 {
 		log.Fatalf("NES2.0 format is not supported")
 		return errors.New("Unsupported iNES version")
 	}
 
-	// MARK: マッパーオブジェクトを生成・設定
+	// マッパーオブジェクトを生成・設定
 	rom := c.GetMapper(mapperNo)
-	rom.Init(raw)
+	rom.Init(name, gamefile, savefile)
 	c.Mapper = rom
 	c.DumpInfo()
 

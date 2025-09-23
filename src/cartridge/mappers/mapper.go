@@ -17,17 +17,20 @@ const (
 	MIRRORING_VERTICAL Mirroring = iota
 	MIRRORING_HORIZONTAL
 	MIRRORING_FOUR_SCREEN
+
+	SAVE_DATA_DIR = "../rom/saves/"
 )
 
 // MARK: マッパーのインターフェース
 type Mapper interface {
-	Init([]uint8)
+	Init(string, []uint8, []uint8)
 	ReadProgramROM(uint16) uint8
 	ReadCharacterROM(uint16) uint8
 	ReadProgramRAM(uint16) uint8
 	WriteToCharacterROM(uint16, uint8)
 	WriteToProgramRAM(uint16, uint8)
 	Write(uint16, uint8)
+	Save()
 
 	GenerateScanlineIRQ(uint16, bool)
 	GetIRQ() bool

@@ -2,16 +2,18 @@ package mappers
 
 // MARK: NROM (マッパー0) の定義
 type NROM struct {
+	Name           string
 	IsCharacterRAM bool
-	Mirroring Mirroring
-	ProgramROM   []uint8
-	CharacterROM []uint8
+	Mirroring      Mirroring
+	ProgramROM     []uint8
+	CharacterROM   []uint8
 }
 
 // MARK: マッパーの初期化
-func (n *NROM) Init(rom []uint8) {
+func (n *NROM) Init(name string, rom []uint8, save []uint8) {
 	programRom, characterROM := GetROMs(rom)
 
+	n.Name = name
 	n.IsCharacterRAM = GetCharacterROMSize(rom) == 0
 	n.Mirroring = GetSimpleMirroring(rom)
 	n.ProgramROM = programRom
@@ -48,6 +50,9 @@ func (n *NROM) ReadProgramRAM(address uint16) uint8 {
 
 // MARK: プログラムRAMへの書き込み
 func (n *NROM) WriteToProgramRAM(address uint16, data uint8) {}
+
+// MARK: セーブデータの書き出し
+func (n *NROM) Save() {}
 
 // MARK: スキャンラインによってIRQを発生させる
 func (n *NROM) GenerateScanlineIRQ(scanline uint16, backgroundEnable bool) {}

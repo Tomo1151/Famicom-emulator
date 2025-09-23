@@ -2,6 +2,7 @@ package mappers
 
 import (
 	"fmt"
+	"os"
 )
 
 const (
@@ -11,41 +12,52 @@ const (
 
 // MARK: MMC3 TxROM (マッパー4) の定義
 type TxROM struct {
-	bank uint8
-	bankData [8]uint8
+	Name string
+
+	bank       uint8
+	bankData   [8]uint8
 	ramProtect uint8
-	irqLatch uint8
-	irqReload bool
-	irqEnable bool
+	irqLatch   uint8
+	irqReload  bool
+	irqEnable  bool
 	irqCounter uint8
-	IRQ bool
+	IRQ        bool
 
 	IsCharacterRAM bool
-	Mirroring Mirroring
-	ProgramROM   []uint8
-	CharacterROM []uint8
-	ProgramRAM	 [PRG_RAM_SIZE]uint8
+	Mirroring      Mirroring
+	ProgramROM     []uint8
+	CharacterROM   []uint8
+	ProgramRAM     [PRG_RAM_SIZE]uint8
 }
 
 // MARK: マッパーの初期化
-func (t *TxROM) Init(rom []uint8) {
+func (t *TxROM) Init(name string, rom []uint8, save []uint8) {
 	programRom, characterROM := GetROMs(rom)
+	t.Name = name
 	t.bank = 0x00
 	t.ramProtect = 0x00
 	t.irqLatch = 0x00
 	t.irqReload = false
 	t.irqEnable = false
 
-	for i := range t.bankData { t.bankData[i] = 0x00 }
-	
+	for i := range t.bankData {
+		t.bankData[i] = 0x00
+	}
+
 	t.IsCharacterRAM = GetCharacterROMSize(rom) == 0
 	t.Mirroring = GetSimpleMirroring(rom)
 	t.ProgramROM = programRom
 	t.CharacterROM = characterROM
-	// プログラムRAMの初期化
 
+	// プログラムRAMの初期化
 	for i := range t.ProgramRAM {
 		t.ProgramRAM[i] = 0xFF
+	}
+
+	// セーブデータの読み込み
+	if len(save) != 0 {
+		copy(t.ProgramRAM[:], save)
+		t.ramProtect = 0x80
 	}
 }
 
@@ -53,17 +65,17 @@ func (t *TxROM) Init(rom []uint8) {
 func (t *TxROM) Write(address uint16, data uint8) {
 	switch {
 	case PRG_ROM_START <= address && address <= 0x9FFF:
-		if address & 0x01 == 0 {
+		if address&0x01 == 0 {
 			// バンクセレクト ($8000~$9FFE, 偶数)
 			t.bank = data
 		} else {
 			// バンクデータ ($8001~$9FFF, 奇数)
-			t.bankData[uint(t.bank & 0x07)] = data
+			t.bankData[uint(t.bank&0x07)] = data
 		}
 	case 0xA000 <= address && address <= 0xBFFF:
-		if address & 0x01 == 0 {
+		if address&0x01 == 0 {
 			// ミラーリング ($A000~$BFFE, 偶数)
-			if data & 0x01 == 0 {
+			if data&0x01 == 0 {
 				t.Mirroring = MIRRORING_VERTICAL
 			} else {
 				t.Mirroring = MIRRORING_HORIZONTAL
@@ -71,14 +83,14 @@ func (t *TxROM) Write(address uint16, data uint8) {
 		} else {
 			// プログラムRAM 保護 ($A001~$BFFF, 奇数)
 			t.ramProtect = data
-			
+
 			/*
 				@NOTE
 				MMC3では一応機能するがあまり必要ない，MMC6との非互換性を避けるために実装しない
 			*/
 		}
 	case 0xC000 <= address && address <= 0xDFFF:
-			if address & 0x01 == 0 {
+		if address&0x01 == 0 {
 			// IRQ ラッチ ($C000~$DFFE, 偶数)
 			t.irqLatch = data
 			t.irqCounter = data
@@ -88,7 +100,7 @@ func (t *TxROM) Write(address uint16, data uint8) {
 			t.irqCounter = 0
 		}
 	case 0xE000 <= address && address <= PRG_ROM_END:
-		if address & 0x01 == 0 {
+		if address&0x01 == 0 {
 			// IRQ 無効化 ($E000~$FFFE, 偶数)
 			t.irqEnable = false
 			t.IRQ = false
@@ -121,26 +133,26 @@ func (t *TxROM) ReadProgramROM(address uint16) uint8 {
 	case 0:
 		switch {
 		case PRG_ROM_START <= address && address <= 0x9FFF:
-			return t.ProgramROM[uint(address - PRG_ROM_START) + r6Bank * TXROM_PRG_BANK_SIZE]
+			return t.ProgramROM[uint(address-PRG_ROM_START)+r6Bank*TXROM_PRG_BANK_SIZE]
 		case 0xA000 <= address && address <= 0xBFFF:
-			return t.ProgramROM[uint(address - 0xA000) + r7Bank * TXROM_PRG_BANK_SIZE]
+			return t.ProgramROM[uint(address-0xA000)+r7Bank*TXROM_PRG_BANK_SIZE]
 		case 0xC000 <= address && address <= 0xDFFF:
-			return t.ProgramROM[uint(address - 0xC000) + lastBank2 * TXROM_PRG_BANK_SIZE]
+			return t.ProgramROM[uint(address-0xC000)+lastBank2*TXROM_PRG_BANK_SIZE]
 		case 0xE000 <= address && address <= PRG_ROM_END:
-			return t.ProgramROM[uint(address - 0xE000) + lastBank1 * TXROM_PRG_BANK_SIZE]
+			return t.ProgramROM[uint(address-0xE000)+lastBank1*TXROM_PRG_BANK_SIZE]
 		default:
 			panic(fmt.Sprintf("Error: unexpected program rom read: $%04X", address))
 		}
 	default:
 		switch {
 		case PRG_ROM_START <= address && address <= 0x9FFF:
-			return t.ProgramROM[uint(address - PRG_ROM_START) + lastBank2 * TXROM_PRG_BANK_SIZE]
+			return t.ProgramROM[uint(address-PRG_ROM_START)+lastBank2*TXROM_PRG_BANK_SIZE]
 		case 0xA000 <= address && address <= 0xBFFF:
-			return t.ProgramROM[uint(address - 0xA000) + r7Bank * TXROM_PRG_BANK_SIZE]
+			return t.ProgramROM[uint(address-0xA000)+r7Bank*TXROM_PRG_BANK_SIZE]
 		case 0xC000 <= address && address <= 0xDFFF:
-			return t.ProgramROM[uint(address - 0xC000) + r6Bank * TXROM_PRG_BANK_SIZE]
+			return t.ProgramROM[uint(address-0xC000)+r6Bank*TXROM_PRG_BANK_SIZE]
 		case 0xE000 <= address && address <= PRG_ROM_END:
-			return t.ProgramROM[uint(address - 0xE000) + lastBank1 * TXROM_PRG_BANK_SIZE]
+			return t.ProgramROM[uint(address-0xE000)+lastBank1*TXROM_PRG_BANK_SIZE]
 		default:
 			panic(fmt.Sprintf("Error: unexpected program rom read: $%04X", address))
 		}
@@ -173,39 +185,38 @@ func (t *TxROM) getCharacterROMAddress(address uint16) uint {
 	r4Bank := uint(t.bankData[4])
 	r5Bank := uint(t.bankData[5])
 
-
 	switch mode {
 	case 0:
 		switch {
 		case CHR_BANK_START <= address && address <= 0x07FF:
-			return uint(address - CHR_BANK_START) + r0Bank * CHR_BANK_SIZE
+			return uint(address-CHR_BANK_START) + r0Bank*CHR_BANK_SIZE
 		case 0x0800 <= address && address <= 0x0FFF:
-			return uint(address - 0x0800) + r1Bank * CHR_BANK_SIZE
+			return uint(address-0x0800) + r1Bank*CHR_BANK_SIZE
 		case 0x1000 <= address && address <= 0x13FF:
-			return uint(address - 0x1000) + r2Bank * CHR_BANK_SIZE
+			return uint(address-0x1000) + r2Bank*CHR_BANK_SIZE
 		case 0x1400 <= address && address <= 0x17FF:
-			return uint(address - 0x1400) + r3Bank * CHR_BANK_SIZE
+			return uint(address-0x1400) + r3Bank*CHR_BANK_SIZE
 		case 0x1800 <= address && address <= 0x1BFF:
-			return uint(address - 0x1800) + r4Bank * CHR_BANK_SIZE
+			return uint(address-0x1800) + r4Bank*CHR_BANK_SIZE
 		case 0x1C00 <= address && address <= CHR_BANK_END:
-			return uint(address - 0x1C00) + r5Bank * CHR_BANK_SIZE
+			return uint(address-0x1C00) + r5Bank*CHR_BANK_SIZE
 		default:
 			panic(fmt.Sprintf("Error: unexpected character rom address: $%04X", address))
 		}
 	default:
 		switch {
 		case CHR_BANK_START <= address && address <= 0x03FF:
-			return uint(address - CHR_BANK_START) + r2Bank * CHR_BANK_SIZE
+			return uint(address-CHR_BANK_START) + r2Bank*CHR_BANK_SIZE
 		case 0x0400 <= address && address <= 0x07FF:
-			return uint(address - 0x0400) + r3Bank * CHR_BANK_SIZE
+			return uint(address-0x0400) + r3Bank*CHR_BANK_SIZE
 		case 0x0800 <= address && address <= 0x0BFF:
-			return uint(address - 0x0800) + r4Bank * CHR_BANK_SIZE
+			return uint(address-0x0800) + r4Bank*CHR_BANK_SIZE
 		case 0x0C00 <= address && address <= 0x0FFF:
-			return uint(address - 0x0C00) + r5Bank * CHR_BANK_SIZE
+			return uint(address-0x0C00) + r5Bank*CHR_BANK_SIZE
 		case 0x1000 <= address && address <= 0x17FF:
-			return uint(address - 0x1000) + r0Bank * CHR_BANK_SIZE
+			return uint(address-0x1000) + r0Bank*CHR_BANK_SIZE
 		case 0x1800 <= address && address <= CHR_BANK_END:
-			return uint(address - 0x1800) + r1Bank * CHR_BANK_SIZE
+			return uint(address-0x1800) + r1Bank*CHR_BANK_SIZE
 		default:
 			panic(fmt.Sprintf("Error: unexpected character rom address: $%04X", address))
 		}
@@ -224,12 +235,32 @@ func (t *TxROM) WriteToCharacterROM(address uint16, data uint8) {
 
 // MARK: プログラムRAMの読み取り
 func (t *TxROM) ReadProgramRAM(address uint16) uint8 {
-	return t.ProgramRAM[address-PRG_RAM_START]
+	// RAM有効ビットが立っている場合のみRAMから読み取り、それ以外は0xFF
+	if t.ramProtect&0x80 != 0 {
+		return t.ProgramRAM[address-PRG_RAM_START]
+	}
+	return 0xFF // 無効なRAMアクセスの場合は0xFFを返す
 }
 
 // MARK: プログラムRAMへの書き込み
 func (t *TxROM) WriteToProgramRAM(address uint16, data uint8) {
-	t.ProgramRAM[address-PRG_RAM_START] = data
+	// RAM保護が無効な場合のみ書き込む
+	if t.ramProtect&0x80 != 0 && t.ramProtect&0x40 == 0 {
+		t.ProgramRAM[address-PRG_RAM_START] = data
+	}
+}
+
+// MARK: セーブデータの書き出し
+func (t *TxROM) Save() {
+	// RAM書き込みが有効な場合のみセーブ
+	if t.ramProtect&0x80 != 0 {
+		err := os.WriteFile(SAVE_DATA_DIR+t.Name+".save", t.ProgramRAM[:], 0644)
+		if err != nil {
+			fmt.Printf("Error saving game data: %v\n", err)
+		} else {
+			fmt.Printf("Game saved to: %s\n", SAVE_DATA_DIR+t.Name+".save")
+		}
+	}
 }
 
 // MARK: スキャンラインによってIRQを発生させる

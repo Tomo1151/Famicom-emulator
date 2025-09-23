@@ -12,26 +12,25 @@ const (
 	CPU_WRAM_START = 0x0000
 	CPU_WRAM_END   = 0x1FFF
 
-	PPU_REG_START  = 0x2000
-	PPU_REG_END    = 0x3FFF
+	PPU_REG_START = 0x2000
+	PPU_REG_END   = 0x3FFF
 
-	PRG_ROM_START  = 0x8000
-	PRG_ROM_END    = 0xFFFF
+	PRG_ROM_START = 0x8000
+	PRG_ROM_END   = 0xFFFF
 )
 
 // MARK: Busの定義
 type Bus struct {
-	wram [CPU_WRAM_SIZE+1]uint8 // CPUのWRAM (2kB)
-	cartridge cartridge.Cartridge // カートリッジ
-	ppu ppu.PPU // PPU
-	apu apu.APU // APU
-	joypad1 *joypad.JoyPad // ポインタに変更
-	joypad2 *joypad.JoyPad // コントローラ (2P)
-	cycles uint // CPUサイクル
-	callback func(*ppu.PPU, *ppu.Canvas, *joypad.JoyPad, *joypad.JoyPad)
-	canvas *ppu.Canvas
+	wram      [CPU_WRAM_SIZE + 1]uint8 // CPUのWRAM (2kB)
+	cartridge cartridge.Cartridge      // カートリッジ
+	ppu       ppu.PPU                  // PPU
+	apu       apu.APU                  // APU
+	joypad1   *joypad.JoyPad           // ポインタに変更
+	joypad2   *joypad.JoyPad           // コントローラ (2P)
+	cycles    uint                     // CPUサイクル
+	callback  func(*ppu.PPU, *ppu.Canvas, *joypad.JoyPad, *joypad.JoyPad)
+	canvas    *ppu.Canvas
 }
-
 
 // MARK: Busの初期化メソッド (カートリッジ無し，デバッグ・テスト用)
 func (b *Bus) Init() {
@@ -74,6 +73,10 @@ func (b *Bus) GetMapperIRQ() bool {
 	return b.cartridge.Mapper.GetIRQ()
 }
 
+// MARK: 終了処理
+func (b *Bus) Shutdown() {
+	b.cartridge.Mapper.Save()
+}
 
 // MARK: サイクルを進める
 func (b *Bus) Tick(cycles uint) {
@@ -82,7 +85,7 @@ func (b *Bus) Tick(cycles uint) {
 	nmiBefore := b.ppu.NMI
 
 	// PPUはCPUの3倍のクロック周波数
-	for i := uint(0); i < cycles * 3; i++ {
+	for range cycles * 3 {
 		b.ppu.Tick(b.canvas, 1)
 	}
 
@@ -150,6 +153,7 @@ func (b *Bus) ReadByteFrom(address uint16) uint8 {
 	case address == 0x4017: // JOYPAD (2P)
 		return 0x00
 	case 0x6000 <= address && address <= 0x7FFF: // プログラムRAM
+		// fmt.Printf("RAM read: $%04X, %04X\n", address, b.cartridge.Mapper.ReadProgramRAM(address))
 		return b.cartridge.Mapper.ReadProgramRAM(address)
 	case PRG_ROM_START <= address && address <= PRG_ROM_END: // プログラムROM
 		return b.cartridge.Mapper.ReadProgramROM(address)
@@ -164,7 +168,7 @@ func (b *Bus) ReadWordFrom(address uint16) uint16 {
 	lower := b.ReadByteFrom(address)
 	upper := b.ReadByteFrom(address + 1)
 
-	return uint16(upper) << 8 | uint16(lower)
+	return uint16(upper)<<8 | uint16(lower)
 }
 
 // MARK: メモリの書き込み (1byte)
@@ -271,7 +275,5 @@ func (b *Bus) WriteWordAt(address uint16, data uint16) {
 	upper := uint8(data >> 8)
 	lower := uint8(data & 0xFF)
 	b.WriteByteAt(address, lower)
-	b.WriteByteAt(address + 1, upper)
+	b.WriteByteAt(address+1, upper)
 }
-
-

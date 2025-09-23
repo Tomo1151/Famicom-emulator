@@ -4,16 +4,18 @@ import "fmt"
 
 // MARK: UxROM (マッパー2) の定義
 type UxROM struct {
-	bank       uint8
+	Name string
+	bank uint8
 
 	IsCharacterRAM bool
-	Mirroring Mirroring
-	ProgramROM []uint8
-	CharacterROM []uint8
+	Mirroring      Mirroring
+	ProgramROM     []uint8
+	CharacterROM   []uint8
 }
 
 // MARK: マッパーの初期化
-func (u *UxROM) Init(rom []uint8) {
+func (u *UxROM) Init(name string, rom []uint8, save []uint8) {
+	u.Name = name
 	u.bank = 0x00
 
 	programROM, characterROM := GetROMs(rom)
@@ -63,6 +65,9 @@ func (u *UxROM) ReadProgramRAM(address uint16) uint8 {
 
 // MARK: プログラムRAMへの書き込み
 func (u *UxROM) WriteToProgramRAM(address uint16, data uint8) {}
+
+// MARK: セーブデータの書き出し
+func (u *UxROM) Save() {}
 
 // MARK: スキャンラインによってIRQを発生させる
 func (u *UxROM) GenerateScanlineIRQ(scanline uint16, backgroundEnable bool) {}

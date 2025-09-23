@@ -2,16 +2,18 @@ package mappers
 
 // MARK: CNROM (マッパー3) の定義
 type CNROM struct {
-	bank       uint8
+	Name string
+	bank uint8
 
 	IsCharacterRAM bool
-	Mirroring Mirroring
-	ProgramROM []uint8
-	CharacterROM []uint8
+	Mirroring      Mirroring
+	ProgramROM     []uint8
+	CharacterROM   []uint8
 }
 
 // MARK: マッパーの初期化
-func (c *CNROM) Init(rom []uint8) {
+func (c *CNROM) Init(name string, rom []uint8, save []uint8) {
+	c.Name = name
 	c.bank = 0x00
 
 	programROM, characterROM := GetROMs(rom)
@@ -34,7 +36,7 @@ func (c *CNROM) ReadProgramROM(address uint16) uint8 {
 // MARK: キャラクタROMの読み取り
 func (c *CNROM) ReadCharacterROM(address uint16) uint8 {
 	// CNROMはバンクセレクトの下位2ビットのみを使う
-	return c.CharacterROM[uint(address)+BANK_SIZE*uint(c.bank & 0x03)]
+	return c.CharacterROM[uint(address)+BANK_SIZE*uint(c.bank&0x03)]
 }
 
 // MARK: キャラクタROMへの書き込み
@@ -49,6 +51,9 @@ func (c *CNROM) ReadProgramRAM(address uint16) uint8 {
 
 // MARK: プログラムRAMへの書き込み
 func (c *CNROM) WriteToProgramRAM(address uint16, data uint8) {}
+
+// MARK: セーブデータの書き出し
+func (c *CNROM) Save() {}
 
 // MARK: スキャンラインによってIRQを発生させる
 func (c *CNROM) GenerateScanlineIRQ(scanline uint16, backgroundEnable bool) {}

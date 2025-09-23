@@ -33,17 +33,10 @@ type InputState struct {
 // MARK: main関数
 func main() {
 	// ROMファイルのロード
-
-	// filedata, err := os.ReadFile("../rom/Kirby'sAdventure.nes")
-	// filedata, err := os.ReadFile("../rom/SuperMarioBros.nes")
-	filedata, err := os.ReadFile("../rom/SuperMarioBros3.nes")
-	if err != nil {
-		log.Fatalf("Error occured in 'os.ReadFile()'")
-	}
-
-	// カートリッジの作成と初期化
 	cart := cartridge.Cartridge{}
-	err = cart.Load(filedata)
+	err := cart.Load("../rom/Kirby'sAdventure.nes")
+	// err := cart.Load("../rom/SuperMarioBros.nes")
+	// err := cart.Load("../rom/SuperMarioBros3.nes")
 	if err != nil {
 		log.Fatalf("Cartridge loading error: %v", err)
 	}
@@ -121,9 +114,11 @@ func main() {
 		for event := eventPump(); event != nil; event = eventPump() {
 			switch e := event.(type) {
 			case *sdl.QuitEvent:
+				bus.Shutdown()
 				os.Exit(0)
 			case *sdl.KeyboardEvent:
 				if e.Keysym.Sym == sdl.K_ESCAPE && e.State == sdl.PRESSED {
+					bus.Shutdown()
 					os.Exit(0)
 				}
 				handleKeyPress(e, &keyboardState)

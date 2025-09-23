@@ -1,7 +1,14 @@
 package mappers
 
+import (
+	"fmt"
+	"os"
+)
+
 // MARK: MMC1 SxROM (マッパー1) の定義
 type SxROM struct {
+	Name string
+
 	shiftRegister uint8
 	shiftCount    uint8
 
@@ -17,7 +24,9 @@ type SxROM struct {
 }
 
 // MARK: マッパーの初期化
-func (s *SxROM) Init(rom []uint8) {
+func (s *SxROM) Init(name string, rom []uint8, save []uint8) {
+	s.Name = name
+
 	s.shiftRegister = 0x10
 	s.shiftCount = 0
 
@@ -34,6 +43,11 @@ func (s *SxROM) Init(rom []uint8) {
 	// プログラムRAMの初期化
 	for i := range s.ProgramRAM {
 		s.ProgramRAM[i] = 0xFF
+	}
+
+	// セーブデータの読み込み
+	if len(save) != 0 {
+		copy(s.ProgramRAM[:], save)
 	}
 }
 
@@ -176,6 +190,19 @@ func (s *SxROM) ReadProgramRAM(address uint16) uint8 {
 // MARK: プログラムRAMへの書き込み
 func (s *SxROM) WriteToProgramRAM(address uint16, data uint8) {
 	s.ProgramRAM[address-PRG_RAM_START] = data
+
+	// セーブデータの書き出し
+	os.WriteFile(SAVE_DATA_DIR+s.Name+".save", s.ProgramRAM[:], 0644)
+}
+
+// MARK: セーブデータの書き出し
+func (s *SxROM) Save() {
+	err := os.WriteFile(SAVE_DATA_DIR+s.Name+".save", s.ProgramRAM[:], 0644)
+	if err != nil {
+		fmt.Printf("Error saving game data: %v\n", err)
+	} else {
+		fmt.Printf("Game saved to: %s\n", SAVE_DATA_DIR+s.Name+".save")
+	}
 }
 
 // MARK: シフトレジスタのリセット
