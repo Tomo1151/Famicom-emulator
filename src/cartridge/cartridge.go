@@ -47,7 +47,10 @@ func (c *Cartridge) Load(filename string) error {
 
 	// セーブデータの読み込み
 	savefile, err := os.ReadFile(SAVE_DATA_DIR + name + ".save")
-	if err != nil {
+	if err == nil {
+		fmt.Println("Save data loaded")
+	} else {
+		fmt.Println("No save data found")
 		savefile = []byte{}
 	}
 
