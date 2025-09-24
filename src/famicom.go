@@ -179,7 +179,7 @@ func (f *Famicom) Run() {
 	})
 
 	// CPUの初期化
-	f.cpu.InitWithCartridge(f.bus, true)
+	f.cpu.InitWithBus(f.bus, true)
 
 	// CPUの起動
 	f.cpu.Run()

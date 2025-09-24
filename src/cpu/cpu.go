@@ -10,18 +10,11 @@ import (
 
 // MARK: CPUの定義
 type CPU struct {
-	Registers registers // レジスタ
+	Registers      registers      // レジスタ
 	InstructionSet instructionSet // 命令セット
 
 	Bus bus.Bus
 	log bool // デバッグ出力フラグ
-}
-
-// MARK: CPUの作成関数
-func CreateCPU(debug bool) *CPU {
-	cpu := &CPU{}
-	// cpu.Init(debug)
-	return cpu
 }
 
 // MARK: CPUの初期化メソッド (カートリッジ無し，デバッグ・テスト用)
@@ -48,13 +41,11 @@ func (c *CPU) Init(debug bool) {
 	c.Bus.Init()
 	c.InstructionSet = generateInstructionSet(c)
 	c.log = debug
-	// fmt.Println(c.wram[0x0600:0x0600+309])
 }
 
-// MARK: CPUの初期化メソッド (カートリッジ有り)
-func (c *CPU) InitWithCartridge(bus bus.Bus, debug bool) {
+// MARK: CPUの初期化メソッド (Bus有り)
+func (c *CPU) InitWithBus(bus bus.Bus, debug bool) {
 	c.Bus = bus
-	// c.Bus.InitWithCartridge(cartridge)
 	c.Registers = registers{
 		A: 0x00,
 		X: 0x00,
@@ -88,7 +79,6 @@ func (c *CPU) Step() {
 		log.Fatalf("Error: Unknown opecode $%02X at PC=%04X", opecode, c.Registers.PC)
 	}
 
-
 	_, isPageCrossed := c.getOperandAddress(instruction.AddressingMode)
 	instruction.Handler(instruction.AddressingMode)
 	if isPageCrossed {
@@ -105,7 +95,7 @@ func (c *CPU) Step() {
 
 // MARK: ループ実行
 func (c *CPU) Run() {
-	c.RunWithCallback(func(c *CPU){})
+	c.RunWithCallback(func(c *CPU) {})
 }
 
 func (c *CPU) RunWithCallback(callback func(c *CPU)) {
@@ -139,8 +129,8 @@ func (c *CPU) interrupt(interrupt Interrupt) {
 
 	// ステータスレジスタをスタックにプッシュ
 	status := c.Registers.P
-	status.Break = interrupt.BFlagMask & 0b0001_0000 == 1
-	status.Reserved = interrupt.BFlagMask & 0b0010_0000 == 1
+	status.Break = interrupt.BFlagMask&0b0001_0000 == 1
+	status.Reserved = interrupt.BFlagMask&0b0010_0000 == 1
 	c.pushByte(status.ToByte())
 	c.Registers.P.Interrupt = true
 
@@ -178,51 +168,51 @@ func (c *CPU) isPageCrossed(address1 uint16, address2 uint16) bool {
 func (c *CPU) getOperandAddress(mode AddressingMode) (uint16, bool) {
 	switch mode {
 	case Immediate:
-		return c.Registers.PC+1, false
+		return c.Registers.PC + 1, false
 	case ZeroPage:
-		return uint16(c.ReadByteFrom(c.Registers.PC+1)), false
+		return uint16(c.ReadByteFrom(c.Registers.PC + 1)), false
 	case Absolute:
-		return c.ReadWordFrom(c.Registers.PC+1), false
+		return c.ReadWordFrom(c.Registers.PC + 1), false
 	case ZeroPageXIndexed:
-		base := c.ReadByteFrom(c.Registers.PC+1)
+		base := c.ReadByteFrom(c.Registers.PC + 1)
 		return uint16(base + c.Registers.X), false
 	case ZeroPageYIndexed:
-		base := c.ReadByteFrom(c.Registers.PC+1)
+		base := c.ReadByteFrom(c.Registers.PC + 1)
 		return uint16(base + c.Registers.Y), false
 	case AbsoluteXIndexed:
-		base := c.ReadWordFrom(c.Registers.PC+1)
+		base := c.ReadWordFrom(c.Registers.PC + 1)
 		ptr := base + uint16(c.Registers.X)
 		return ptr, c.isPageCrossed(base, ptr)
 	case AbsoluteYIndexed:
-		base := c.ReadWordFrom(c.Registers.PC+1)
+		base := c.ReadWordFrom(c.Registers.PC + 1)
 		ptr := base + uint16(c.Registers.Y)
 		return ptr, c.isPageCrossed(base, ptr)
 	case Indirect:
-		ptr := c.ReadWordFrom(c.Registers.PC+1)
+		ptr := c.ReadWordFrom(c.Registers.PC + 1)
 		// ページ境界をまたぐ際のバグを再現
 		if (ptr & 0xFF) == 0xFF {
 			lower := c.ReadByteFrom(ptr)
 			upper := c.ReadByteFrom(ptr & 0xFF00)
-			return uint16(upper) << 8 | uint16(lower), false
+			return uint16(upper)<<8 | uint16(lower), false
 		} else {
 			return c.ReadWordFrom(ptr), false
 		}
 	case IndirectXIndexed:
-		base := c.ReadByteFrom(c.Registers.PC+1)
+		base := c.ReadByteFrom(c.Registers.PC + 1)
 		ptr := uint8(base + c.Registers.X)
 		lower := c.ReadByteFrom(uint16(ptr))
-		upper := c.ReadByteFrom(uint16(ptr + 1) & 0xFF)
-		return uint16(upper) << 8 | uint16(lower), false
+		upper := c.ReadByteFrom(uint16(ptr+1) & 0xFF)
+		return uint16(upper)<<8 | uint16(lower), false
 	case IndirectYIndexed:
-		base := c.ReadByteFrom(c.Registers.PC+1)
+		base := c.ReadByteFrom(c.Registers.PC + 1)
 		ptr := uint8(base)
 		lower := c.ReadByteFrom(uint16(ptr))
-		upper := c.ReadByteFrom(uint16(ptr + 1) & 0xFF)
-		derefBase := uint16(upper) << 8 | uint16(lower)
+		upper := c.ReadByteFrom(uint16(ptr+1) & 0xFF)
+		derefBase := uint16(upper)<<8 | uint16(lower)
 		deref := derefBase + uint16(c.Registers.Y)
 		return deref, c.isPageCrossed(deref, derefBase)
 	case Relative:
-		offset := int8(c.ReadByteFrom(c.Registers.PC+1))
+		offset := int8(c.ReadByteFrom(c.Registers.PC + 1))
 		return uint16(offset), false
 	case Accumulator:
 		// log.Fatalf("Error: Mode Accumulator doesn't take any operands")
@@ -236,11 +226,10 @@ func (c *CPU) getOperandAddress(mode AddressingMode) (uint16, bool) {
 	}
 }
 
-
 // MARK: フラグ(N, Z)の更新
 func (c *CPU) updateNZFlags(result uint8) {
 	// Nフラグの更新
-	if (result >> 7) != 0  {
+	if (result >> 7) != 0 {
 		c.Registers.P.Negative = true
 	} else {
 		c.Registers.P.Negative = false
@@ -253,8 +242,6 @@ func (c *CPU) updateNZFlags(result uint8) {
 		c.Registers.P.Zero = false
 	}
 }
-
-
 
 // MARK: スタック操作
 func (c *CPU) pushByte(value uint8) {
@@ -289,9 +276,8 @@ func (c *CPU) popWord() uint16 {
 	stack_addr = 0x0100 | uint16(c.Registers.SP)
 	upper := c.ReadByteFrom(stack_addr)
 
-	return uint16(upper) << 8 | uint16(lower)
+	return uint16(upper)<<8 | uint16(lower)
 }
-
 
 // MARK: AAC命令の実装
 func (c *CPU) aac(mode AddressingMode) {
@@ -328,7 +314,7 @@ func (c *CPU) adc(mode AddressingMode) {
 
 	// 符号付きオーバーフローの検出
 	// 両方の入力の符号が同じで結果の符号が異なる場合にオーバーフロー
-	c.Registers.P.Overflow = ((c.Registers.A ^ value) & 0x80) == 0 && ((c.Registers.A ^ result) & 0x80) != 0
+	c.Registers.P.Overflow = ((c.Registers.A^value)&0x80) == 0 && ((c.Registers.A^result)&0x80) != 0
 
 	c.updateNZFlags(result)
 	c.Registers.A = result
@@ -352,11 +338,11 @@ func (c *CPU) arr(mode AddressingMode) {
 	// 1ビット右回転
 	c.Registers.A = c.Registers.A >> 1
 
-	if (c.Registers.P.Carry) {
+	if c.Registers.P.Carry {
 		c.Registers.A |= 1 << 7
 	}
 
-	c.Registers.P.Carry = c.Registers.A >> 6 != 0
+	c.Registers.P.Carry = c.Registers.A>>6 != 0
 	c.Registers.P.Overflow = (c.Registers.A >> 6) != (c.Registers.A >> 5) // XOR
 	c.updateNZFlags(c.Registers.A)
 
@@ -769,10 +755,10 @@ func (c *CPU) plp(mode AddressingMode) {
 // MARK: ROL命令の実装
 func (c *CPU) rol(mode AddressingMode) {
 	if mode == Accumulator {
-		carry := c.Registers.A >> 7 != 0
+		carry := c.Registers.A>>7 != 0
 		c.Registers.A = c.Registers.A << 1
 
-		if (c.Registers.P.Carry) {
+		if c.Registers.P.Carry {
 			c.Registers.A |= 0x01
 		}
 
@@ -782,7 +768,7 @@ func (c *CPU) rol(mode AddressingMode) {
 		addr, _ := c.getOperandAddress(mode)
 		value := c.ReadByteFrom(addr)
 
-		carry := value >> 7 != 0
+		carry := value>>7 != 0
 		value <<= 1
 
 		if c.Registers.P.Carry {
@@ -790,7 +776,7 @@ func (c *CPU) rol(mode AddressingMode) {
 		}
 
 		c.Registers.P.Carry = carry
-		c.Registers.P.Negative = value >> 7 != 0
+		c.Registers.P.Negative = value>>7 != 0
 		c.updateNZFlags(value)
 
 		c.WriteByteAt(addr, value)
@@ -806,10 +792,10 @@ func (c *CPU) rla(mode AddressingMode) {
 // MARK: ROR命令の実装
 func (c *CPU) ror(mode AddressingMode) {
 	if mode == Accumulator {
-		carry := c.Registers.A & 0x01 != 0
+		carry := c.Registers.A&0x01 != 0
 		c.Registers.A = c.Registers.A >> 1
-		
-		if (c.Registers.P.Carry) {
+
+		if c.Registers.P.Carry {
 			c.Registers.A |= 1 << 7
 		}
 
@@ -819,7 +805,7 @@ func (c *CPU) ror(mode AddressingMode) {
 		addr, _ := c.getOperandAddress(mode)
 		value := c.ReadByteFrom(addr)
 
-		carry := value & 0x01 != 0
+		carry := value&0x01 != 0
 		value >>= 1
 
 		if c.Registers.P.Carry {
@@ -827,7 +813,7 @@ func (c *CPU) ror(mode AddressingMode) {
 		}
 
 		c.Registers.P.Carry = carry
-		c.Registers.P.Negative = value >> 7 != 0
+		c.Registers.P.Negative = value>>7 != 0
 		c.updateNZFlags(value)
 
 		c.WriteByteAt(addr, value)
@@ -873,7 +859,7 @@ func (c *CPU) sbc(mode AddressingMode) {
 
 	// フラグ設定
 	c.Registers.P.Carry = sum > 0xFF
-	c.Registers.P.Overflow = ((c.Registers.A ^ value) & 0x80) != 0 && ((c.Registers.A ^ result) & 0x80) != 0
+	c.Registers.P.Overflow = ((c.Registers.A^value)&0x80) != 0 && ((c.Registers.A^result)&0x80) != 0
 
 	c.updateNZFlags(result)
 	c.Registers.A = result
@@ -927,14 +913,14 @@ func (c *CPU) sty(mode AddressingMode) {
 // MARK: SXA命令の実装
 func (c *CPU) sxa(mode AddressingMode) {
 	addr, _ := c.getOperandAddress(mode)
-	result := c.Registers.X & (uint8(addr >> 8) + 1)
+	result := c.Registers.X & (uint8(addr>>8) + 1)
 	c.WriteByteAt(addr, result)
 }
 
 // MARK: SYA命令の実装
 func (c *CPU) sya(mode AddressingMode) {
 	addr, _ := c.getOperandAddress(mode)
-	result := c.Registers.Y & (uint8(addr >> 8) + 1)
+	result := c.Registers.Y & (uint8(addr>>8) + 1)
 	c.WriteByteAt(addr, result)
 }
 
@@ -989,10 +975,9 @@ func (c *CPU) xaa(mode AddressingMode) {
 func (c *CPU) xas(mode AddressingMode) {
 	addr, _ := c.getOperandAddress(mode)
 	c.Registers.SP = c.Registers.X & c.Registers.A
-	result := c.Registers.SP & (uint8(addr >> 8) + 1)
+	result := c.Registers.SP & (uint8(addr>>8) + 1)
 	c.WriteByteAt(addr, result)
 }
-
 
 // MARK: デバッグ用表示メソッド
 func (c *CPU) Trace() string {
@@ -1016,7 +1001,7 @@ func (c *CPU) Trace() string {
 	}
 
 	var tmp string
-	
+
 	switch instruction.Bytes {
 	case 1:
 		if instruction.AddressingMode == Accumulator {
@@ -1025,7 +1010,7 @@ func (c *CPU) Trace() string {
 	case 2:
 		address := c.ReadByteFrom(begin + 1)
 		hexDump = append(hexDump, address)
-		
+
 		switch instruction.AddressingMode {
 		case Immediate:
 			tmp = fmt.Sprintf("#$%02X", address)
@@ -1036,11 +1021,11 @@ func (c *CPU) Trace() string {
 		case ZeroPageYIndexed:
 			tmp = fmt.Sprintf("$%02X,Y @ %02X = %02X", address, addr, value)
 		case IndirectXIndexed:
-			tmp = fmt.Sprintf("($%02X,X) @ %02X = %04X = %02X", address, address + c.Registers.X, addr, value)
+			tmp = fmt.Sprintf("($%02X,X) @ %02X = %04X = %02X", address, address+c.Registers.X, addr, value)
 		case IndirectYIndexed:
-			tmp = fmt.Sprintf("($%02X),Y = %04X @ %04X = %02X", address, addr - uint16(c.Registers.Y), addr, value)
+			tmp = fmt.Sprintf("($%02X),Y = %04X @ %04X = %02X", address, addr-uint16(c.Registers.Y), addr, value)
 		case Relative:
-			tmp = fmt.Sprintf("$%04X", (uint(begin) + 2 + uint(int8(address))) & 0xFFFFFFFF)
+			tmp = fmt.Sprintf("$%04X", (uint(begin)+2+uint(int8(address)))&0xFFFFFFFF)
 		default:
 			panic(fmt.Sprintf("unexpected addressing mode %v has opecode length 2. code %02X", instruction.AddressingMode.ToString(), instruction.Opecode))
 		}
@@ -1057,10 +1042,10 @@ func (c *CPU) Trace() string {
 			if instruction.Opecode == 0x6C {
 				// JMP (indirect)
 				var jmpAddr uint16
-				if address & 0x00FF == 0x00FF {
+				if address&0x00FF == 0x00FF {
 					lower := c.ReadByteFrom(address)
 					upper := c.ReadByteFrom(address & 0xFF00)
-					jmpAddr = uint16(upper) << 8 | uint16(lower)
+					jmpAddr = uint16(upper)<<8 | uint16(lower)
 				} else {
 					jmpAddr = c.ReadWordFrom(address)
 				}
@@ -1089,7 +1074,6 @@ func (c *CPU) Trace() string {
 
 	return fmt.Sprintf("%-47s A:%02X X:%02X Y:%02X P:%02X SP:%02X", asmStr, c.Registers.A, c.Registers.X, c.Registers.Y, c.Registers.P.ToByte(), c.Registers.SP)
 }
-
 
 // MARK: デバッグ用実行メソッド
 func (c *CPU) REPL(commands []uint8) {
