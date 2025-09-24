@@ -984,14 +984,40 @@ func (c *CPU) xas(mode AddressingMode) {
 
 // MARK: canPeek: トレース時に安全に読み取れるアドレスか (副作用やpanicを避ける)
 func (c *CPU) canPeek(addr uint16) bool {
-	// PPUレジスタ: 2000-2007
-	// 読み取り可能: $2002(PPUSTATUS), $2004(OAMDATA), $2007(PPUDATA)
-	if addr < 0x2000 { // WRAM (ミラー含む)
+	// WRAM (含ミラー)
+	if addr < 0x2000 {
 		return true
 	}
-	if addr >= 0x6000 { // Cart RAM / PRG ROM / Mapper
+
+	// PPUレジスタ ($2000-$3FFF) のうち副作用の小さいものだけ許可
+	// ミラーを正規化 ($2000 + (addr & 7))
+	if addr >= 0x2000 && addr <= 0x3FFF {
+		m := 0x2000 + (addr & 0x0007)
+		switch m {
+		case 0x2000, // PPUCTRL (読み出しはラッチ値で副作用なし)
+			0x2001: // PPUMASK
+			return true
+		default:
+			return false
+		}
+	}
+
+	// APU / IO
+	if addr == 0x4015 { // APU STATUS (読み出し副作用なし想定)
 		return true
 	}
+	// 0x4016/0x4017 (JoyPad) は読み出しでシフト進行するため除外
+
+	// 拡張領域 (多くのマッパでは ROM/RAM/未使用) - bus.ReadByteFrom は panic しない
+	if addr >= 0x4020 && addr < 0x6000 {
+		return true
+	}
+
+	// カートリッジRAM/ROM/マッパ
+	if addr >= 0x6000 {
+		return true
+	}
+
 	return false
 }
 
