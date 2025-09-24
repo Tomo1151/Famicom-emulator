@@ -155,6 +155,9 @@ func (f *Famicom) Run() {
 					f.bus.Shutdown()
 					os.Exit(0)
 				}
+				if e.Keysym.Sym == sdl.K_F12 && e.State == sdl.PRESSED {
+					f.cpu.Log = !f.cpu.Log
+				}
 				f.handleKeyPress(e, &f.keyboard1, &f.keyboard2)
 			case *sdl.ControllerButtonEvent:
 				switch e.Which {
@@ -179,7 +182,7 @@ func (f *Famicom) Run() {
 	})
 
 	// CPUの初期化
-	f.cpu.InitWithBus(f.bus, true)
+	f.cpu.InitWithBus(f.bus, false)
 
 	// CPUの起動
 	f.cpu.Run()

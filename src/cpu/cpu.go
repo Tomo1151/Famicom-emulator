@@ -3,7 +3,6 @@ package cpu
 import (
 	"fmt"
 	"log"
-	"strings"
 
 	"Famicom-emulator/bus"
 )
@@ -14,7 +13,7 @@ type CPU struct {
 	InstructionSet instructionSet // 命令セット
 
 	Bus bus.Bus
-	log bool // デバッグ出力フラグ
+	Log bool // デバッグ出力フラグ
 }
 
 // MARK: CPUの初期化メソッド (カートリッジ無し，デバッグ・テスト用)
@@ -40,7 +39,7 @@ func (c *CPU) Init(debug bool) {
 	c.Bus = bus.Bus{}
 	c.Bus.Init()
 	c.InstructionSet = generateInstructionSet(c)
-	c.log = debug
+	c.Log = debug
 }
 
 // MARK: CPUの初期化メソッド (Bus有り)
@@ -64,7 +63,7 @@ func (c *CPU) InitWithBus(bus bus.Bus, debug bool) {
 		PC: c.ReadWordFrom(0xFFFC),
 	}
 	c.InstructionSet = generateInstructionSet(c)
-	c.log = debug
+	c.Log = debug
 }
 
 // MARK:  命令の実行
@@ -95,7 +94,11 @@ func (c *CPU) Step() {
 
 // MARK: ループ実行
 func (c *CPU) Run() {
-	c.RunWithCallback(func(c *CPU) {})
+	c.RunWithCallback(func(c *CPU) {
+		if c.Log {
+			fmt.Println(c.Trace())
+		}
+	})
 }
 
 func (c *CPU) RunWithCallback(callback func(c *CPU)) {
@@ -979,100 +982,181 @@ func (c *CPU) xas(mode AddressingMode) {
 	c.WriteByteAt(addr, result)
 }
 
+// MARK: canPeek: トレース時に安全に読み取れるアドレスか (副作用やpanicを避ける)
+func (c *CPU) canPeek(addr uint16) bool {
+	// PPUレジスタ: 2000-2007
+	// 読み取り可能: $2002(PPUSTATUS), $2004(OAMDATA), $2007(PPUDATA)
+	if addr < 0x2000 { // WRAM (ミラー含む)
+		return true
+	}
+	if addr >= 0x6000 { // Cart RAM / PRG ROM / Mapper
+		return true
+	}
+	return false
+}
+
 // MARK: デバッグ用表示メソッド
 func (c *CPU) Trace() string {
-	opecode := c.ReadByteFrom(c.Registers.PC)
-	instruction := c.InstructionSet[opecode]
-	begin := c.Registers.PC
-
-	var hexDump []uint8
-	hexDump = append(hexDump, opecode)
-
-	var addr uint16
-	var value uint8
-
-	switch instruction.AddressingMode {
-	case Immediate, Implied:
-		addr = 0
-		value = 0
-	default:
-		addr, _ = c.getOperandAddress(instruction.AddressingMode)
-		value = c.ReadByteFrom(addr)
+	pc := c.Registers.PC
+	opcode := c.ReadByteFrom(pc)
+	inst, ok := c.InstructionSet[opcode]
+	if !ok {
+		return fmt.Sprintf("%04X  %02X        ???                         A:%02X X:%02X Y:%02X P:%02X SP:%02X",
+			pc, opcode, c.Registers.A, c.Registers.X, c.Registers.Y, c.Registers.P.ToByte(), c.Registers.SP)
 	}
 
-	var tmp string
+	var b1, b2 uint8
+	if inst.Bytes > 1 {
+		b1 = c.ReadByteFrom(pc + 1)
+	}
+	if inst.Bytes > 2 {
+		b2 = c.ReadByteFrom(pc + 2)
+	}
 
-	switch instruction.Bytes {
-	case 1:
-		if instruction.AddressingMode == Accumulator {
-			tmp = "A "
-		}
+	hexDump := fmt.Sprintf("%02X", opcode)
+	switch inst.Bytes {
 	case 2:
-		address := c.ReadByteFrom(begin + 1)
-		hexDump = append(hexDump, address)
-
-		switch instruction.AddressingMode {
-		case Immediate:
-			tmp = fmt.Sprintf("#$%02X", address)
-		case ZeroPage:
-			tmp = fmt.Sprintf("$%02X = %02X", addr, value)
-		case ZeroPageXIndexed:
-			tmp = fmt.Sprintf("$%02X,X @ %02X = %02X", address, addr, value)
-		case ZeroPageYIndexed:
-			tmp = fmt.Sprintf("$%02X,Y @ %02X = %02X", address, addr, value)
-		case IndirectXIndexed:
-			tmp = fmt.Sprintf("($%02X,X) @ %02X = %04X = %02X", address, address+c.Registers.X, addr, value)
-		case IndirectYIndexed:
-			tmp = fmt.Sprintf("($%02X),Y = %04X @ %04X = %02X", address, addr-uint16(c.Registers.Y), addr, value)
-		case Relative:
-			tmp = fmt.Sprintf("$%04X", (uint(begin)+2+uint(int8(address)))&0xFFFFFFFF)
-		default:
-			panic(fmt.Sprintf("unexpected addressing mode %v has opecode length 2. code %02X", instruction.AddressingMode.ToString(), instruction.Opecode))
-		}
+		hexDump = fmt.Sprintf("%02X %02X", opcode, b1)
 	case 3:
-		addressLower := c.ReadByteFrom(begin + 1)
-		addressUpper := c.ReadByteFrom(begin + 2)
-		hexDump = append(hexDump, addressLower)
-		hexDump = append(hexDump, addressUpper)
+		hexDump = fmt.Sprintf("%02X %02X %02X", opcode, b1, b2)
+	}
+	hexDump = fmt.Sprintf("%-8s", hexDump)
 
-		address := c.ReadWordFrom(begin + 1)
+	operandStr := ""
+	effAddr := uint16(0)
 
-		switch instruction.AddressingMode {
-		case Indirect:
-			if instruction.Opecode == 0x6C {
-				// JMP (indirect)
-				var jmpAddr uint16
-				if address&0x00FF == 0x00FF {
-					lower := c.ReadByteFrom(address)
-					upper := c.ReadByteFrom(address & 0xFF00)
-					jmpAddr = uint16(upper)<<8 | uint16(lower)
-				} else {
-					jmpAddr = c.ReadWordFrom(address)
-				}
-				tmp = fmt.Sprintf("($%04X) = %04X", address, jmpAddr)
-			} else {
-				tmp = fmt.Sprintf("$%04X", address)
-			}
-		case Absolute:
-			tmp = fmt.Sprintf("$%04X = %02X", addr, value)
-		case AbsoluteXIndexed:
-			tmp = fmt.Sprintf("$%04X,X @ %04X = %02X", address, addr, value)
-		case AbsoluteYIndexed:
-			tmp = fmt.Sprintf("$%04X,Y @ %04X = %02X", address, addr, value)
-		default:
-			panic(fmt.Sprintf("unexpected addressing mode %v has opecode length 3. code: %02X", instruction.AddressingMode.ToString(), instruction.Opecode))
+	mn := inst.Code.ToString()
+	isStore := mn == "STA" || mn == "STX" || mn == "STY" || mn == "SAX" || mn == "AAX"
+
+	peek := func(addr uint16) (uint8, bool) {
+		if c.canPeek(addr) {
+			return c.ReadByteFrom(addr), true
 		}
+		return 0, false
 	}
 
-	var hexParts []string
-	for _, hex := range hexDump {
-		hexParts = append(hexParts, fmt.Sprintf("%02X", hex))
+	switch inst.AddressingMode {
+	case Implied:
+	case Accumulator:
+		operandStr = "A"
+	case Immediate:
+		operandStr = fmt.Sprintf("#$%02X", b1)
+	case Relative:
+		offset := int8(b1)
+		target := pc + 2 + uint16(offset)
+		operandStr = fmt.Sprintf("$%04X", target)
+	case ZeroPage:
+		effAddr = uint16(b1)
+		if !isStore {
+			if v, ok := peek(effAddr); ok {
+				operandStr = fmt.Sprintf("$%02X = %02X", b1, v)
+				break
+			}
+		}
+		operandStr = fmt.Sprintf("$%02X", b1)
+	case ZeroPageXIndexed:
+		base := b1
+		effAddr = uint16(uint8(base + c.Registers.X))
+		if !isStore {
+			if v, ok := peek(effAddr); ok {
+				operandStr = fmt.Sprintf("$%02X,X @ %02X = %02X", base, effAddr, v)
+				break
+			}
+		}
+		operandStr = fmt.Sprintf("$%02X,X @ %02X", base, effAddr)
+	case ZeroPageYIndexed:
+		base := b1
+		effAddr = uint16(uint8(base + c.Registers.Y))
+		if !isStore {
+			if v, ok := peek(effAddr); ok {
+				operandStr = fmt.Sprintf("$%02X,Y @ %02X = %02X", base, effAddr, v)
+				break
+			}
+		}
+		operandStr = fmt.Sprintf("$%02X,Y @ %02X", base, effAddr)
+	case Absolute:
+		effAddr = uint16(b1) | (uint16(b2) << 8)
+		if opcode == 0x20 || opcode == 0x4C { // JSR/JMP
+			operandStr = fmt.Sprintf("$%04X", effAddr)
+		} else if !isStore {
+			if v, ok := peek(effAddr); ok {
+				operandStr = fmt.Sprintf("$%04X = %02X", effAddr, v)
+			} else {
+				operandStr = fmt.Sprintf("$%04X", effAddr)
+			}
+		} else {
+			operandStr = fmt.Sprintf("$%04X", effAddr)
+		}
+	case AbsoluteXIndexed:
+		base := uint16(b1) | (uint16(b2) << 8)
+		effAddr = base + uint16(c.Registers.X)
+		if !isStore {
+			if v, ok := peek(effAddr); ok {
+				operandStr = fmt.Sprintf("$%04X,X @ %04X = %02X", base, effAddr, v)
+				break
+			}
+		}
+		operandStr = fmt.Sprintf("$%04X,X @ %04X", base, effAddr)
+	case AbsoluteYIndexed:
+		base := uint16(b1) | (uint16(b2) << 8)
+		effAddr = base + uint16(c.Registers.Y)
+		if !isStore {
+			if v, ok := peek(effAddr); ok {
+				operandStr = fmt.Sprintf("$%04X,Y @ %04X = %02X", base, effAddr, v)
+				break
+			}
+		}
+		operandStr = fmt.Sprintf("$%04X,Y @ %04X", base, effAddr)
+	case Indirect:
+		ptr := uint16(b1) | (uint16(b2) << 8)
+		var target uint16
+		if ptr&0x00FF == 0x00FF {
+			low := c.ReadByteFrom(ptr)
+			high := c.ReadByteFrom(ptr & 0xFF00)
+			target = uint16(high)<<8 | uint16(low)
+		} else {
+			target = c.ReadWordFrom(ptr)
+		}
+		operandStr = fmt.Sprintf("($%04X) = %04X", ptr, target)
+	case IndirectXIndexed:
+		base := b1
+		ptr := uint8(base + c.Registers.X)
+		low := c.ReadByteFrom(uint16(ptr))
+		high := c.ReadByteFrom(uint16(ptr+1) & 0x00FF)
+		effAddr = uint16(high)<<8 | uint16(low)
+		if !isStore {
+			if v, ok := peek(effAddr); ok {
+				operandStr = fmt.Sprintf("($%02X,X) @ %02X = %04X = %02X", base, ptr, effAddr, v)
+				break
+			}
+		}
+		operandStr = fmt.Sprintf("($%02X,X) @ %02X = %04X", base, ptr, effAddr)
+	case IndirectYIndexed:
+		base := b1
+		low := c.ReadByteFrom(uint16(base))
+		high := c.ReadByteFrom(uint16(base+1) & 0x00FF)
+		baseAddr := uint16(high)<<8 | uint16(low)
+		effAddr = baseAddr + uint16(c.Registers.Y)
+		if !isStore {
+			if v, ok := peek(effAddr); ok {
+				operandStr = fmt.Sprintf("($%02X),Y = %04X @ %04X = %02X", base, baseAddr, effAddr, v)
+				break
+			}
+		}
+		operandStr = fmt.Sprintf("($%02X),Y = %04X @ %04X", base, baseAddr, effAddr)
+	default:
 	}
 
-	hexStr := strings.Join(hexParts, " ")
-	asmStr := fmt.Sprintf("%04X  %-8s %4s %s", begin, hexStr, instruction.Code.ToString(), tmp)
+	asm := fmt.Sprintf("%04X  %s %4s %s",
+		pc,
+		hexDump,
+		inst.Code.ToString(),
+		operandStr)
 
-	return fmt.Sprintf("%-47s A:%02X X:%02X Y:%02X P:%02X SP:%02X", asmStr, c.Registers.A, c.Registers.X, c.Registers.Y, c.Registers.P.ToByte(), c.Registers.SP)
+	return fmt.Sprintf("%-47s A:%02X X:%02X Y:%02X P:%02X SP:%02X",
+		asm,
+		c.Registers.A, c.Registers.X, c.Registers.Y,
+		c.Registers.P.ToByte(), c.Registers.SP)
 }
 
 // MARK: デバッグ用実行メソッド
