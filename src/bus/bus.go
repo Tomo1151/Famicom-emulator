@@ -151,7 +151,7 @@ func (b *Bus) ReadByteFrom(address uint16) uint8 {
 	case address == 0x4016: // JOYPAD (1P)
 		return b.joypad1.Read()
 	case address == 0x4017: // JOYPAD (2P)
-		return 0x00
+		return b.joypad2.Read()
 	case 0x6000 <= address && address <= 0x7FFF: // プログラムRAM
 		// fmt.Printf("RAM read: $%04X, %04X\n", address, b.cartridge.Mapper.ReadProgramRAM(address))
 		return b.cartridge.Mapper.ReadProgramRAM(address)
@@ -256,9 +256,10 @@ func (b *Bus) WriteByteAt(address uint16, data uint8) {
 		b.ppu.DMATransfer(&buffer)
 	case address == 0x4015: // APU
 		b.apu.WriteStatus(data)
-	case address == 0x4016: // コントローラ (1P)
-		// fmt.Printf("JOYPAD Write: data=0x%02X\n", data)
+	case address == 0x4016: // コントローラ (1P/2P)
+		// @FIXME 2PのB・A同時押しの読み取りミスが多い
 		b.joypad1.Write(data)
+		b.joypad2.Write(data)
 	case address == 0x4017: // APU フレームカウンタ
 		b.apu.WriteFrameCounter(data)
 	case 0x6000 <= address && address <= 0x7FFF: // プログラムRAM

@@ -13,6 +13,7 @@ import (
 )
 
 type Cartridge struct {
+	ROM    string
 	Mapper mappers.Mapper
 }
 
@@ -29,15 +30,15 @@ const (
 var NES_TAG = []uint8{0x4E, 0x45, 0x53, 0x1A}
 
 // MARK: カートリッジの読み込み
-func (c *Cartridge) Load(filename string) error {
-	ext := filepath.Ext(filename)
-	name := strings.TrimSuffix(filepath.Base(filename), ext)
+func (c *Cartridge) Load() error {
+	ext := filepath.Ext(c.ROM)
+	name := strings.TrimSuffix(filepath.Base(c.ROM), ext)
 
 	// ゲームROMの読み込み
-	gamefile, err := os.ReadFile(filename)
+	gamefile, err := os.ReadFile(c.ROM)
 	if err != nil {
 		log.Fatalf("Error occured in 'os.ReadFile()'")
-		return fmt.Errorf("Couldn't read file: %s", filename)
+		return fmt.Errorf("Couldn't read file: %s", c.ROM)
 	}
 
 	// savesディレクトリがなければ作成
