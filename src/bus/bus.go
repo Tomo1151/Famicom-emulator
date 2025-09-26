@@ -33,29 +33,43 @@ type Bus struct {
 }
 
 // MARK: Busの初期化メソッド (カートリッジ無し，デバッグ・テスト用)
-func (b *Bus) Init() {
+func (b *Bus) InitForTest() {
 	for addr := range b.wram {
 		b.wram[addr] = 0x00
 	}
 }
 
 // MARK: Busの初期化メソッド (カートリッジ有り)
-func (b *Bus) InitWithCartridge(cartridge *cartridge.Cartridge, callback func(*ppu.PPU, *ppu.Canvas, *joypad.JoyPad, *joypad.JoyPad)) {
+func (b *Bus) Init(callback func(*ppu.PPU, *ppu.Canvas, *joypad.JoyPad, *joypad.JoyPad)) {
 	for addr := range b.wram {
 		b.wram[addr] = 0x00
 	}
-	b.cartridge = *cartridge
-	b.ppu = ppu.PPU{}
-	b.ppu.Init(b.cartridge.Mapper)
-	b.apu = apu.APU{}
-	b.apu.Init()
-	b.joypad1 = &joypad.JoyPad{}
-	b.joypad1.Init()
-	b.joypad2 = &joypad.JoyPad{}
-	b.joypad2.Init()
+
 	b.callback = callback
 	b.canvas = &ppu.Canvas{}
 	b.canvas.Init()
+}
+
+// MARK: Busに各コンポーネントを接続
+func (b *Bus) ConnectComponents(
+	ppu *ppu.PPU,
+	apu *apu.APU,
+	cartridge *cartridge.Cartridge,
+	joypad1 *joypad.JoyPad,
+	joypad2 *joypad.JoyPad,
+) {
+	// コンポーネントをBusと接続
+	b.ppu = *ppu
+	b.apu = *apu
+	b.cartridge = *cartridge
+	b.joypad1 = joypad1
+	b.joypad2 = joypad2
+
+	// 各コンポーネントを初期化
+	b.ppu.Init(b.cartridge.Mapper)
+	b.apu.Init()
+	b.joypad1.Init()
+	b.joypad2.Init()
 }
 
 // MARK: NMIを取得
