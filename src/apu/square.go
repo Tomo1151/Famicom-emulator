@@ -46,7 +46,7 @@ type SquareWaveEvent struct {
 	sweepUnitData     *SweepUnitData
 	frequency         *uint16
 	enabled           bool
-	changed 					bool
+	changed           bool
 }
 
 // MARK: 矩形波データ
@@ -100,7 +100,7 @@ func (sw *SquareWave) generatePCM() {
 						sw.sweepUnit.frequency = *event.frequency
 					}
 				case SQUARE_WAVE_SWEEP_TICK: // SWEEP TICKイベント
-					sw.sweepUnit.tick(&sw.lengthCounter, *(&sw.channelNumber) == 1)
+					sw.sweepUnit.tick(&sw.lengthCounter, sw.channelNumber == 1)
 				case SQUARE_WAVE_RESET: // RESETイベント
 					sw.envelope.reset()
 					sw.lengthCounter.reset()

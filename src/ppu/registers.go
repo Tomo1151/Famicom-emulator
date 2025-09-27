@@ -5,18 +5,18 @@ package ppu
 // PPUレジスタ関連の定数
 const (
 	// PPUのI/Oレジスタのアドレス
-	PPU_CTRL uint16 = 0x2000
-	PPU_MASK uint16 = 0x2001
+	PPU_CTRL   uint16 = 0x2000
+	PPU_MASK   uint16 = 0x2001
 	PPU_STATUS uint16 = 0x2002
-	OAM_ADDR uint16 = 0x2003
-	OAM_DATA uint16 = 0x2004
+	OAM_ADDR   uint16 = 0x2003
+	OAM_DATA   uint16 = 0x2004
 	PPU_SCROLL uint16 = 0x2005
-	PPU_ADDR uint16 = 0x2006
-	PPU_DATA uint16 = 0x2007
-	OAM_DMA uint16 = 0x4014
+	PPU_ADDR   uint16 = 0x2006
+	PPU_DATA   uint16 = 0x2007
+	OAM_DMA    uint16 = 0x4014
 
-	PPU_REG_START  = 0x2000
-	PPU_REG_END    = 0x3FFF
+	PPU_REG_START = 0x2000
+	PPU_REG_END   = 0x3FFF
 
 	// PPU_ADDRのアドレスマスク
 	// PPU_ADDR_MIRROR_MASK = 0b111111_11111111
@@ -25,31 +25,30 @@ const (
 
 const (
 	// コントロールレジスタ ($2000) のビット位置
-	CONTROL_REG_NAMETABLE1_POS uint8 = 0
-	CONTROL_REG_NAMETABLE2_POS uint8 = 1
-	CONTROL_REG_VRAM_ADD_INCREMENT_POS uint8 = 2
-	CONTROL_REG_SPRITE_PATTERN_ADDR_POS uint8 = 3
+	CONTROL_REG_NAMETABLE1_POS             uint8 = 0
+	CONTROL_REG_NAMETABLE2_POS             uint8 = 1
+	CONTROL_REG_VRAM_ADD_INCREMENT_POS     uint8 = 2
+	CONTROL_REG_SPRITE_PATTERN_ADDR_POS    uint8 = 3
 	CONTROL_REG_BACKROUND_PATTERN_ADDR_POS uint8 = 4
-	CONTROL_REG_SPRITE_SIZE_POS uint8 = 5
-	CONTROL_REG_MASTER_SLAVE_SELECT_POS uint8 = 6
-	CONTROL_REG_GENERATE_NMI_POS uint8 = 7
+	CONTROL_REG_SPRITE_SIZE_POS            uint8 = 5
+	CONTROL_REG_MASTER_SLAVE_SELECT_POS    uint8 = 6
+	CONTROL_REG_GENERATE_NMI_POS           uint8 = 7
 
 	// マスクレジスタ ($2001) のビット位置
-	MASK_REG_GRAYSCALE uint8 = 0
+	MASK_REG_GRAYSCALE                  uint8 = 0
 	MASK_REG_LEFTMOST_BACKGROUND_ENABLE uint8 = 1
-	MASK_REG_LEFTMOST_SPRITE_ENABLE uint8 = 2
-	MASK_REG_BACKGROUND_ENABLE uint8 = 3
-	MASK_REG_SPRITE_ENABLE uint8 = 4
-	MASK_REG_EMPHASIZE_RED_POS uint8 = 5
-	MASK_REG_EMPHASIZE_GREEN_POS uint8 = 6
-	MASK_REG_EMPHASIZE_BLUE_POS uint8 = 7
+	MASK_REG_LEFTMOST_SPRITE_ENABLE     uint8 = 2
+	MASK_REG_BACKGROUND_ENABLE          uint8 = 3
+	MASK_REG_SPRITE_ENABLE              uint8 = 4
+	MASK_REG_EMPHASIZE_RED_POS          uint8 = 5
+	MASK_REG_EMPHASIZE_GREEN_POS        uint8 = 6
+	MASK_REG_EMPHASIZE_BLUE_POS         uint8 = 7
 
 	// ステータスレジスタ ($2002) のビット位置
 	STATUS_REG_SPRITE_OVERFLOW uint8 = 5
 	STATUS_REG_SPRITE_ZERO_HIT uint8 = 6
-	STATUS_REG_VBLANK_FLAG uint8 = 7
+	STATUS_REG_VBLANK_FLAG     uint8 = 7
 )
-
 
 // MARK: コントロールレジスタ ($2000)
 type ControlRegister struct {
@@ -71,14 +70,14 @@ type ControlRegister struct {
 		+--------- Vblank開始時に NMI を発生させるか否か (0: off, 1: on)
 	*/
 
-	NameTable1 bool
-	NameTable2 bool
-	VRAMAddIncrement bool
-	SpritePatternAddress bool
+	NameTable1               bool
+	NameTable2               bool
+	VRAMAddIncrement         bool
+	SpritePatternAddress     bool
 	BackgroundPatternAddress bool
-	SpriteSize bool
-	MasterSlaveSelect bool
-	GenerateNMI bool
+	SpriteSize               bool
+	MasterSlaveSelect        bool
+	GenerateNMI              bool
 }
 
 // コントロールレジスタのコンストラクタ
@@ -193,32 +192,31 @@ func (cr *ControlRegister) update(value uint8) {
 	cr.GenerateNMI = (value & (1 << CONTROL_REG_GENERATE_NMI_POS)) != 0
 }
 
-
 // MARK: マスクレジスタ ($2001)
 type MaskRegister struct {
 	/*
-    7654 3210
-    ---- ----
-    BGRs bMmG
-    |||| ||||
-    |||| |||+- カラー/モノクロフラグ (0: カラー, 1: モノクロ)
-    |||| ||+-- 1: 画面左端8pxの背景を描画, 0: 非表示
-    |||| |+--- 1: 画面左端8pxのスプライトを描画, 0: 非表示
-    |||| +---- 1: 背景を描画
-    |||+------ 1: スプライトを描画
-    ||+------- 赤色を強調
-    |+-------- 緑色を強調
-    +--------- 青色を強調
+	   7654 3210
+	   ---- ----
+	   BGRs bMmG
+	   |||| ||||
+	   |||| |||+- カラー/モノクロフラグ (0: カラー, 1: モノクロ)
+	   |||| ||+-- 1: 画面左端8pxの背景を描画, 0: 非表示
+	   |||| |+--- 1: 画面左端8pxのスプライトを描画, 0: 非表示
+	   |||| +---- 1: 背景を描画
+	   |||+------ 1: スプライトを描画
+	   ||+------- 赤色を強調
+	   |+-------- 緑色を強調
+	   +--------- 青色を強調
 	*/
 
-	Grayscale bool
+	Grayscale                bool
 	LeftmostBackgroundEnable bool
-	LeftmostSpriteEnable bool
-	BackgroundEnable bool
-	SpriteEnable bool
-	EmphasizeRed bool
-	EmphasizeGreen bool
-	EmphasizeBlue bool
+	LeftmostSpriteEnable     bool
+	BackgroundEnable         bool
+	SpriteEnable             bool
+	EmphasizeRed             bool
+	EmphasizeGreen           bool
+	EmphasizeBlue            bool
 }
 
 func (mr *MaskRegister) Init() {
@@ -269,7 +267,6 @@ func (mr *MaskRegister) update(value uint8) {
 	mr.EmphasizeBlue = (value & (1 << MASK_REG_EMPHASIZE_BLUE_POS)) != 0
 }
 
-
 // MARK: ステータスレジスタ ($2002)
 type StatusRegister struct {
 	/*
@@ -284,8 +281,8 @@ type StatusRegister struct {
 	*/
 
 	SpriteOverflow bool
-	SpriteZeroHit bool
-	VBlankFlag bool
+	SpriteZeroHit  bool
+	VBlankFlag     bool
 }
 
 // ステータスレジスタのコンストラクタ
@@ -338,8 +335,8 @@ func (sr *StatusRegister) ToByte() uint8 {
 // uint8の値をステータスレジスタオブジェクトへ反映するメソッド
 func (sr *StatusRegister) update(value uint8) {
 	sr.SpriteOverflow = (value & (1 << STATUS_REG_SPRITE_OVERFLOW)) != 0
-	sr.SpriteZeroHit  = (value & (1 << STATUS_REG_SPRITE_ZERO_HIT)) != 0
-	sr.VBlankFlag     = (value & (1 << STATUS_REG_VBLANK_FLAG)) != 0
+	sr.SpriteZeroHit = (value & (1 << STATUS_REG_SPRITE_ZERO_HIT)) != 0
+	sr.VBlankFlag = (value & (1 << STATUS_REG_VBLANK_FLAG)) != 0
 }
 
 // MARK: T/Vレジスタ (PPU 内部)
@@ -351,10 +348,10 @@ type InternalAddressRegiseter struct {
 		||| ++-------------- nametable select
 		+++----------------- タイル内の Y 座標 (0-7)
 	*/
-	fineY uint8
+	fineY     uint8
 	nameTable uint8
-	coarseY uint8
-	coarseX uint8
+	coarseY   uint8
+	coarseX   uint8
 }
 
 // T/Vレジスタの初期化メソッド
@@ -528,7 +525,6 @@ func (ixr *InternalXRegister) update(value uint8) {
 	ixr.fineX &= ^uint8(0x07) // 元の値をクリア
 	ixr.fineX |= value & 0x07 // 下位3bitに書き込み
 }
-
 
 // MARK: Wレジスタ (PPU 内部)
 type InternalWRegister struct {
