@@ -8,17 +8,17 @@ const (
 )
 
 const (
-	STATUS_REG_ENABLE_1CH_POS = 0
-	STATUS_REG_ENABLE_2CH_POS = 1
-	STATUS_REG_ENABLE_3CH_POS = 2
-	STATUS_REG_ENABLE_4CH_POS = 3
-	STATUS_REG_ENABLE_5CH_POS = 4
+	STATUS_REG_ENABLE_1CH_POS       = 0
+	STATUS_REG_ENABLE_2CH_POS       = 1
+	STATUS_REG_ENABLE_3CH_POS       = 2
+	STATUS_REG_ENABLE_4CH_POS       = 3
+	STATUS_REG_ENABLE_5CH_POS       = 4
 	STATUS_REG_ENABLE_FRAME_IRQ_POS = 6
-	STATUS_REG_ENABLE_DMC_IRQ_POS = 7
+	STATUS_REG_ENABLE_DMC_IRQ_POS   = 7
 )
 
 const (
-	FRAME_COUNTER_IRQ_POS = 6
+	FRAME_COUNTER_IRQ_POS  = 6
 	FRAME_COUNTER_MODE_POS = 7
 )
 
@@ -27,16 +27,16 @@ type NoiseRegisterMode uint8
 // MARK: 矩形波レジスタ
 type SquareWaveRegister struct {
 	// 0x4000 | 0x4004
-	volume uint8
-	envelope bool
+	volume        uint8
+	envelope      bool
 	keyOffCounter bool
-	duty uint8
+	duty          uint8
 
 	// 0x4001 | 0x4005
-	sweepShift uint8
+	sweepShift     uint8
 	sweepDirection uint8
-	sweepPeriod uint8
-	sweepEnabled bool
+	sweepPeriod    uint8
+	sweepEnabled   bool
 
 	// 0x4002 | 0x4006
 	frequency uint16
@@ -75,7 +75,7 @@ func (swr *SquareWaveRegister) write(address uint16, data uint8) {
 	case 0x4002, 0x4006:
 		swr.frequency = (swr.frequency & 0x0700) | uint16(data)
 	case 0x4003, 0x4007:
-		swr.frequency = (swr.frequency & 0x00FF) | (uint16(data) & 0x07) << 8
+		swr.frequency = (swr.frequency & 0x00FF) | (uint16(data)&0x07)<<8
 		swr.keyOffCount = (data & 0xF8) >> 3
 	default:
 		panic(fmt.Sprintf("APU Error: Invalid write at: %04X", address))
@@ -99,15 +99,14 @@ func (swr *SquareWaveRegister) getDuty() float32 {
 	}
 }
 
-
 // MARK: 三角波レジスタ
 type TriangleWaveRegister struct {
 	// 0x4008
-	length uint8
+	length        uint8
 	keyOffCounter bool
 
 	// 0x400A, 0x400B
-	frequency uint16
+	frequency   uint16
 	keyOffCount uint8
 }
 
@@ -128,7 +127,7 @@ func (twr *TriangleWaveRegister) write(address uint16, data uint8) {
 	case 0x400A:
 		twr.frequency = (twr.frequency & 0x0700) | uint16(data)
 	case 0x400B:
-		twr.frequency = (twr.frequency & 0x00FF) | (uint16(data) & 0x07) << 8
+		twr.frequency = (twr.frequency & 0x00FF) | (uint16(data)&0x07)<<8
 		twr.keyOffCount = (data & 0xF8) >> 3
 	default:
 		panic(fmt.Sprintf("APU Error: Invalid write at: %04X", address))
@@ -140,17 +139,16 @@ func (twr *TriangleWaveRegister) getFrequency() float32 {
 	return CPU_CLOCK / (32.0*float32(twr.frequency) + 1.0)
 }
 
-
 // MARK: ノイズレジスタ
 type NoiseWaveRegister struct {
 	// 0x400C
-	volume uint8
-	envelope bool
+	volume        uint8
+	envelope      bool
 	keyOffCounter bool
 
 	// 0x400E
 	frequency uint8
-	mode NoiseRegisterMode
+	mode      NoiseRegisterMode
 
 	// 0x400F
 	keyOffCount uint8
@@ -177,7 +175,7 @@ func (nwr *NoiseWaveRegister) write(address uint16, data uint8) {
 		nwr.frequency = data & 0x0F
 		mode := data & 0x80
 
-		if (mode == 0){
+		if mode == 0 {
 			nwr.mode = NOISE_MODE_LONG
 		} else {
 			nwr.mode = NOISE_MODE_SHORT
@@ -206,11 +204,10 @@ func (nwr *NoiseWaveRegister) getFrequency() float32 {
 	return CPU_CLOCK / float32(noiseFrequencyTable[nwr.frequency])
 }
 
-
 // MARK: ノイズシフトレジスタ
 type NoiseShiftRegister struct {
-	mode   NoiseRegisterMode
-	value  uint16
+	mode  NoiseRegisterMode
+	value uint16
 }
 
 func (nsr *NoiseShiftRegister) InitWithLongMode() {
@@ -257,8 +254,8 @@ func (nsr *NoiseShiftRegister) next() bool {
 // MARK: DPCMレジスタ
 type DPCMRegister struct {
 	// 0x4010
-	irqEnabled bool
-	loop bool
+	irqEnabled     bool
+	loop           bool
 	frequencyIndex uint8
 
 	// 0x4011
@@ -299,17 +296,15 @@ func (dr *DPCMRegister) write(address uint16, data uint8) {
 	}
 }
 
-
-
 // MARK: ステータスレジスタ
 type StatusRegister struct {
-	enable1ch bool
-	enable2ch bool
-	enable3ch bool
-	enable4ch bool
-	enable5ch bool
+	enable1ch      bool
+	enable2ch      bool
+	enable3ch      bool
+	enable4ch      bool
+	enable5ch      bool
 	enableFrameIRQ bool
-	enableDMCIRQ bool
+	enableDMCIRQ   bool
 }
 
 // MARK: ステータスレジスタの初期化メソッド
@@ -398,10 +393,9 @@ func (sr *StatusRegister) update(value uint8) {
 
 }
 
-
 // MARK: フレームカウンタ
 type FrameCounter struct {
-	DisableIRQ bool
+	DisableIRQ    bool
 	SequencerMode bool
 }
 

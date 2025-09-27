@@ -14,22 +14,22 @@ const (
 
 // Joy-Con (R) 向けボタンマッピング
 const (
-	JOYCON_R_BUTTON_X uint8 = 0
-	JOYCON_R_BUTTON_A uint8 = 1
-	JOYCON_R_BUTTON_Y uint8 = 2
-	JOYCON_R_BUTTON_B uint8 = 3
+	JOYCON_R_BUTTON_X    uint8 = 0
+	JOYCON_R_BUTTON_A    uint8 = 1
+	JOYCON_R_BUTTON_Y    uint8 = 2
+	JOYCON_R_BUTTON_B    uint8 = 3
 	JOYCON_R_BUTTON_HOME uint8 = 5
 	JOYCON_R_BUTTON_PLUS uint8 = 6
-	JOYCON_R_BUTTON_R uint8 = 16
-	JOYCON_R_BUTTON_ZR uint8 = 16
+	JOYCON_R_BUTTON_R    uint8 = 16
+	JOYCON_R_BUTTON_ZR   uint8 = 16
 )
 
 type JoyPadButton uint8
 
 type JoyPad struct {
-	strobe bool
+	strobe      bool
 	ButtonIndex uint8
-	State uint8
+	State       uint8
 }
 
 func (j *JoyPad) Init() {
@@ -39,7 +39,7 @@ func (j *JoyPad) Init() {
 }
 
 func (j *JoyPad) Write(data uint8) {
-	j.strobe = data & 1 == 1
+	j.strobe = data&1 == 1
 	if j.strobe {
 		j.ButtonIndex = 0
 	}

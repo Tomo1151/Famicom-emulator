@@ -14,13 +14,13 @@ import (
 )
 
 const (
-	CPU_CLOCK = 1_789_772.5 // 1.78MHz
+	CPU_CLOCK          = 1_789_772.5 // 1.78MHz
 	APU_CYCLE_INTERVAL = 7457
-	MAX_VOLUME = 0.8
-	toneHz   = 440
-	sampleHz = 44100
-	BUFFER_SIZE = 16384 // リングバッファサイズ
-	CHUNK_SIZE = 1024
+	MAX_VOLUME         = 0.8
+	toneHz             = 440
+	sampleHz           = 44100
+	BUFFER_SIZE        = 16384 // リングバッファサイズ
+	CHUNK_SIZE         = 1024
 )
 
 var (
@@ -33,50 +33,49 @@ var (
 // MARK: APUの定義
 type APU struct {
 	// CH1
-	Ch1Register SquareWaveRegister
-	Ch1Channel chan SquareWaveEvent
-	Ch1Receiver chan ChannelEvent
-	Ch1Buffer *RingBuffer
+	Ch1Register    SquareWaveRegister
+	Ch1Channel     chan SquareWaveEvent
+	Ch1Receiver    chan ChannelEvent
+	Ch1Buffer      *RingBuffer
 	Ch1LengthCount uint8
 
 	// CH2
-	Ch2Register SquareWaveRegister
-	Ch2Channel chan SquareWaveEvent
-	Ch2Receiver chan ChannelEvent
-	Ch2Buffer *RingBuffer
+	Ch2Register    SquareWaveRegister
+	Ch2Channel     chan SquareWaveEvent
+	Ch2Receiver    chan ChannelEvent
+	Ch2Buffer      *RingBuffer
 	Ch2LengthCount uint8
 
 	// CH3
-	Ch3Register TriangleWaveRegister
-	Ch3Channel chan TriangleWaveEvent
-	Ch3Receiver chan ChannelEvent
-	Ch3Buffer *RingBuffer
+	Ch3Register    TriangleWaveRegister
+	Ch3Channel     chan TriangleWaveEvent
+	Ch3Receiver    chan ChannelEvent
+	Ch3Buffer      *RingBuffer
 	Ch3LengthCount uint8
 
 	// CH4
-	Ch4Register NoiseWaveRegister
-	Ch4Channel chan NoiseWaveEvent
-	Ch4Receiver chan ChannelEvent
-	Ch4Buffer *RingBuffer
+	Ch4Register    NoiseWaveRegister
+	Ch4Channel     chan NoiseWaveEvent
+	Ch4Receiver    chan ChannelEvent
+	Ch4Buffer      *RingBuffer
 	Ch4LengthCount uint8
 
 	// CH5
-	Ch5Register DPCMRegister
-	Ch5Channel chan DPCMWaveEvent
-	Ch5Receiver chan ChannelEvent
-	Ch5Buffer *RingBuffer
+	Ch5Register    DPCMRegister
+	Ch5Channel     chan DPCMWaveEvent
+	Ch5Receiver    chan ChannelEvent
+	Ch5Buffer      *RingBuffer
 	Ch5LengthCount uint8
 
 	frameCounter FrameCounter
-	cycles uint
-	counter uint
-	Status StatusRegister
+	cycles       uint
+	counter      uint
+	Status       StatusRegister
 }
 
 type ChannelEvent struct {
 	length uint8
 }
-
 
 // MARK: APUの初期化メソッド
 func (a *APU) Init() {
@@ -150,7 +149,7 @@ func (a *APU) Write1ch(address uint16, data uint8) {
 			!a.Ch1Register.keyOffCounter,
 		)
 		a.Ch1Channel <- SquareWaveEvent{
-			eventType: SQUARE_WAVE_ENVELOPE,
+			eventType:    SQUARE_WAVE_ENVELOPE,
 			envelopeData: &envelopeData,
 		}
 	}
@@ -163,7 +162,7 @@ func (a *APU) Write1ch(address uint16, data uint8) {
 		)
 
 		a.Ch1Channel <- SquareWaveEvent{
-			eventType: SQUARE_WAVE_LENGTH_COUNTER,
+			eventType:         SQUARE_WAVE_LENGTH_COUNTER,
 			lengthCounterData: &lengthCounterData,
 		}
 	}
@@ -178,7 +177,7 @@ func (a *APU) Write1ch(address uint16, data uint8) {
 		)
 
 		a.Ch1Channel <- SquareWaveEvent{
-			eventType: SQUARE_WAVE_SWEEP,
+			eventType:     SQUARE_WAVE_SWEEP,
 			sweepUnitData: &sweepUnitData,
 		}
 	}
@@ -216,7 +215,7 @@ func (a *APU) Write2ch(address uint16, data uint8) {
 			!a.Ch2Register.keyOffCounter,
 		)
 		a.Ch2Channel <- SquareWaveEvent{
-			eventType: SQUARE_WAVE_ENVELOPE,
+			eventType:    SQUARE_WAVE_ENVELOPE,
 			envelopeData: &envelopeData,
 		}
 	}
@@ -229,11 +228,10 @@ func (a *APU) Write2ch(address uint16, data uint8) {
 		)
 
 		a.Ch2Channel <- SquareWaveEvent{
-			eventType: SQUARE_WAVE_LENGTH_COUNTER,
+			eventType:         SQUARE_WAVE_LENGTH_COUNTER,
 			lengthCounterData: &lengthCounterData,
 		}
 	}
-
 
 	if address == 0x4005 {
 		sweepUnitData := SweepUnitData{}
@@ -245,7 +243,7 @@ func (a *APU) Write2ch(address uint16, data uint8) {
 		)
 
 		a.Ch2Channel <- SquareWaveEvent{
-			eventType: SQUARE_WAVE_SWEEP,
+			eventType:     SQUARE_WAVE_SWEEP,
 			sweepUnitData: &sweepUnitData,
 		}
 	}
@@ -284,7 +282,7 @@ func (a *APU) Write3ch(address uint16, data uint8) {
 			a.Ch3Register.keyOffCounter,
 		)
 		a.Ch3Channel <- TriangleWaveEvent{
-			eventType: TRIANGLE_WAVE_LENGTH_COUNTER,
+			eventType:         TRIANGLE_WAVE_LENGTH_COUNTER,
 			lengthCounterData: &lengthCounterData,
 		}
 	}
@@ -296,7 +294,7 @@ func (a *APU) Write3ch(address uint16, data uint8) {
 			a.Ch3Register.keyOffCounter,
 		)
 		a.Ch3Channel <- TriangleWaveEvent{
-			eventType: TRIANGLE_WAVE_LINEAR_COUNTER,
+			eventType:         TRIANGLE_WAVE_LINEAR_COUNTER,
 			linearCounterData: &linearCounterData,
 		}
 	}
@@ -316,7 +314,7 @@ func (a *APU) Write4ch(address uint16, data uint8) {
 		a.Ch4Channel <- NoiseWaveEvent{
 			eventType: NOISE_WAVE_NOTE,
 			note: &NoiseNote{
-				hz: a.Ch4Register.getFrequency(),
+				hz:        a.Ch4Register.getFrequency(),
 				noiseMode: a.Ch4Register.getMode(),
 			},
 		}
@@ -330,7 +328,7 @@ func (a *APU) Write4ch(address uint16, data uint8) {
 			!a.Ch4Register.keyOffCounter,
 		)
 		a.Ch4Channel <- NoiseWaveEvent{
-			eventType: NOISE_WAVE_ENVELOPE,
+			eventType:    NOISE_WAVE_ENVELOPE,
 			envelopeData: &envelopeData,
 		}
 	}
@@ -342,7 +340,7 @@ func (a *APU) Write4ch(address uint16, data uint8) {
 			a.Ch4Register.keyOffCounter,
 		)
 		a.Ch4Channel <- NoiseWaveEvent{
-			eventType: NOISE_WAVE_LENGTH_COUNTER,
+			eventType:         NOISE_WAVE_LENGTH_COUNTER,
 			lengthCounterData: &lengthCounterData,
 		}
 	}
@@ -418,39 +416,47 @@ func (a *APU) WriteStatus(data uint8) {
 	// 各チャンネルの状態によってミュートにする
 	a.Ch1Channel <- SquareWaveEvent{
 		eventType: SQUARE_WAVE_ENABLED,
-		enabled: a.Status.is1chEnabled(),
-		changed: wasCh1Enabled && !a.Status.is1chEnabled(),
+		enabled:   a.Status.is1chEnabled(),
+		changed:   wasCh1Enabled && !a.Status.is1chEnabled(),
 	}
 	a.Ch2Channel <- SquareWaveEvent{
 		eventType: SQUARE_WAVE_ENABLED,
-		enabled: a.Status.is2chEnabled(),
-		changed: wasCh2Enabled && !a.Status.is2chEnabled(),
+		enabled:   a.Status.is2chEnabled(),
+		changed:   wasCh2Enabled && !a.Status.is2chEnabled(),
 	}
 	a.Ch3Channel <- TriangleWaveEvent{
 		eventType: TRIANGLE_WAVE_ENABLED,
-		enabled: a.Status.is3chEnabled(),
-		changed: wasCh3Enabled && !a.Status.is3chEnabled(),
+		enabled:   a.Status.is3chEnabled(),
+		changed:   wasCh3Enabled && !a.Status.is3chEnabled(),
 	}
 	a.Ch4Channel <- NoiseWaveEvent{
 		eventType: NOISE_WAVE_ENABLED,
-		enabled: a.Status.is4chEnabled(),
-		changed: wasCh4Enabled && !a.Status.is4chEnabled(),
+		enabled:   a.Status.is4chEnabled(),
+		changed:   wasCh4Enabled && !a.Status.is4chEnabled(),
 	}
 	a.Ch5Channel <- DPCMWaveEvent{
 		eventType: DPCM_WAVE_ENABLED,
-		enabled: a.Status.is5chEnabled(),
-		changed: wasCh5Enabled && !a.Status.is5chEnabled(),
+		enabled:   a.Status.is5chEnabled(),
+		changed:   wasCh5Enabled && !a.Status.is5chEnabled(),
 	}
 
 	// disableされた時に長さカウンタも落とす (halt)
-	if wasCh1Enabled && !a.Status.is1chEnabled() { a.Ch1LengthCount = 0 }
-	if wasCh2Enabled && !a.Status.is2chEnabled() { a.Ch2LengthCount = 0 }
-	if wasCh3Enabled && !a.Status.is3chEnabled() { a.Ch3LengthCount = 0 }
-	if wasCh4Enabled && !a.Status.is4chEnabled() { a.Ch4LengthCount = 0 }
+	if wasCh1Enabled && !a.Status.is1chEnabled() {
+		a.Ch1LengthCount = 0
+	}
+	if wasCh2Enabled && !a.Status.is2chEnabled() {
+		a.Ch2LengthCount = 0
+	}
+	if wasCh3Enabled && !a.Status.is3chEnabled() {
+		a.Ch3LengthCount = 0
+	}
+	if wasCh4Enabled && !a.Status.is4chEnabled() {
+		a.Ch4LengthCount = 0
+	}
 }
 
-
 // MARK: 全チャンネルをミックスした音声生成コールバック
+//
 //export MixedAudioCallback
 func MixedAudioCallback(userdata unsafe.Pointer, stream *C.Uint8, length C.int) {
 	n := int(length) / 4
@@ -464,13 +470,13 @@ func MixedAudioCallback(userdata unsafe.Pointer, stream *C.Uint8, length C.int) 
 
 	// 1chのデータの読み込み
 	squareWave1.buffer.Read(ch1Buffer)
-	
+
 	// 2chのデータの読み込み
 	squareWave2.buffer.Read(ch2Buffer)
-	
+
 	// 3chのデータの読み込み
 	triangleWave.buffer.Read(ch3Buffer)
-	
+
 	// 4chのデータの読み込み
 	noiseWave.buffer.Read(ch4Buffer)
 
@@ -491,10 +497,10 @@ func MixedAudioCallback(userdata unsafe.Pointer, stream *C.Uint8, length C.int) 
 // MARK: オーディオの初期化メソッド
 func (a *APU) initAudioDevice() {
 	spec := &sdl.AudioSpec{
-		Freq: sampleHz,
-		Format: sdl.AUDIO_F32,
+		Freq:     sampleHz,
+		Format:   sdl.AUDIO_F32,
 		Channels: 1,
-		Samples: 2048,
+		Samples:  2048,
 		Callback: sdl.AudioCallback(C.MixedAudioCallback),
 	}
 	if err := sdl.OpenAudio(spec, nil); err != nil {
@@ -520,18 +526,18 @@ func initSquareChannel(channelNumber uint, wave *SquareWave, buffer *RingBuffer)
 	// SquareWave構造体を初期化
 	*wave = SquareWave{
 		channelNumber: channelNumber,
-		freq:   44100.0,
-		phase:  0.0,
-		channel: ch1Channel,
-		sender: sendChannel,
-		buffer: buffer,
+		freq:          44100.0,
+		phase:         0.0,
+		channel:       ch1Channel,
+		sender:        sendChannel,
+		buffer:        buffer,
 		note: SquareNote{
-			duty:   0.0,
+			duty: 0.0,
 		},
-		envelope: envelope,
+		envelope:      envelope,
 		lengthCounter: lengthCounter,
-		sweepUnit: sweepUnit,
-		enabled: true,
+		sweepUnit:     sweepUnit,
+		enabled:       true,
 	}
 
 	// PCM生成のgoroutineを開始
@@ -551,17 +557,17 @@ func initTriangleChannel(buffer *RingBuffer) (chan TriangleWaveEvent, chan Chann
 	linearCounter.Init()
 
 	triangleWave = TriangleWave{
-		freq: 44100.0,
-		phase: 0.0,
+		freq:    44100.0,
+		phase:   0.0,
 		channel: ch3Channel,
-		sender: sendChannel,
-		buffer: buffer,
+		sender:  sendChannel,
+		buffer:  buffer,
 		note: TriangleNote{
 			hz: 0.0,
 		},
 		lengthCounter: lengthCounter,
 		linearCounter: linearCounter,
-		enabled: true,
+		enabled:       true,
 	}
 
 	go triangleWave.generatePCM()
@@ -579,21 +585,21 @@ func initNoiseChannel(buffer *RingBuffer) (chan NoiseWaveEvent, chan ChannelEven
 
 	// NoiseWave構造体を初期化
 	noiseWave = NoiseWave{
-		freq:   44100.0,
-		phase:  0.0,
+		freq:    44100.0,
+		phase:   0.0,
 		channel: ch4Channel,
-		sender: sendChannel,
-		buffer: buffer,
-		noise: false,
+		sender:  sendChannel,
+		buffer:  buffer,
+		noise:   false,
 		note: NoiseNote{
-			hz: 0,
+			hz:        0,
 			noiseMode: NOISE_MODE_SHORT,
 		},
 		lengthCounter: lengthCounter,
 
-		longNoise: NoiseShiftRegister{},
+		longNoise:  NoiseShiftRegister{},
 		shortNoise: NoiseShiftRegister{},
-		enabled: true,
+		enabled:    true,
 	}
 
 	noiseWave.shortNoise.InitWithShortMode()
@@ -611,12 +617,12 @@ func (a *APU) initDPCMChannel(buffer *RingBuffer) (chan DPCMWaveEvent, chan Chan
 	sendChannel := make(chan ChannelEvent, 1000)
 
 	dpcmWave = DPCMWave{
-		freq: 44100.0,
-		phase: 0.0,
+		freq:    44100.0,
+		phase:   0.0,
 		channel: ch5Channel,
-		sender: sendChannel,
-		note: DPCMNote{},
-		buffer: buffer,
+		sender:  sendChannel,
+		note:    DPCMNote{},
+		buffer:  buffer,
 		enabled: true,
 	}
 
@@ -666,7 +672,7 @@ func (a *APU) sendLengthCounterTick() {
 
 // MARK: イベント受け取りのメソッド
 func (a *APU) receiveEvents() {
-	ch1EventLoop:
+ch1EventLoop:
 	for {
 		select {
 		case event := <-a.Ch1Receiver:
@@ -676,7 +682,7 @@ func (a *APU) receiveEvents() {
 		}
 	}
 
-	ch2EventLoop:
+ch2EventLoop:
 	for {
 		select {
 		case event := <-a.Ch2Receiver:
@@ -686,7 +692,7 @@ func (a *APU) receiveEvents() {
 		}
 	}
 
-	ch3EventLoop:
+ch3EventLoop:
 	for {
 		select {
 		case event := <-a.Ch3Receiver:
@@ -696,7 +702,7 @@ func (a *APU) receiveEvents() {
 		}
 	}
 
-	ch4EventLoop:
+ch4EventLoop:
 	for {
 		select {
 		case event := <-a.Ch4Receiver:
@@ -747,7 +753,7 @@ func (a *APU) Tick(cycles uint) {
 					a.Status.SetFrameIRQ()
 				}
 			}
-			if a.counter == 1 || a.counter == 2 || a.counter == 3 || a.counter ==4 {
+			if a.counter == 1 || a.counter == 2 || a.counter == 3 || a.counter == 4 {
 				a.sendEnvelopeTick()
 			}
 		case 5:
@@ -761,7 +767,7 @@ func (a *APU) Tick(cycles uint) {
 				a.sendLengthCounterTick()
 				a.sendSweepTick()
 			}
-			if a.counter == 1 || a.counter == 2 || a.counter == 3 || a.counter ==4 {
+			if a.counter == 1 || a.counter == 2 || a.counter == 3 || a.counter == 4 {
 				a.sendEnvelopeTick()
 			}
 			if a.counter == 5 {
@@ -772,4 +778,3 @@ func (a *APU) Tick(cycles uint) {
 		}
 	}
 }
-
