@@ -115,8 +115,7 @@ func (sw *SquareWave) generatePCM() {
 
 		// バッファに十分なデータがある場合は少し待つ
 		if sw.buffer.Available() > BUFFER_SIZE/2 {
-			time.Sleep(1 * time.Millisecond)
-			continue
+			time.Sleep(10 * time.Nanosecond)
 		}
 
 		// pcmBufferを再利用
