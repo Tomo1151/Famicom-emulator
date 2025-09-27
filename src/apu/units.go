@@ -77,7 +77,7 @@ type SweepUnit struct {
 	data      SweepUnitData
 	frequency uint16
 	counter   uint8
-	mute bool
+	mute      bool
 }
 
 // MARK: スイープの初期化メソッド
