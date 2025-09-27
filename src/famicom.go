@@ -1,6 +1,7 @@
 package main
 
 import (
+	"Famicom-emulator/apu"
 	"Famicom-emulator/bus"
 	"Famicom-emulator/cartridge"
 	"Famicom-emulator/cpu"
@@ -33,6 +34,10 @@ type InputState struct {
 // MARK: Famicomの定義
 type Famicom struct {
 	cpu       cpu.CPU
+	ppu       ppu.PPU
+	apu       apu.APU
+	joypad1   joypad.JoyPad
+	joypad2   joypad.JoyPad
 	bus       bus.Bus
 	cartridge cartridge.Cartridge
 
@@ -53,11 +58,31 @@ func (f *Famicom) Init(cartridge cartridge.Cartridge) {
 	if err != nil {
 		log.Fatalf("Cartridge loading error: %v", err)
 	}
+
+	// 各コンポーネントの定義 / 接続
 	f.cpu = cpu.CPU{}
+	f.ppu = ppu.PPU{}
+	f.apu = apu.APU{}
+	f.joypad1 = joypad.JoyPad{}
+	f.joypad2 = joypad.JoyPad{}
+	f.bus = bus.Bus{}
+	f.bus.ConnectComponents(
+		&f.ppu,
+		&f.apu,
+		&f.cartridge,
+		&f.joypad1,
+		&f.joypad2,
+	)
+
+	// 入力データの定義
+	f.keyboard1 = InputState{}
+	f.keyboard2 = InputState{}
+	f.controller1 = InputState{}
+	f.controller2 = InputState{}
 }
 
 // MARK: Famicomの起動
-func (f *Famicom) Run() {
+func (f *Famicom) Start() {
 	// SDLの初期化
 	if err := sdl.Init(sdl.INIT_VIDEO | sdl.INIT_GAMECONTROLLER); err != nil {
 		panic(err)
@@ -111,12 +136,6 @@ func (f *Famicom) Run() {
 	}
 	defer texture.Destroy()
 
-	// 入力データの定義
-	f.keyboard1 = InputState{}
-	f.keyboard2 = InputState{}
-	f.controller1 = InputState{}
-	f.controller2 = InputState{}
-
 	// SDL2イベントポンプを取得
 	eventPump := sdl.PollEvent
 
@@ -124,8 +143,7 @@ func (f *Famicom) Run() {
 	var lastFrameTime = time.Now()
 
 	// BusのNMIコールバックで描画とイベント処理
-	f.bus = bus.Bus{}
-	f.bus.InitWithCartridge(&f.cartridge, func(p *ppu.PPU, c *ppu.Canvas, j1 *joypad.JoyPad, j2 *joypad.JoyPad) {
+	f.bus.Init(func(p *ppu.PPU, c *ppu.Canvas, j1 *joypad.JoyPad, j2 *joypad.JoyPad) {
 
 		// フレームレート調整 (60FPS)
 		now := time.Now()
@@ -182,7 +200,7 @@ func (f *Famicom) Run() {
 	})
 
 	// CPUの初期化
-	f.cpu.InitWithBus(f.bus, false)
+	f.cpu.Init(f.bus, false)
 
 	// CPUの起動
 	f.cpu.Run()

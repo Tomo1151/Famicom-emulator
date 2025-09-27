@@ -17,7 +17,7 @@ type CPU struct {
 }
 
 // MARK: CPUの初期化メソッド (カートリッジ無し，デバッグ・テスト用)
-func (c *CPU) Init(debug bool) {
+func (c *CPU) InitForTest(debug bool) {
 	c.Registers = registers{
 		A: 0x00,
 		X: 0x00,
@@ -37,13 +37,13 @@ func (c *CPU) Init(debug bool) {
 		// PC: c.ReadWordFrom(0xFFFC),
 	}
 	c.Bus = bus.Bus{}
-	c.Bus.Init()
+	c.Bus.InitForTest()
 	c.InstructionSet = generateInstructionSet(c)
 	c.Log = debug
 }
 
 // MARK: CPUの初期化メソッド (Bus有り)
-func (c *CPU) InitWithBus(bus bus.Bus, debug bool) {
+func (c *CPU) Init(bus bus.Bus, debug bool) {
 	c.Bus = bus
 	c.Registers = registers{
 		A: 0x00,
@@ -1187,7 +1187,7 @@ func (c *CPU) Trace() string {
 
 // MARK: デバッグ用実行メソッド
 func (c *CPU) REPL(commands []uint8) {
-	c.Init(true)
+	c.InitForTest(true)
 
 	for addr, opecode := range commands {
 		c.WriteByteAt(uint16(addr), opecode)

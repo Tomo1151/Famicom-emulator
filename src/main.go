@@ -10,5 +10,5 @@ func main() {
 		// ROM: "../rom/SuperMarioBros.nes",
 		// ROM: "../rom/SuperMarioBros3.nes",
 	})
-	famicom.Run()
+	famicom.Start()
 }

@@ -7,7 +7,7 @@ import (
 // テストヘルパー関数：CPUを初期化する
 func setupCPU() *CPU {
 	cpu := &CPU{}
-	cpu.Init(false)
+	cpu.InitForTest(false)
 	// PCを固定アドレスに設定（テスト用）
 	cpu.Registers.PC = 0x0000
 	return cpu
