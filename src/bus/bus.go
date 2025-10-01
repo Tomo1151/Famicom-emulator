@@ -73,7 +73,7 @@ func (b *Bus) ConnectComponents(
 }
 
 // MARK: NMIを取得
-func (b *Bus) GetNMIStatus() *uint8 {
+func (b *Bus) GetNMIStatus() bool {
 	return b.ppu.GetNMI()
 }
 
@@ -107,7 +107,7 @@ func (b *Bus) Tick(cycles uint) {
 	b.apu.Tick(cycles)
 
 	nmiAfter := b.ppu.NMI
-	if nmiBefore == nil && nmiAfter != nil {
+	if !nmiBefore && nmiAfter {
 		b.callback(&b.ppu, b.canvas, b.joypad1, b.joypad2)
 	}
 }

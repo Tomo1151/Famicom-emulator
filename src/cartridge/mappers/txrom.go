@@ -126,8 +126,16 @@ func (t *TxROM) ReadProgramROM(address uint16) uint8 {
 
 	lastBank1 := uint(bankMax - 1)
 	lastBank2 := uint(bankMax - 2)
-	r6Bank := uint(t.bankData[6])
-	r7Bank := uint(t.bankData[7])
+
+	/*
+		@NOTE
+		> R6 and R7 will ignore the top two bits, as the MMC3 has only 6 PRG ROM address lines.
+		https://www.nesdev.org/wiki/MMC3
+
+		TxROMではR6/R7の上位2bitが無視されるためマスク
+	*/
+	r6Bank := uint(t.bankData[6]) & 0x3F
+	r7Bank := uint(t.bankData[7]) & 0x3F
 
 	switch mode {
 	case 0:

@@ -101,8 +101,7 @@ func (nw *NoiseWave) generatePCM() {
 
 		// バッファに十分なデータがある場合は少し待つ
 		if nw.buffer.Available() > BUFFER_SIZE/2 {
-			time.Sleep(1 * time.Millisecond)
-			continue
+			time.Sleep(10 * time.Nanosecond)
 		}
 
 		for i := range pcmBuffer {
