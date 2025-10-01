@@ -61,8 +61,8 @@ type APU struct {
 	Ch4LengthCount uint8
 
 	// CH5
-	Ch5Register    DPCMRegister
-	Ch5Channel     chan DPCMWaveEvent
+	Ch5Register    DMCRegister
+	Ch5Channel     chan DMCWaveEvent
 	Ch5Receiver    chan ChannelEvent
 	Ch5Buffer      *RingBuffer
 	Ch5LengthCount uint8
@@ -112,11 +112,11 @@ func (a *APU) Init() {
 	a.Ch4LengthCount = 0
 
 	// CH5
-	a.Ch5Register = DPCMRegister{}
+	a.Ch5Register = DMCRegister{}
 	a.Ch5Register.Init()
 	a.Ch5Buffer = &RingBuffer{}
 	a.Ch5Buffer.Init()
-	a.Ch5Channel, a.Ch5Receiver = a.initDPCMChannel(a.Ch5Buffer)
+	a.Ch5Channel, a.Ch5Receiver = a.initDMCChannel(a.Ch5Buffer)
 	a.Ch5LengthCount = 0
 
 	a.frameCounter = FrameCounter{}
@@ -352,7 +352,7 @@ func (a *APU) Write4ch(address uint16, data uint8) {
 	}
 }
 
-// MARK: 5chへの書き込みメソッド（DPCM）
+// MARK: 5chへの書き込みメソッド（DMC）
 func (a *APU) Write5ch(address uint16, data uint8) {
 	a.Ch5Register.write(address, data)
 }
@@ -434,8 +434,8 @@ func (a *APU) WriteStatus(data uint8) {
 		enabled:   a.Status.is4chEnabled(),
 		changed:   wasCh4Enabled && !a.Status.is4chEnabled(),
 	}
-	a.Ch5Channel <- DPCMWaveEvent{
-		eventType: DPCM_WAVE_ENABLED,
+	a.Ch5Channel <- DMCWaveEvent{
+		eventType: DMC_WAVE_ENABLED,
 		enabled:   a.Status.is5chEnabled(),
 		changed:   wasCh5Enabled && !a.Status.is5chEnabled(),
 	}
@@ -612,16 +612,16 @@ func initNoiseChannel(buffer *RingBuffer) (chan NoiseWaveEvent, chan ChannelEven
 }
 
 // MARK: 5chの初期化メソッド
-func (a *APU) initDPCMChannel(buffer *RingBuffer) (chan DPCMWaveEvent, chan ChannelEvent) {
-	ch5Channel := make(chan DPCMWaveEvent, 1000)
+func (a *APU) initDMCChannel(buffer *RingBuffer) (chan DMCWaveEvent, chan ChannelEvent) {
+	ch5Channel := make(chan DMCWaveEvent, 1000)
 	sendChannel := make(chan ChannelEvent, 1000)
 
-	dpcmWave = DPCMWave{
+	dpcmWave = DMCWave{
 		freq:    44100.0,
 		phase:   0.0,
 		channel: ch5Channel,
 		sender:  sendChannel,
-		note:    DPCMNote{},
+		note:    DMCNote{},
 		buffer:  buffer,
 		enabled: true,
 	}

@@ -251,8 +251,8 @@ func (nsr *NoiseShiftRegister) next() bool {
 	return result
 }
 
-// MARK: DPCMレジスタ
-type DPCMRegister struct {
+// MARK: DMCレジスタ
+type DMCRegister struct {
 	// 0x4010
 	irqEnabled     bool
 	loop           bool
@@ -268,8 +268,8 @@ type DPCMRegister struct {
 	byteCount uint8
 }
 
-// MARK: DPCMレジスタの初期化メソッド
-func (dr *DPCMRegister) Init() {
+// MARK: DMCレジスタの初期化メソッド
+func (dr *DMCRegister) Init() {
 	dr.irqEnabled = false
 	dr.loop = false
 	dr.frequencyIndex = 0
@@ -278,8 +278,8 @@ func (dr *DPCMRegister) Init() {
 	dr.byteCount = 0
 }
 
-// MARK: DPCMレジスタの書き込みメソッド（5ch）
-func (dr *DPCMRegister) write(address uint16, data uint8) {
+// MARK: DMCレジスタの書き込みメソッド（5ch）
+func (dr *DMCRegister) write(address uint16, data uint8) {
 	switch address {
 	case 0x4010:
 		dr.irqEnabled = (data & 0x80) != 0
