@@ -105,7 +105,7 @@ func (c *CPU) RunWithCallback(callback func(c *CPU)) {
 	for {
 		// NMIが発生したら処理をする
 		nmi := c.Bus.GetNMIStatus()
-		if nmi != nil {
+		if nmi {
 			c.interrupt(NMI)
 		}
 

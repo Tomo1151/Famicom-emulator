@@ -55,7 +55,7 @@ type PPU struct {
 	internalDataBuffer uint8
 	oamAddress         uint8 // OAM書き込みのポインタ
 
-	NMI *uint8
+	NMI bool
 
 	lineBuffer [SCREEN_WIDTH]Pixel // 次のスキャンラインのバッファ
 }
@@ -98,7 +98,7 @@ func (p *PPU) Init(mapper mappers.Mapper) {
 	p.cycles = 0
 	p.internalDataBuffer = 0x00
 
-	p.NMI = nil
+	p.NMI = false
 
 	// ラインバッファの初期化
 	for i := range p.lineBuffer {
@@ -122,7 +122,7 @@ func (p *PPU) WriteToPPUControlRegister(value uint8) {
 
 	// VBlank中にGenerateNMIが立つタイミングでNMIを発生させる
 	if !prev && p.control.GenerateVBlankNMI() && p.status.IsInVBlank() {
-		*p.NMI = 0x01
+		p.NMI = true
 	}
 }
 
@@ -318,13 +318,12 @@ func (p *PPU) mirrorVRAMAddress(addr uint16) uint16 {
 }
 
 // MARK: 待機しているNMIを取得
-func (p *PPU) GetNMI() *uint8 {
-	if p.NMI != nil {
-		value := *p.NMI
-		p.NMI = nil
-		return &value
+func (p *PPU) GetNMI() bool {
+	if p.NMI {
+		p.NMI = false
+		return true
 	} else {
-		return nil
+		return false
 	}
 }
 
@@ -713,15 +712,14 @@ func (p *PPU) Tick(canvas *Canvas, cycles uint) bool {
 			p.status.SetVBlankStatus(true)
 			if p.control.GenerateVBlankNMI() {
 				// NMIを設定
-				nmiValue := uint8(1)
-				p.NMI = &nmiValue
+				p.NMI = true
 			}
 		}
 
 		// プリレンダーラインに到達した時（フレーム終了）
 		if p.scanline > SCANLINE_PRERENDER {
 			p.scanline = 0
-			p.NMI = nil
+			p.NMI = false
 			p.status.SetSpriteZeroHit(false)
 			p.status.ClearVBlankStatus()
 			return true
