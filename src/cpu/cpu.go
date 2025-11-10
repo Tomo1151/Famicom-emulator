@@ -71,7 +71,7 @@ func (c *CPU) Step() {
 	// 命令のフェッチ
 	opecode := c.ReadByteFrom(c.registers.PC)
 
-	// 命令の出コード
+	// 命令のデコード
 	instruction, exists := c.InstructionSet[opecode]
 
 	if !exists {
