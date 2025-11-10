@@ -25,9 +25,10 @@ type Bus struct {
 	cartridge cartridge.Cartridge      // カートリッジ
 	ppu       ppu.PPU                  // PPU
 	apu       apu.APU                  // APU
-	joypad1   *joypad.JoyPad           // ポインタに変更
-	joypad2   *joypad.JoyPad           // コントローラ (2P)
-	cycles    uint                     // CPUサイクル
+	tapu      apu.TAPU
+	joypad1   *joypad.JoyPad // ポインタに変更
+	joypad2   *joypad.JoyPad // コントローラ (2P)
+	cycles    uint           // CPUサイクル
 	callback  func(*ppu.PPU, *ppu.Canvas, *joypad.JoyPad, *joypad.JoyPad)
 	canvas    *ppu.Canvas
 }
@@ -48,6 +49,7 @@ func (b *Bus) Init(callback func(*ppu.PPU, *ppu.Canvas, *joypad.JoyPad, *joypad.
 	b.callback = callback
 	b.canvas = &ppu.Canvas{}
 	b.canvas.Init()
+	b.tapu.Init()
 }
 
 // MARK: Busに各コンポーネントを接続
@@ -79,7 +81,7 @@ func (b *Bus) GetNMIStatus() bool {
 
 // MARK: APUのIRQを取得
 func (b *Bus) GetAPUIRQ() bool {
-	return b.apu.Status.GetFrameIRQ()
+	return b.apu.FrameIRQ()
 }
 
 // MARK: マッパーのIRQを取得
@@ -105,6 +107,7 @@ func (b *Bus) Tick(cycles uint) {
 
 	// APUと同期
 	b.apu.Tick(cycles)
+	b.tapu.Tick(cycles)
 
 	nmiAfter := b.ppu.NMI
 	if !nmiBefore && nmiAfter {
@@ -161,7 +164,7 @@ func (b *Bus) ReadByteFrom(address uint16) uint8 {
 	case address == 0x4014: // OAM_DATA (DMA)
 		panic("Error: attempt to read from OAM Data register")
 	case address == 0x4015: // APU
-		return b.apu.ReadStatus()
+		return b.tapu.ReadStatus()
 	case address == 0x4016: // JOYPAD (1P)
 		return b.joypad1.Read()
 	case address == 0x4017: // JOYPAD (2P)
@@ -241,8 +244,10 @@ func (b *Bus) WriteByteAt(address uint16, data uint8) {
 		b.WriteByteAt(ptr, data)
 	case 0x4000 <= address && address <= 0x4003: // APU 1ch
 		b.apu.Write1ch(address, data)
+		b.tapu.Write1ch(address, data)
 	case 0x4004 <= address && address <= 0x4007: // APU 2ch
 		b.apu.Write2ch(address, data)
+		b.tapu.Write2ch(address, data)
 	case address == 0x4008: // APU 3ch
 		b.apu.Write3ch(address, data)
 	case address == 0x400A: // APU 3ch
@@ -270,12 +275,13 @@ func (b *Bus) WriteByteAt(address uint16, data uint8) {
 		b.ppu.DMATransfer(&buffer)
 	case address == 0x4015: // APU
 		b.apu.WriteStatus(data)
+		b.tapu.WriteStatus(data)
 	case address == 0x4016: // コントローラ (1P/2P)
 		// @FIXME 2PのB・A同時押しの読み取りミスが多い
 		b.joypad1.Write(data)
 		b.joypad2.Write(data)
 	case address == 0x4017: // APU フレームカウンタ
-		b.apu.WriteFrameCounter(data)
+		b.apu.WriteFrameSequencer(data)
 	case 0x6000 <= address && address <= 0x7FFF: // プログラムRAM
 		b.cartridge.Mapper.WriteToProgramRAM(address, data)
 	case PRG_ROM_START <= address && address <= PRG_ROM_END: // プログラムROM

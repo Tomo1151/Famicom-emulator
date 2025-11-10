@@ -1,33 +1,30 @@
 package apu
 
-/*
-typedef unsigned char Uint8;
-typedef float Float32;
-void MixedAudioCallback(void *userdata, Uint8 *stream, int len);
-*/
-import "C"
+// /*
+// typedef unsigned char Uint8;
+// typedef float Float32;
+// void MixedAudioCallback(void *userdata, Uint8 *stream, int len);
+// */
+// // import "C"
 import (
 	"fmt"
-	"unsafe"
-
-	"github.com/veandco/go-sdl2/sdl"
 )
 
 const (
-	CPU_CLOCK          = 1_789_772.5 // 1.78MHz
-	APU_CYCLE_INTERVAL = 7457
-	MAX_VOLUME         = 0.8
-	toneHz             = 440
-	sampleHz           = 44100
-	BUFFER_SIZE        = 16384 // リングバッファサイズ
-	CHUNK_SIZE         = 1024
+	CPU_CLOCK = 1_789_772.5 // 1.78MHz
+	// APU_CYCLE_INTERVAL = 7457
+	MAX_VOLUME  = 0.8
+	toneHz      = 440
+	sampleHz    = 44100
+	BUFFER_SIZE = 16384 // リングバッファサイズ
+	CHUNK_SIZE  = 1024
 )
 
 var (
-	ch1BufferPool = make([]float32, BUFFER_SIZE)
-	ch2BufferPool = make([]float32, BUFFER_SIZE)
-	ch3BufferPool = make([]float32, BUFFER_SIZE)
-	ch4BufferPool = make([]float32, BUFFER_SIZE)
+// ch1BufferPool = make([]float32, BUFFER_SIZE)
+// ch2BufferPool = make([]float32, BUFFER_SIZE)
+// ch3BufferPool = make([]float32, BUFFER_SIZE)
+// ch4BufferPool = make([]float32, BUFFER_SIZE)
 )
 
 // MARK: APUの定義
@@ -67,10 +64,10 @@ type APU struct {
 	Ch5Buffer      *RingBuffer
 	Ch5LengthCount uint8
 
-	frameCounter FrameCounter
-	cycles       uint
-	counter      uint
-	Status       StatusRegister
+	frameSequencer FrameSequencer
+	cycles         uint
+	counter        uint
+	status         StatusRegister
 }
 
 type ChannelEvent struct {
@@ -119,12 +116,12 @@ func (a *APU) Init() {
 	a.Ch5Channel, a.Ch5Receiver = a.initDMCChannel(a.Ch5Buffer)
 	a.Ch5LengthCount = 0
 
-	a.frameCounter = FrameCounter{}
-	a.frameCounter.Init()
+	a.frameSequencer = FrameSequencer{}
+	a.frameSequencer.Init()
 
 	a.cycles = 0
-	a.Status = StatusRegister{}
-	a.Status.Init()
+	a.status = StatusRegister{}
+	a.status.Init()
 
 	// オーディオデバイスの初期化
 	a.initAudioDevice()
@@ -138,7 +135,7 @@ func (a *APU) Write1ch(address uint16, data uint8) {
 		a.Ch1Channel <- SquareWaveEvent{
 			eventType: SQUARE_WAVE_NOTE,
 			note: &SquareNote{
-				duty: a.Ch1Register.getDuty(),
+				duty: a.Ch1Register.Duty(),
 			},
 		}
 
@@ -204,7 +201,7 @@ func (a *APU) Write2ch(address uint16, data uint8) {
 		a.Ch2Channel <- SquareWaveEvent{
 			eventType: SQUARE_WAVE_NOTE,
 			note: &SquareNote{
-				duty: a.Ch2Register.getDuty(),
+				duty: a.Ch2Register.Duty(),
 			},
 		}
 
@@ -358,15 +355,16 @@ func (a *APU) Write5ch(address uint16, data uint8) {
 }
 
 // MARK: フレームカウンタの書き込みメソッド
-func (a *APU) WriteFrameCounter(data uint8) {
-	a.frameCounter.update(data)
+func (a *APU) WriteFrameSequencer(data uint8) {
+	a.frameSequencer.update(data)
 	a.counter = 0
 	a.cycles = 0
+	// a.status.ClearFrameIRQ()
 }
 
 // MARK: ステータスレジスタの読み取りメソッド
 func (a *APU) ReadStatus() uint8 {
-	status := a.Status.ToByte()
+	status := a.status.ToByte()
 
 	a.receiveEvents()
 	status = status & 0xF0
@@ -397,60 +395,65 @@ func (a *APU) ReadStatus() uint8 {
 		status |= 1 << 4
 	}
 
-	a.Status.ClearFrameIRQ()
+	a.status.ClearFrameIRQ()
 
 	return status
+}
+
+// MARK: フレームIRQの取得
+func (a *APU) FrameIRQ() bool {
+	return a.status.FrameIRQ()
 }
 
 // MARK: ステータスレジスタの書き込みメソッド
 func (a *APU) WriteStatus(data uint8) {
 	// 更新前の状態を保存
-	wasCh1Enabled := a.Status.is1chEnabled()
-	wasCh2Enabled := a.Status.is2chEnabled()
-	wasCh3Enabled := a.Status.is3chEnabled()
-	wasCh4Enabled := a.Status.is4chEnabled()
-	wasCh5Enabled := a.Status.is5chEnabled()
+	wasCh1Enabled := a.status.is1chEnabled()
+	wasCh2Enabled := a.status.is2chEnabled()
+	wasCh3Enabled := a.status.is3chEnabled()
+	wasCh4Enabled := a.status.is4chEnabled()
+	wasCh5Enabled := a.status.is5chEnabled()
 
-	a.Status.update(data)
+	a.status.update(data)
 
 	// 各チャンネルの状態によってミュートにする
 	a.Ch1Channel <- SquareWaveEvent{
 		eventType: SQUARE_WAVE_ENABLED,
-		enabled:   a.Status.is1chEnabled(),
-		changed:   wasCh1Enabled && !a.Status.is1chEnabled(),
+		enabled:   a.status.is1chEnabled(),
+		changed:   wasCh1Enabled && !a.status.is1chEnabled(),
 	}
 	a.Ch2Channel <- SquareWaveEvent{
 		eventType: SQUARE_WAVE_ENABLED,
-		enabled:   a.Status.is2chEnabled(),
-		changed:   wasCh2Enabled && !a.Status.is2chEnabled(),
+		enabled:   a.status.is2chEnabled(),
+		changed:   wasCh2Enabled && !a.status.is2chEnabled(),
 	}
 	a.Ch3Channel <- TriangleWaveEvent{
 		eventType: TRIANGLE_WAVE_ENABLED,
-		enabled:   a.Status.is3chEnabled(),
-		changed:   wasCh3Enabled && !a.Status.is3chEnabled(),
+		enabled:   a.status.is3chEnabled(),
+		changed:   wasCh3Enabled && !a.status.is3chEnabled(),
 	}
 	a.Ch4Channel <- NoiseWaveEvent{
 		eventType: NOISE_WAVE_ENABLED,
-		enabled:   a.Status.is4chEnabled(),
-		changed:   wasCh4Enabled && !a.Status.is4chEnabled(),
+		enabled:   a.status.is4chEnabled(),
+		changed:   wasCh4Enabled && !a.status.is4chEnabled(),
 	}
 	a.Ch5Channel <- DMCWaveEvent{
 		eventType: DMC_WAVE_ENABLED,
-		enabled:   a.Status.is5chEnabled(),
-		changed:   wasCh5Enabled && !a.Status.is5chEnabled(),
+		enabled:   a.status.is5chEnabled(),
+		changed:   wasCh5Enabled && !a.status.is5chEnabled(),
 	}
 
 	// disableされた時に長さカウンタも落とす (halt)
-	if wasCh1Enabled && !a.Status.is1chEnabled() {
+	if wasCh1Enabled && !a.status.is1chEnabled() {
 		a.Ch1LengthCount = 0
 	}
-	if wasCh2Enabled && !a.Status.is2chEnabled() {
+	if wasCh2Enabled && !a.status.is2chEnabled() {
 		a.Ch2LengthCount = 0
 	}
-	if wasCh3Enabled && !a.Status.is3chEnabled() {
+	if wasCh3Enabled && !a.status.is3chEnabled() {
 		a.Ch3LengthCount = 0
 	}
-	if wasCh4Enabled && !a.Status.is4chEnabled() {
+	if wasCh4Enabled && !a.status.is4chEnabled() {
 		a.Ch4LengthCount = 0
 	}
 }
@@ -458,57 +461,57 @@ func (a *APU) WriteStatus(data uint8) {
 // MARK: 全チャンネルをミックスした音声生成コールバック
 //
 //export MixedAudioCallback
-func MixedAudioCallback(userdata unsafe.Pointer, stream *C.Uint8, length C.int) {
-	n := int(length) / 4
-	buffer := unsafe.Slice((*float32)(unsafe.Pointer(stream)), n)
+// func MixedAudioCallback(userdata unsafe.Pointer, stream *C.Uint8, length C.int) {
+// 	n := int(length) / 4
+// 	buffer := unsafe.Slice((*float32)(unsafe.Pointer(stream)), n)
 
-	// 事前確保バッファを使用
-	ch1Buffer := ch1BufferPool[:n]
-	ch2Buffer := ch2BufferPool[:n]
-	ch3Buffer := ch3BufferPool[:n]
-	ch4Buffer := ch4BufferPool[:n]
+// 	// 事前確保バッファを使用
+// 	ch1Buffer := ch1BufferPool[:n]
+// 	ch2Buffer := ch2BufferPool[:n]
+// 	ch3Buffer := ch3BufferPool[:n]
+// 	ch4Buffer := ch4BufferPool[:n]
 
-	// 1chのデータの読み込み
-	squareWave1.buffer.Read(ch1Buffer)
+// 	// 1chのデータの読み込み
+// 	squareWave1.buffer.Read(ch1Buffer)
 
-	// 2chのデータの読み込み
-	squareWave2.buffer.Read(ch2Buffer)
+// 	// 2chのデータの読み込み
+// 	squareWave2.buffer.Read(ch2Buffer)
 
-	// 3chのデータの読み込み
-	triangleWave.buffer.Read(ch3Buffer)
+// 	// 3chのデータの読み込み
+// 	triangleWave.buffer.Read(ch3Buffer)
 
-	// 4chのデータの読み込み
-	noiseWave.buffer.Read(ch4Buffer)
+// 	// 4chのデータの読み込み
+// 	noiseWave.buffer.Read(ch4Buffer)
 
-	for i := range n {
-		// ミックス
-		mixed := (ch1Buffer[i] + ch2Buffer[i] + ch3Buffer[i] + ch4Buffer[i]) / 75
+// 	for i := range n {
+// 		// ミックス
+// 		mixed := (ch1Buffer[i] + ch2Buffer[i] + ch3Buffer[i] + ch4Buffer[i]) / 75
 
-		if mixed > MAX_VOLUME {
-			mixed = MAX_VOLUME
-		} else if mixed < -MAX_VOLUME {
-			mixed = -MAX_VOLUME
-		}
+// 		if mixed > MAX_VOLUME {
+// 			mixed = MAX_VOLUME
+// 		} else if mixed < -MAX_VOLUME {
+// 			mixed = -MAX_VOLUME
+// 		}
 
-		buffer[i] = mixed
-	}
-}
+// 		buffer[i] = mixed
+// 	}
+// }
 
 // MARK: オーディオの初期化メソッド
 func (a *APU) initAudioDevice() {
-	spec := &sdl.AudioSpec{
-		Freq:     sampleHz,
-		Format:   sdl.AUDIO_F32,
-		Channels: 1,
-		Samples:  2048,
-		Callback: sdl.AudioCallback(C.MixedAudioCallback),
-	}
-	if err := sdl.OpenAudio(spec, nil); err != nil {
-		panic(err)
-	}
+	// spec := &sdl.AudioSpec{
+	// 	Freq:     sampleHz,
+	// 	Format:   sdl.AUDIO_F32,
+	// 	Channels: 1,
+	// 	Samples:  2048,
+	// 	// Callback: sdl.AudioCallback(C.MixedAudioCallback),
+	// }
+	// if err := sdl.OpenAudio(spec, nil); err != nil {
+	// 	panic(err)
+	// }
 
-	// オーディオ再生開始
-	sdl.PauseAudio(false)
+	// // オーディオ再生開始
+	// sdl.PauseAudio(false)
 }
 
 // MARK: 1ch/2chの初期化メソッド
@@ -732,7 +735,7 @@ func (a *APU) Tick(cycles uint) {
 		a.counter++
 
 		a.receiveEvents()
-		mode := a.frameCounter.getMode()
+		mode := a.frameSequencer.Mode()
 
 		switch mode {
 		case 4:
@@ -746,15 +749,15 @@ func (a *APU) Tick(cycles uint) {
 				a.sendLengthCounterTick()
 				a.sendSweepTick()
 			}
+			if a.counter == 1 || a.counter == 2 || a.counter == 3 || a.counter == 4 {
+				a.sendEnvelopeTick()
+			}
 			if a.counter == 4 {
 				// 割り込みフラグをセット
 				a.counter = 0
-				if !a.frameCounter.getDisableIRQ() {
-					a.Status.SetFrameIRQ()
+				if !a.frameSequencer.DisableIRQ() {
+					a.status.SetFrameIRQ()
 				}
-			}
-			if a.counter == 1 || a.counter == 2 || a.counter == 3 || a.counter == 4 {
-				a.sendEnvelopeTick()
 			}
 		case 5:
 			/*

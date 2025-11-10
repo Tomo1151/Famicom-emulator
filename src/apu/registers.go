@@ -83,7 +83,7 @@ func (swr *SquareWaveRegister) write(address uint16, data uint8) {
 }
 
 // MARK: レジスタからデューティ比を取得するメソッド
-func (swr *SquareWaveRegister) getDuty() float32 {
+func (swr *SquareWaveRegister) Duty() float32 {
 	// 00: 12.5%, 01: 25.0%, 10: 50.0%, 11: 75.0%
 	switch swr.duty {
 	case 0b00:
@@ -313,7 +313,7 @@ func (sr *StatusRegister) Init() {
 }
 
 // MARK: フレーム割込みフラグを取得
-func (sr *StatusRegister) GetFrameIRQ() bool {
+func (sr *StatusRegister) FrameIRQ() bool {
 	return sr.enableFrameIRQ
 }
 
@@ -393,32 +393,32 @@ func (sr *StatusRegister) update(value uint8) {
 
 }
 
-// MARK: フレームカウンタ
-type FrameCounter struct {
-	DisableIRQ    bool
-	SequencerMode bool
+// MARK: フレームシーケンサ
+type FrameSequencer struct {
+	disableIRQ    bool
+	sequencerMode bool
 }
 
-func (fc *FrameCounter) Init() {
-	fc.DisableIRQ = true
-	fc.SequencerMode = true
+func (fs *FrameSequencer) Init() {
+	fs.disableIRQ = true
+	fs.sequencerMode = true
 }
 
-func (fc *FrameCounter) getMode() uint8 {
-	if fc.SequencerMode {
+func (fs *FrameSequencer) Mode() uint8 {
+	if fs.sequencerMode {
 		return 5
 	} else {
 		return 4
 	}
 }
-func (fc *FrameCounter) getDisableIRQ() bool {
-	return fc.DisableIRQ
+func (fs *FrameSequencer) DisableIRQ() bool {
+	return fs.disableIRQ
 }
 
-func (fc *FrameCounter) update(data uint8) {
+func (fs *FrameSequencer) update(data uint8) {
 	irq := ((data & 0x40) >> FRAME_COUNTER_IRQ_POS) != 0
 	mode := ((data & 0x80) >> FRAME_COUNTER_MODE_POS) != 0
 
-	fc.DisableIRQ = irq
-	fc.SequencerMode = mode
+	fs.disableIRQ = irq
+	fs.sequencerMode = mode
 }
