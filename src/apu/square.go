@@ -125,7 +125,7 @@ func (sw *SquareWave) generatePCM() {
 		}
 
 		// 現在の音符の周波数に基づいてphaseIncrementを計算
-		frequency := sw.sweepUnit.getFrequency()
+		frequency := sw.sweepUnit.Frequency()
 		phaseIncrement := frequency / float32(sampleHz)
 
 		for i := range CHUNK_SIZE {

@@ -83,7 +83,7 @@ func (swr *SquareWaveRegister) write(address uint16, data uint8) {
 }
 
 // MARK: レジスタからデューティ比を取得するメソッド
-func (swr *SquareWaveRegister) getDuty() float32 {
+func (swr *SquareWaveRegister) Duty() float32 {
 	// 00: 12.5%, 01: 25.0%, 10: 50.0%, 11: 75.0%
 	switch swr.duty {
 	case 0b00:
@@ -135,7 +135,7 @@ func (twr *TriangleWaveRegister) write(address uint16, data uint8) {
 }
 
 // MARK: レジスタから三角波のピッチを取得するメソッド
-func (twr *TriangleWaveRegister) getFrequency() float32 {
+func (twr *TriangleWaveRegister) Frequency() float32 {
 	return CPU_CLOCK / (32.0*float32(twr.frequency) + 1.0)
 }
 
@@ -188,12 +188,12 @@ func (nwr *NoiseWaveRegister) write(address uint16, data uint8) {
 }
 
 // MARK: ノイズレジスタから4chのモードを取得するメソッド
-func (nwr *NoiseWaveRegister) getMode() NoiseRegisterMode {
+func (nwr *NoiseWaveRegister) Mode() NoiseRegisterMode {
 	return nwr.mode
 }
 
 // MARK: ノイズレジスタからノイズのピッチを取得するメソッド
-func (nwr *NoiseWaveRegister) getFrequency() float32 {
+func (nwr *NoiseWaveRegister) Frequency() float32 {
 	noiseFrequencyTable := [16]uint16{
 		0x0002, 0x0004, 0x0008, 0x0010,
 		0x0020, 0x0030, 0x0040, 0x0050,
@@ -313,7 +313,7 @@ func (sr *StatusRegister) Init() {
 }
 
 // MARK: フレーム割込みフラグを取得
-func (sr *StatusRegister) GetFrameIRQ() bool {
+func (sr *StatusRegister) FrameIRQ() bool {
 	return sr.enableFrameIRQ
 }
 
@@ -395,30 +395,30 @@ func (sr *StatusRegister) update(value uint8) {
 
 // MARK: フレームカウンタ
 type FrameCounter struct {
-	DisableIRQ    bool
-	SequencerMode bool
+	disableIRQ    bool
+	sequencerMode bool
 }
 
 func (fc *FrameCounter) Init() {
-	fc.DisableIRQ = true
-	fc.SequencerMode = true
+	fc.disableIRQ = true
+	fc.sequencerMode = true
 }
 
-func (fc *FrameCounter) getMode() uint8 {
-	if fc.SequencerMode {
+func (fc *FrameCounter) Mode() uint8 {
+	if fc.sequencerMode {
 		return 5
 	} else {
 		return 4
 	}
 }
-func (fc *FrameCounter) getDisableIRQ() bool {
-	return fc.DisableIRQ
+func (fc *FrameCounter) DisableIRQ() bool {
+	return fc.disableIRQ
 }
 
 func (fc *FrameCounter) update(data uint8) {
 	irq := ((data & 0x40) >> FRAME_COUNTER_IRQ_POS) != 0
 	mode := ((data & 0x80) >> FRAME_COUNTER_MODE_POS) != 0
 
-	fc.DisableIRQ = irq
-	fc.SequencerMode = mode
+	fc.disableIRQ = irq
+	fc.sequencerMode = mode
 }

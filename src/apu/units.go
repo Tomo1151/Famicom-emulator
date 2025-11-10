@@ -90,7 +90,7 @@ func (su *SweepUnit) Init() {
 }
 
 // MARK: スイープの周波数を取得するメソッド
-func (su *SweepUnit) getFrequency() float32 {
+func (su *SweepUnit) Frequency() float32 {
 	if su.frequency == 0 {
 		return 0.0
 	}

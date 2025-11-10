@@ -138,7 +138,7 @@ func (a *APU) Write1ch(address uint16, data uint8) {
 		a.Ch1Channel <- SquareWaveEvent{
 			eventType: SQUARE_WAVE_NOTE,
 			note: &SquareNote{
-				duty: a.Ch1Register.getDuty(),
+				duty: a.Ch1Register.Duty(),
 			},
 		}
 
@@ -204,7 +204,7 @@ func (a *APU) Write2ch(address uint16, data uint8) {
 		a.Ch2Channel <- SquareWaveEvent{
 			eventType: SQUARE_WAVE_NOTE,
 			note: &SquareNote{
-				duty: a.Ch2Register.getDuty(),
+				duty: a.Ch2Register.Duty(),
 			},
 		}
 
@@ -270,7 +270,7 @@ func (a *APU) Write3ch(address uint16, data uint8) {
 		a.Ch3Channel <- TriangleWaveEvent{
 			eventType: TRIANGLE_WAVE_NOTE,
 			note: &TriangleNote{
-				hz: a.Ch3Register.getFrequency(),
+				hz: a.Ch3Register.Frequency(),
 			},
 		}
 	}
@@ -314,8 +314,8 @@ func (a *APU) Write4ch(address uint16, data uint8) {
 		a.Ch4Channel <- NoiseWaveEvent{
 			eventType: NOISE_WAVE_NOTE,
 			note: &NoiseNote{
-				hz:        a.Ch4Register.getFrequency(),
-				noiseMode: a.Ch4Register.getMode(),
+				hz:        a.Ch4Register.Frequency(),
+				noiseMode: a.Ch4Register.Mode(),
 			},
 		}
 	}
@@ -732,7 +732,7 @@ func (a *APU) Tick(cycles uint) {
 		a.counter++
 
 		a.receiveEvents()
-		mode := a.frameCounter.getMode()
+		mode := a.frameCounter.Mode()
 
 		switch mode {
 		case 4:
@@ -749,7 +749,7 @@ func (a *APU) Tick(cycles uint) {
 			if a.counter == 4 {
 				// 割り込みフラグをセット
 				a.counter = 0
-				if !a.frameCounter.getDisableIRQ() {
+				if !a.frameCounter.DisableIRQ() {
 					a.Status.SetFrameIRQ()
 				}
 			}
