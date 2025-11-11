@@ -6,7 +6,6 @@ void AudioMixCallback(void* userdata, uint8_t* stream, int length);
 */
 import "C"
 import (
-	"runtime/cgo"
 	"unsafe"
 
 	"github.com/veandco/go-sdl2/sdl"
@@ -26,16 +25,17 @@ type TAPU struct {
 
 	channel1 *SquareWaveChannel
 	channel2 *SquareWaveChannel
+	channel3 *TriangleWaveChannel
 
 	frameSequencer FrameSequencer
 	status         StatusRegister
 
 	sampleClock uint64
-	userHandle  cgo.Handle
 
 	// 各チャンネルの前回レベルを保持
 	prevLevel1 float32
 	prevLevel2 float32
+	prevLevel3 float32
 }
 
 // MARK: APUの初期化メソッド
@@ -47,6 +47,8 @@ func (a *TAPU) Init() {
 	a.channel1.Init()
 	a.channel2 = &square2
 	a.channel2.Init()
+	a.channel3 = &triangle
+	a.channel3.Init()
 
 	a.frameSequencer = FrameSequencer{}
 	a.frameSequencer.Init()
@@ -56,6 +58,7 @@ func (a *TAPU) Init() {
 
 	a.prevLevel1 = 0.0
 	a.prevLevel2 = 0.0
+	a.prevLevel3 = 0.0
 
 	// オーディオデバイスの初期化
 	a.initAudioDevice()
@@ -63,9 +66,6 @@ func (a *TAPU) Init() {
 
 // MARK: オーディオデバイスの初期化メソッド
 func (a *TAPU) initAudioDevice() {
-	handle := cgo.NewHandle(a)
-	a.userHandle = handle
-
 	spec := &sdl.AudioSpec{
 		Freq:     SampleRate,
 		Format:   sdl.AUDIO_F32,
@@ -86,15 +86,19 @@ func (a *TAPU) initAudioDevice() {
 func AudioMixCallback(userdata unsafe.Pointer, stream *C.uint8_t, length C.int) {
 	n := int(length) / 4
 	buffer := unsafe.Slice((*float32)(unsafe.Pointer(stream)), n)
+
 	ch1 := make([]float32, BUFFER_SIZE)[:n]
 	ch2 := make([]float32, BUFFER_SIZE)[:n]
+	ch3 := make([]float32, BUFFER_SIZE)[:n]
 
 	square1.buffer.Read(ch1, n)
 	square2.buffer.Read(ch2, n)
+	triangle.buffer.Read(ch3, n)
 
 	for i := range n {
 		// @FIXME mixのバランス
-		mixed := (ch1[i] + ch2[i]) / 25
+		mixed := (ch1[i] + ch2[i] + ch3[i]) / 25
+		// mixed := (ch1[i] + ch2[i]) / 25
 
 		if mixed > MAX_VOLUME {
 			mixed = MAX_VOLUME
@@ -114,10 +118,12 @@ func (a *TAPU) Tick(cycles uint) {
 	// 現在のレベルを計算
 	currentLevel1 := a.channel1.output(cycles)
 	currentLevel2 := a.channel2.output(cycles)
+	currentLevel3 := a.channel3.output(cycles)
 
 	// 前回レベルとの差分を計算
 	delta1 := currentLevel1 - a.prevLevel1
 	delta2 := currentLevel2 - a.prevLevel2
+	delta3 := currentLevel3 - a.prevLevel3
 
 	// レベルが変化した場合のみ、差分をバッファに追加
 	if delta1 != 0 {
@@ -127,6 +133,10 @@ func (a *TAPU) Tick(cycles uint) {
 	if delta2 != 0 {
 		a.channel2.buffer.addDelta(a.sampleClock, delta2)
 		a.prevLevel2 = currentLevel2
+	}
+	if delta3 != 0 {
+		a.channel3.buffer.addDelta(a.sampleClock, delta3)
+		a.prevLevel3 = currentLevel3
 	}
 }
 
@@ -150,6 +160,9 @@ func (a *TAPU) WriteStatus(data uint8) {
 	}
 	if (prev&(1<<STATUS_REG_ENABLE_2CH_POS)) != 0 && !a.status.is2chEnabled() {
 		a.channel2.lengthCounter.counter = 0
+	}
+	if (prev&(1<<STATUS_REG_ENABLE_3CH_POS)) != 0 && !a.status.is3chEnabled() {
+		a.channel3.lengthCounter.counter = 0
 	}
 }
 
@@ -176,6 +189,10 @@ func (a *TAPU) Write1ch(address uint16, data uint8) {
 		a.channel1.envelope.data.rate = a.channel1.register.volume
 		a.channel1.envelope.data.enabled = a.channel1.register.envelope
 		a.channel1.envelope.data.loop = !a.channel1.register.keyOffCounter
+		a.channel1.lengthCounter.data.Init(
+			a.channel1.register.keyOffCount,
+			a.channel1.register.keyOffCounter,
+		)
 	case 0x4001:
 		// スイープ更新
 		a.channel1.sweepUnit.data.shift = a.channel1.register.sweepShift
@@ -210,6 +227,10 @@ func (a *TAPU) Write2ch(address uint16, data uint8) {
 		a.channel2.envelope.data.rate = a.channel2.register.volume
 		a.channel2.envelope.data.enabled = a.channel2.register.envelope
 		a.channel2.envelope.data.loop = !a.channel2.register.keyOffCounter
+		a.channel2.lengthCounter.data.Init(
+			a.channel2.register.keyOffCount,
+			a.channel2.register.keyOffCounter,
+		)
 	case 0x4005:
 		// スイープ更新
 		a.channel2.sweepUnit.data.shift = a.channel2.register.sweepShift
@@ -234,11 +255,41 @@ func (a *TAPU) Write2ch(address uint16, data uint8) {
 	}
 }
 
+// MARK: 3chの書き込みメソッド (三角波)
+func (a *TAPU) Write3ch(address uint16, data uint8) {
+	a.channel3.register.write(address, data)
+
+	switch address {
+	case 0x4008:
+		a.channel3.lengthCounter.data.Init(
+			a.channel3.register.keyOffCount,
+			a.channel3.register.keyOffCounter,
+		)
+		a.channel3.linearCounter.data.Init(
+			a.channel3.register.length,
+			a.channel3.register.keyOffCounter,
+		)
+	case 0x400A:
+		a.channel3.frequency = float32(a.channel3.register.frequency)
+	case 0x400B:
+		// 長さカウンタのリセット (有効時のみ)
+		a.channel3.lengthCounter.data.Init(
+			a.channel3.register.keyOffCount,
+			!a.channel3.register.keyOffCounter,
+		)
+		a.channel3.lengthCounter.reset()
+		a.channel3.frequency = float32(a.channel3.register.frequency)
+		a.channel3.linearCounter.reset()
+		a.channel3.phase = 0
+	}
+}
+
 // MARK: バッファのフラッシュ
 func (a *TAPU) EndFrame() {
 	// フレームの終わりまでの時間を処理するため、現在のクロックを渡す
 	a.channel1.buffer.endFrame(a.sampleClock)
 	a.channel2.buffer.endFrame(a.sampleClock)
+	a.channel3.buffer.endFrame(a.sampleClock)
 }
 
 // MARK: エンベロープのクロック
@@ -261,17 +312,20 @@ func (a *TAPU) clockSweepUnits() {
 
 // MARK: 線形カウンタのクロック
 func (a *TAPU) clockLinearCounter() {
+	a.channel3.linearCounter.tick()
 }
 
 // MARK: 長さカウンタのクロック
 func (a *TAPU) clockLengthCounter() {
 	a.channel1.lengthCounter.tick()
 	a.channel2.lengthCounter.tick()
+	a.channel3.lengthCounter.tick()
 }
 
 // MARK: フレームシーケンサのクロック
 func (a *TAPU) clockFrameSequencer() {
 	if a.cycles >= APU_CYCLE_INTERVAL {
+		// フレームシーケンサは入力の1.789MHzを7457分周する
 		a.cycles %= APU_CYCLE_INTERVAL
 		a.step++
 		mode := a.frameSequencer.Mode()
@@ -332,8 +386,9 @@ type AudioChannelRegister interface {
 }
 
 var (
-	square1 = SquareWaveChannel{}
-	square2 = SquareWaveChannel{}
+	square1  = SquareWaveChannel{}
+	square2  = SquareWaveChannel{}
+	triangle = TriangleWaveChannel{}
 )
 
 type SquareWaveChannel struct {
@@ -381,4 +436,49 @@ func (swc *SquareWaveChannel) output(cycles uint) float32 {
 	}
 
 	return float32(value) * swc.envelope.volume()
+}
+
+type TriangleWaveChannel struct {
+	register      TriangleWaveRegister
+	lengthCounter LengthCounter
+	linearCounter LinearCounter
+	frequency     float32
+	phase         float32
+	buffer        BlipBuffer
+}
+
+func (twc *TriangleWaveChannel) Init() {
+	twc.register = TriangleWaveRegister{}
+	twc.register.Init()
+	twc.lengthCounter = LengthCounter{}
+	twc.lengthCounter.Init()
+	twc.linearCounter = LinearCounter{}
+	twc.linearCounter.Init()
+	twc.buffer.Init()
+}
+
+func (twc *TriangleWaveChannel) output(cycles uint) float32 {
+	if twc.lengthCounter.isMuted() || twc.linearCounter.isMuted() || twc.frequency < 2 {
+		return 0.0
+	}
+
+	period := float32((twc.frequency + 1) * 32)
+	twc.phase += float32(cycles) / period
+
+	if twc.phase >= 1.0 {
+		// 0.0 ~ 1.0 の範囲に制限
+		twc.phase -= 1.0
+	}
+
+	// -1.0 から 1.0 の範囲で線形に変化する三角波を生成
+	var value float32
+	if twc.phase < 0.5 {
+		// 0.0 -> 0.5 の区間で 1.0 -> -1.0 に変化
+		value = 1.0 - 4.0*twc.phase
+	} else {
+		// 0.5 -> 1.0 の区間で -1.0 -> 1.0 に変化
+		value = -1.0 + 4.0*(twc.phase-0.5)
+	}
+
+	return value
 }
