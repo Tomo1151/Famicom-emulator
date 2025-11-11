@@ -6,7 +6,6 @@ void AudioMixCallback(void* userdata, uint8_t* stream, int length);
 */
 import "C"
 import (
-	"fmt"
 	"runtime/cgo"
 	"unsafe"
 
@@ -25,16 +24,18 @@ type TAPU struct {
 	cycles uint
 	step   uint8
 
-	channel1 SquareWaveChannel
-	channel2 SquareWaveChannel
+	channel1 *SquareWaveChannel
+	channel2 *SquareWaveChannel
 
 	frameSequencer FrameSequencer
 	status         StatusRegister
 
-	buffer BlipBuffer
-
 	sampleClock uint64
 	userHandle  cgo.Handle
+
+	// 各チャンネルの前回レベルを保持
+	prevLevel1 float32
+	prevLevel2 float32
 }
 
 // MARK: APUの初期化メソッド
@@ -42,9 +43,9 @@ func (a *TAPU) Init() {
 	a.cycles = 0
 	a.step = 0
 
-	a.channel1 = SquareWaveChannel{}
+	a.channel1 = &square1
 	a.channel1.Init()
-	a.channel2 = SquareWaveChannel{}
+	a.channel2 = &square2
 	a.channel2.Init()
 
 	a.frameSequencer = FrameSequencer{}
@@ -53,7 +54,8 @@ func (a *TAPU) Init() {
 	a.status = StatusRegister{}
 	a.status.Init()
 
-	a.buffer.Init(SampleRate)
+	a.prevLevel1 = 0.0
+	a.prevLevel2 = 0.0
 
 	// オーディオデバイスの初期化
 	a.initAudioDevice()
@@ -70,7 +72,6 @@ func (a *TAPU) initAudioDevice() {
 		Channels: 1,
 		Samples:  2048,
 		Callback: sdl.AudioCallback(C.AudioMixCallback),
-		UserData: unsafe.Pointer(uintptr(handle)),
 	}
 
 	if err := sdl.OpenAudio(spec, nil); err != nil {
@@ -79,6 +80,54 @@ func (a *TAPU) initAudioDevice() {
 
 	// オーディオ再生開始
 	sdl.PauseAudio(false)
+}
+
+//export AudioMixCallback
+func AudioMixCallback(userdata unsafe.Pointer, stream *C.uint8_t, length C.int) {
+	n := int(length) / 4
+	buffer := unsafe.Slice((*float32)(unsafe.Pointer(stream)), n)
+	ch1 := make([]float32, BUFFER_SIZE)[:n]
+	ch2 := make([]float32, BUFFER_SIZE)[:n]
+
+	square1.buffer.Read(ch1, n)
+	square2.buffer.Read(ch2, n)
+
+	for i := range n {
+		// @FIXME mixのバランス
+		mixed := (ch1[i] + ch2[i]) / 25
+
+		if mixed > MAX_VOLUME {
+			mixed = MAX_VOLUME
+		} else if mixed < -MAX_VOLUME {
+			mixed = -MAX_VOLUME
+		}
+		buffer[i] = mixed
+	}
+}
+
+// MARK: APUのサイクルを進める
+func (a *TAPU) Tick(cycles uint) {
+	a.cycles += cycles
+	a.sampleClock += uint64(cycles)
+	a.clockFrameSequencer()
+
+	// 現在のレベルを計算
+	currentLevel1 := a.channel1.output(cycles)
+	currentLevel2 := a.channel2.output(cycles)
+
+	// 前回レベルとの差分を計算
+	delta1 := currentLevel1 - a.prevLevel1
+	delta2 := currentLevel2 - a.prevLevel2
+
+	// レベルが変化した場合のみ、差分をバッファに追加
+	if delta1 != 0 {
+		a.channel1.buffer.addDelta(a.sampleClock, delta1)
+		a.prevLevel1 = currentLevel1
+	}
+	if delta2 != 0 {
+		a.channel2.buffer.addDelta(a.sampleClock, delta2)
+		a.prevLevel2 = currentLevel2
+	}
 }
 
 // MARK: ステータスレジスタの読み込みメソッド
@@ -185,43 +234,11 @@ func (a *TAPU) Write2ch(address uint16, data uint8) {
 	}
 }
 
-//export AudioMixCallback
-func AudioMixCallback(userdata unsafe.Pointer, stream *C.uint8_t, length C.int) {
-	// apu := (*TAPU)(userdata)
-
-	// // stream を float32 のスライスに変換
-	// out := (*[1 << 24]float32)(unsafe.Pointer(&stream))[: length/4 : length/4]
-
-	// // Blip_Buffer から stream にサンプルを書き込む
-	// apu.buffer.Read(out, len(out))
-	handle := cgo.Handle(uintptr(userdata))
-	apu := handle.Value().(*TAPU)
-
-	// stream を float32 のスライスに変換
-	// AUDIO_F32フォーマットなので、バッファはfloat32の配列として扱います。
-	n := int(length) / 4
-	out := unsafe.Slice((*float32)(unsafe.Pointer(stream)), n)
-	fmt.Println("Audio sample:", out[0], out[1], out[2])
-	// Blip_Buffer から stream にサンプルを書き込む
-	apu.buffer.Read(out, len(out))
-}
-
-// MARK: APUのサイクルを進める
-func (a *TAPU) Tick(cycles uint) {
-	a.cycles += cycles
-	a.sampleClock += uint64(cycles)
-	a.clockFrameSequencer()
-
-	// サンプル生成
-	sample1ch := a.channel1.output(cycles)
-	sample2ch := a.channel2.output(cycles)
-
-	mixed := (sample1ch + sample2ch) / 2
-
-	a.buffer.addDelta(a.sampleClock, mixed)
-	if a.cycles%100 == 0 {
-		fmt.Println("TAPU mixed: ", mixed)
-	}
+// MARK: バッファのフラッシュ
+func (a *TAPU) EndFrame() {
+	// フレームの終わりまでの時間を処理するため、現在のクロックを渡す
+	a.channel1.buffer.endFrame(a.sampleClock)
+	a.channel2.buffer.endFrame(a.sampleClock)
 }
 
 // MARK: エンベロープのクロック
@@ -314,12 +331,18 @@ type AudioChannelRegister interface {
 	write(uint16, uint8)
 }
 
+var (
+	square1 = SquareWaveChannel{}
+	square2 = SquareWaveChannel{}
+)
+
 type SquareWaveChannel struct {
 	register      SquareWaveRegister
 	envelope      Envelope
 	lengthCounter LengthCounter
 	sweepUnit     SweepUnit
 	phase         float32
+	buffer        BlipBuffer
 }
 
 func (swc *SquareWaveChannel) Init() {
@@ -331,6 +354,7 @@ func (swc *SquareWaveChannel) Init() {
 	swc.lengthCounter.Init()
 	swc.sweepUnit = SweepUnit{}
 	swc.sweepUnit.Init()
+	swc.buffer.Init()
 }
 
 func (swc *SquareWaveChannel) output(cycles uint) float32 {

@@ -111,6 +111,7 @@ func (b *Bus) Tick(cycles uint) {
 
 	nmiAfter := b.ppu.NMI
 	if !nmiBefore && nmiAfter {
+		b.tapu.EndFrame()
 		b.callback(&b.ppu, b.canvas, b.joypad1, b.joypad2)
 	}
 }

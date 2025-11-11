@@ -103,49 +103,68 @@ func (rb *RingBuffer) Init() {
 	rb.readPos = 0
 }
 
+func (rb *RingBuffer) Buffer() [BUFFER_SIZE]float32 { return rb.buffer }
+func (rb *RingBuffer) testBuffer() {
+	for i := range 100 {
+		rb.buffer[i] = 1.0
+	}
+}
+
 type BlipBuffer struct {
-	sampleRate float32
-	tickRate   float32 // Tick 単位のクロック (CPUClock / 2)
+	sampleRate float64
+	tickRate   float64
 	lastTime   uint64
-	accum      float32
+	lastLevel  float32 // 絶対レベルを保持
+	frac       float64 // サンプル生成の余り
 	samples    []float32
+	mutex      sync.Mutex // RWMutexからMutexに変更
 }
 
-func (b *BlipBuffer) Init(sampleRate uint) {
-	b.sampleRate = float32(sampleRate)
-	b.tickRate = CPUClock / 2
-	b.samples = make([]float32, 0, 4096)
+func (b *BlipBuffer) Init() {
+	b.sampleRate = float64(SampleRate)
+	b.tickRate = float64(CPUClock)
+	b.samples = make([]float32, 0, 8192)
 }
 
-// Tick単位の音量差分を追加
+// time: APUクロック, delta: レベルの差分
 func (b *BlipBuffer) addDelta(time uint64, delta float32) {
-	// 前回の時間からサンプルに変換
-	dt := max(time-b.lastTime, 0)
+	b.mutex.Lock()
+	defer b.mutex.Unlock()
 
-	// Tickからサンプルレート
-	n := int(float32(dt) * b.sampleRate / b.tickRate)
-	if n == 0 {
-		// Tick内での変化は累積
-		b.accum += float32(delta)
-		return
+	// 前回イベントから今回イベントまでの時間を、前回レベルで埋める
+	dt := time - b.lastTime
+	if dt > 0 {
+		// 生成すべきサンプル数を計算
+		samplesToGen := b.frac + (float64(dt) * b.sampleRate / b.tickRate)
+		count := int(samplesToGen)
+
+		if count > 0 {
+			// ゼロ次ホールド：この区間はずっと同じレベル
+			for i := 0; i < count; i++ {
+				b.samples = append(b.samples, b.lastLevel)
+			}
+			b.frac = samplesToGen - float64(count)
+		} else {
+			b.frac = samplesToGen
+		}
 	}
 
-	// 累積分を加えてn個のサンプルを生成
-	value := float32(b.accum) + delta
-	for range n {
-		b.samples = append(b.samples, value)
-	}
-
-	// 累積をクリア
-	b.accum = 0
 	b.lastTime = time
+	b.lastLevel += delta // レベルを更新
 }
 
 // Blip_Buffer の読み取り
 func (b *BlipBuffer) Read(out []float32, count int) int {
+	b.mutex.Lock()
+	defer b.mutex.Unlock()
+
 	n := min(len(b.samples), count)
-	copy(out, b.samples[:n])
-	b.samples = b.samples[n:]
+	if n > 0 {
+		copy(out, b.samples[:n])
+		b.samples = b.samples[n:]
+	}
+
+	// 足りない分を0で埋める
 	for i := n; i < count && i < len(out); i++ {
 		out[i] = 0
 	}
@@ -153,9 +172,7 @@ func (b *BlipBuffer) Read(out []float32, count int) int {
 }
 
 // バッファのフラッシュ
-func (b *BlipBuffer) endFrame() {
-	if b.accum != 0 {
-		b.samples = append(b.samples, b.accum)
-		b.accum = 0
-	}
+func (b *BlipBuffer) endFrame(time uint64) {
+	// 最後のイベントから現在時刻までをフラッシュ
+	b.addDelta(time, 0)
 }
