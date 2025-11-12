@@ -72,7 +72,7 @@ func (swr *SquareWaveRegister) write(address uint16, data uint8) {
 		*/
 		swr.volume = data & 0x0F
 		swr.envelope = (data & 0x10) == 0
-		swr.keyOffCounter = (data & 0x20) == 0
+		swr.keyOffCounter = (data & 0x20) != 0
 		swr.duty = (data & 0xC0) >> 6
 	case 0x4001, 0x4005:
 		/*
@@ -168,10 +168,10 @@ func (twr *TriangleWaveRegister) write(address uint16, data uint8) {
 		/*
 			$4008  clll llll
 				7   c   長さカウンタ無効フラグ
-				6-0 l   線形カウンタ
+				6-0 l   線形カウンタリロード値
 		*/
 		twr.length = data & 0x7F
-		twr.keyOffCounter = (data & 0x80) == 0
+		twr.keyOffCounter = (data & 0x80) != 0
 	case 0x400A:
 		/*
 			$400A  llll llll

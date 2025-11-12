@@ -177,6 +177,7 @@ func (sud *SweepUnitData) Init(shift uint8, direction uint8, timerCount uint8, e
 type LinearCounter struct {
 	data    LinearCounterData
 	counter uint8
+	reload  bool
 }
 
 // MARK: 線形カウンタの初期化メソッド
@@ -184,16 +185,19 @@ func (lc *LinearCounter) Init() {
 	lc.data = LinearCounterData{}
 	lc.data.Init(0, false)
 	lc.counter = 0
+	lc.reload = false
 }
 
 // MARK: 線形カウンタのサイクルを進めるメソッド
 func (lc *LinearCounter) tick() {
-	if !lc.data.enabled {
-		return
+	if lc.reload {
+		lc.counter = lc.data.count
+	} else if lc.counter > 0 {
+		lc.counter--
 	}
 
-	if lc.counter > 0 {
-		lc.counter--
+	if !lc.data.enabled {
+		lc.reload = false
 	}
 }
 
@@ -205,6 +209,11 @@ func (lc *LinearCounter) isMuted() bool {
 // MARK: 線形カウンタをリセットするメソッド
 func (lc *LinearCounter) reset() {
 	lc.counter = lc.data.count
+}
+
+// MARK: 線型カウンタをリロードするメソッド
+func (lc *LinearCounter) setReload() {
+	lc.reload = true
 }
 
 // MARK: 線型カウンタの更新メソッド
@@ -256,7 +265,7 @@ func (lc *LengthCounter) update(count uint8, enabled bool) {
 
 // MARK: 長さカウンタのサイクルを進めるメソッド
 func (lc *LengthCounter) tick() {
-	if !lc.data.enabled {
+	if lc.data.enabled {
 		return
 	}
 
