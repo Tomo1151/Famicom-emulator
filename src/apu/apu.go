@@ -11,7 +11,7 @@ import (
 )
 
 const (
-	CPU_CLOCK = 1_789_772.5 // 1.78MHz
+	// CPU_CLOCK = 1_789_772.5 // 1.78MHz
 	// APU_CYCLE_INTERVAL = 7457
 	MAX_VOLUME  = 0.8
 	toneHz      = 440

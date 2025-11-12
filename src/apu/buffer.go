@@ -121,8 +121,8 @@ type BlipBuffer struct {
 }
 
 func (b *BlipBuffer) Init() {
-	b.sampleRate = float64(SampleRate)
-	b.tickRate = float64(CPUClock)
+	b.sampleRate = float64(SAMPLE_RATE)
+	b.tickRate = float64(CPU_CLOCK)
 	b.samples = make([]float32, 0, 8192)
 }
 

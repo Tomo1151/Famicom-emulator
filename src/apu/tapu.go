@@ -13,8 +13,8 @@ import (
 
 // MARK: 定数定義
 const (
-	CPUClock           = 1_789_772.5 // 1.78MHz
-	SampleRate         = 44100       // 44.1kHz
+	CPU_CLOCK          = 1_789_772.5 // 1.78MHz
+	SAMPLE_RATE        = 44100       // 44.1kHz
 	APU_CYCLE_INTERVAL = 7457
 )
 
@@ -67,7 +67,7 @@ func (a *TAPU) Init() {
 // MARK: オーディオデバイスの初期化メソッド
 func (a *TAPU) initAudioDevice() {
 	spec := &sdl.AudioSpec{
-		Freq:     SampleRate,
+		Freq:     SAMPLE_RATE,
 		Format:   sdl.AUDIO_F32,
 		Channels: 1,
 		Samples:  2048,
@@ -346,7 +346,7 @@ func (a *TAPU) Write3ch(address uint16, data uint8) {
 			a.channel3.register.LengthCounterHalt(),
 		)
 		a.channel3.lengthCounter.reload()
-		a.channel3.linearCounter.reset()
+		a.channel3.linearCounter.setReload()
 		a.channel3.frequency = float32(a.channel3.register.frequency)
 		a.channel3.phase = 0
 	}
