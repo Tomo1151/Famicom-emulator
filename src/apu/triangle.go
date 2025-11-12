@@ -84,7 +84,7 @@ func (tw *TriangleWave) generatePCM() {
 				case TRIANGLE_WAVE_LINEAR_COUNTER_TICK: // LINEAR COUNTER TICKイベント
 					tw.linearCounter.tick()
 				case TRIANGLE_WAVE_RESET: // RESETイベント
-					tw.lengthCounter.reset()
+					tw.lengthCounter.reload()
 					tw.linearCounter.reset()
 					tw.phase = 0.0 // 音符が変わったらphaseをリセット
 				}

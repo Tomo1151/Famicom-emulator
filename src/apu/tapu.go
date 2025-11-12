@@ -183,35 +183,63 @@ func (a *TAPU) WriteFrameSequencer(data uint8) {
 func (a *TAPU) Write1ch(address uint16, data uint8) {
 	a.channel1.register.write(address, data)
 
+	// @FIXME 既にレジスタに値が反映されているため、AudioChannel側でapply()などを用意し、一本化できるかも
 	switch address {
 	case 0x4000:
-		// エンベロープ更新
-		a.channel1.envelope.data.rate = a.channel1.register.volume
-		a.channel1.envelope.data.enabled = a.channel1.register.envelope
-		a.channel1.envelope.data.loop = !a.channel1.register.keyOffCounter
-		a.channel1.lengthCounter.data.Init(
+		/*
+			$4000		ddld nnnn
+				7-6 d   デューティ
+				5   l   エンベロープループ
+				4   d   エンベロープ無効
+				3-0 n   ボリューム/エンベロープ周期
+		*/
+		a.channel1.duty = a.channel1.register.Duty()
+		a.channel1.envelope.update(
+			a.channel1.register.Volume(),
+			a.channel1.register.EnvelopeEnabled(),
+			a.channel1.register.EnvelopeLoop(),
+		)
+		a.channel1.lengthCounter.update(
 			a.channel1.register.keyOffCount,
-			a.channel1.register.keyOffCounter,
+			a.channel1.register.LengthCounterHalt(),
 		)
 	case 0x4001:
-		// スイープ更新
-		a.channel1.sweepUnit.data.shift = a.channel1.register.sweepShift
-		a.channel1.sweepUnit.data.direction = a.channel1.register.sweepDirection
-		a.channel1.sweepUnit.data.timerCount = a.channel1.register.sweepPeriod
-		a.channel1.sweepUnit.data.enabled = a.channel1.register.sweepEnabled
+		/*
+			$4001		eppp nsss
+				7   e   スイープ有効
+				6-4 p   スイープ周期
+				3   n   スイープ方向
+				2-0 s   スイープ量
+		*/
+		a.channel1.sweepUnit.update(
+			a.channel1.register.sweepShift,
+			a.channel1.register.sweepDirection,
+			a.channel1.register.sweepPeriod,
+			a.channel1.register.sweepEnabled,
+		)
 	case 0x4002:
+		/*
+			$4002		llll llll
+				7-0 l   チャンネル周期下位
+		*/
 		a.channel1.sweepUnit.frequency = a.channel1.register.frequency
 	case 0x4003:
-		// 長さカウンタのリセット (有効時のみ)
+		/*
+			$4003		cccc chhh
+				7-3 c   長さカウンタインデクス
+				2-0 h   チャンネル周期上位
+
+				$4003への書き込みは長さカウンタのリロード，エンベロープの再起動，パルス生成器の位相のリセットが発生する
+		*/
 		if a.status.is1chEnabled() {
-			a.channel1.lengthCounter.data.Init(
+			a.channel1.lengthCounter.update(
 				a.channel1.register.keyOffCount,
-				!a.channel1.register.keyOffCounter,
+				a.channel1.register.LengthCounterHalt(),
 			)
-			a.channel1.lengthCounter.reset()
+			a.channel1.lengthCounter.reload()
 			a.channel1.envelope.reset()
-			a.channel1.sweepUnit.frequency = a.channel1.register.frequency
 			a.channel1.sweepUnit.reset()
+			a.channel1.sweepUnit.frequency = a.channel1.register.frequency
 			a.channel1.phase = 0
 		}
 	}
@@ -223,33 +251,60 @@ func (a *TAPU) Write2ch(address uint16, data uint8) {
 
 	switch address {
 	case 0x4004:
-		// エンベロープ更新
-		a.channel2.envelope.data.rate = a.channel2.register.volume
-		a.channel2.envelope.data.enabled = a.channel2.register.envelope
-		a.channel2.envelope.data.loop = !a.channel2.register.keyOffCounter
-		a.channel2.lengthCounter.data.Init(
+		/*
+			$4004		ddld nnnn
+				7-6 d   デューティ
+				5   l   エンベロープループ
+				4   d   エンベロープ無効
+				3-0 n   ボリューム/エンベロープ周期
+		*/
+		a.channel2.duty = a.channel2.register.Duty()
+		a.channel2.envelope.update(
+			a.channel2.register.Volume(),
+			a.channel2.register.EnvelopeEnabled(),
+			a.channel2.register.EnvelopeLoop(),
+		)
+		a.channel2.lengthCounter.update(
 			a.channel2.register.keyOffCount,
-			a.channel2.register.keyOffCounter,
+			a.channel2.register.LengthCounterHalt(),
 		)
 	case 0x4005:
-		// スイープ更新
-		a.channel2.sweepUnit.data.shift = a.channel2.register.sweepShift
-		a.channel2.sweepUnit.data.direction = a.channel2.register.sweepDirection
-		a.channel2.sweepUnit.data.timerCount = a.channel2.register.sweepPeriod
-		a.channel2.sweepUnit.data.enabled = a.channel2.register.sweepEnabled
+		/*
+			$4005		eppp nsss
+				7   e   スイープ有効
+				6-4 p   スイープ周期
+				3   n   スイープ方向
+				2-0 s   スイープ量
+		*/
+		a.channel2.sweepUnit.update(
+			a.channel2.register.sweepShift,
+			a.channel2.register.sweepDirection,
+			a.channel2.register.sweepPeriod,
+			a.channel2.register.sweepEnabled,
+		)
 	case 0x4006:
+		/*
+			$4006		llll llll
+				7-0 l   チャンネル周期下位
+		*/
 		a.channel2.sweepUnit.frequency = a.channel2.register.frequency
 	case 0x4007:
-		// 長さカウンタのリセット (有効時のみ)
+		/*
+			$4007		cccc chhh
+				7-3 c   長さカウンタインデックス
+				2-0 h   チャンネル周期上位
+
+				$4007への書き込みは長さカウンタのリロード，エンベロープの再起動，パルス生成器の位相のリセットが発生する
+		*/
 		if a.status.is2chEnabled() {
-			a.channel2.lengthCounter.data.Init(
+			a.channel2.lengthCounter.update(
 				a.channel2.register.keyOffCount,
-				!a.channel2.register.keyOffCounter,
+				a.channel2.register.LengthCounterHalt(),
 			)
-			a.channel2.lengthCounter.reset()
+			a.channel2.lengthCounter.reload()
 			a.channel2.envelope.reset()
-			a.channel2.sweepUnit.frequency = a.channel2.register.frequency
 			a.channel2.sweepUnit.reset()
+			a.channel2.sweepUnit.frequency = a.channel2.register.frequency
 			a.channel2.phase = 0
 		}
 	}
@@ -261,25 +316,38 @@ func (a *TAPU) Write3ch(address uint16, data uint8) {
 
 	switch address {
 	case 0x4008:
-		a.channel3.lengthCounter.data.Init(
+		/*
+			$4008  clll llll
+				7   c   長さカウンタ無効フラグ
+				6-0 l   線形カウンタ
+		*/
+		a.channel3.lengthCounter.update(
 			a.channel3.register.keyOffCount,
-			a.channel3.register.keyOffCounter,
+			a.channel3.register.LengthCounterHalt(),
 		)
-		a.channel3.linearCounter.data.Init(
+		a.channel3.linearCounter.update(
 			a.channel3.register.length,
 			a.channel3.register.keyOffCounter,
 		)
 	case 0x400A:
+		/*
+			$400A  llll llll
+				7-0 l   チャンネル周期下位
+		*/
 		a.channel3.frequency = float32(a.channel3.register.frequency)
 	case 0x400B:
-		// 長さカウンタのリセット (有効時のみ)
-		a.channel3.lengthCounter.data.Init(
+		/*
+			$400B  llll lhhh
+				7-3 l   長さカウンタインデクス
+				2-0 h   チャンネル周期上位
+		*/
+		a.channel3.lengthCounter.update(
 			a.channel3.register.keyOffCount,
-			!a.channel3.register.keyOffCounter,
+			a.channel3.register.LengthCounterHalt(),
 		)
-		a.channel3.lengthCounter.reset()
-		a.channel3.frequency = float32(a.channel3.register.frequency)
+		a.channel3.lengthCounter.reload()
 		a.channel3.linearCounter.reset()
+		a.channel3.frequency = float32(a.channel3.register.frequency)
 		a.channel3.phase = 0
 	}
 }
@@ -392,10 +460,11 @@ var (
 )
 
 type SquareWaveChannel struct {
-	register      SquareWaveRegister
+	register      SquareWaveRegister // @FIXME レジスタはAPUに持たせ、ここは参照にする
 	envelope      Envelope
 	lengthCounter LengthCounter
 	sweepUnit     SweepUnit
+	duty          float32
 	phase         float32
 	buffer        BlipBuffer
 }
@@ -429,7 +498,7 @@ func (swc *SquareWaveChannel) output(cycles uint) float32 {
 	}
 
 	value := 0.0
-	if swc.phase <= swc.register.Duty() {
+	if swc.phase <= swc.duty {
 		value = 1.0
 	} else {
 		value = -1.0

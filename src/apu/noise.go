@@ -90,7 +90,7 @@ func (nw *NoiseWave) generatePCM() {
 					}
 				case NOISE_WAVE_RESET: // RESETイベント
 					nw.envelope.reset()
-					nw.lengthCounter.reset()
+					nw.lengthCounter.reload()
 					nw.phase = 0.0 // 音符が変わったらphaseをリセット
 				}
 			default:

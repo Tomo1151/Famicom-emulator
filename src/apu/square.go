@@ -103,7 +103,7 @@ func (sw *SquareWave) generatePCM() {
 					sw.sweepUnit.tick(&sw.lengthCounter, sw.channelNumber == 1)
 				case SQUARE_WAVE_RESET: // RESETイベント
 					sw.envelope.reset()
-					sw.lengthCounter.reset()
+					sw.lengthCounter.reload()
 					sw.sweepUnit.reset()
 					sw.phase = 0.0 // 音符が変わったらphaseをリセット
 				}

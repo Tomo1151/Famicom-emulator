@@ -29,7 +29,7 @@ type SquareWaveRegister struct {
 	// 0x4000 | 0x4004
 	volume        uint8
 	envelope      bool
-	keyOffCounter bool
+	keyOffCounter bool // envelope loop | halt flag
 	duty          uint8
 
 	// 0x4001 | 0x4005
@@ -63,18 +63,41 @@ func (swr *SquareWaveRegister) Init() {
 func (swr *SquareWaveRegister) write(address uint16, data uint8) {
 	switch address {
 	case 0x4000, 0x4004:
+		/*
+			$4000/$4004		ddld nnnn
+				7-6 d   デューティ
+				5   l   エンベロープループ
+				4   d   エンベロープ無効
+				3-0 n   ボリューム/エンベロープ周期
+		*/
 		swr.volume = data & 0x0F
 		swr.envelope = (data & 0x10) == 0
 		swr.keyOffCounter = (data & 0x20) == 0
 		swr.duty = (data & 0xC0) >> 6
 	case 0x4001, 0x4005:
+		/*
+			$4001/$4005		eppp nsss
+				7   e   スイープ有効
+				6-4 p   スイープ周期
+				3   n   スイープ方向
+				2-0 s   スイープ量
+		*/
 		swr.sweepShift = data & 0x07
 		swr.sweepDirection = (data & 0x08) >> 3
 		swr.sweepPeriod = (data & 0x70) >> 4
 		swr.sweepEnabled = (data & 0x80) != 0
 	case 0x4002, 0x4006:
+		/*
+			$4002/$4006		llll llll
+				7-0 l   チャンネル周期下位
+		*/
 		swr.frequency = (swr.frequency & 0x0700) | uint16(data)
 	case 0x4003, 0x4007:
+		/*
+			$4003/$4007		cccc chhh
+				7-3 c   長さカウンタインデクス
+				2-0 h   チャンネル周期上位
+		*/
 		swr.frequency = (swr.frequency & 0x00FF) | (uint16(data)&0x07)<<8
 		swr.keyOffCount = (data & 0xF8) >> 3
 	default:
@@ -97,6 +120,26 @@ func (swr *SquareWaveRegister) Duty() float32 {
 	default:
 		return 0.0
 	}
+}
+
+// MARK: レジスタからボリュームを取得するメソッド
+func (swr *SquareWaveRegister) Volume() uint8 {
+	return swr.volume
+}
+
+// MARK: レジスタからエンベロープの有効/無効を取得するメソッド
+func (swr *SquareWaveRegister) EnvelopeEnabled() bool {
+	return swr.envelope
+}
+
+// MARK: レジスタからエンベロープループの有効/無効を取得するメソッド
+func (swr *SquareWaveRegister) EnvelopeLoop() bool {
+	return !swr.keyOffCounter
+}
+
+// MARK: レジスタから長さカウンタのHALT有効/無効を取得するメソッド
+func (swr *SquareWaveRegister) LengthCounterHalt() bool {
+	return swr.keyOffCounter
 }
 
 // MARK: 三角波レジスタ
@@ -122,11 +165,25 @@ func (twr *TriangleWaveRegister) Init() {
 func (twr *TriangleWaveRegister) write(address uint16, data uint8) {
 	switch address {
 	case 0x4008:
+		/*
+			$4008  clll llll
+				7   c   長さカウンタ無効フラグ
+				6-0 l   線形カウンタ
+		*/
 		twr.length = data & 0x7F
 		twr.keyOffCounter = (data & 0x80) == 0
 	case 0x400A:
+		/*
+			$400A  llll llll
+				7-0 l   チャンネル周期下位
+		*/
 		twr.frequency = (twr.frequency & 0x0700) | uint16(data)
 	case 0x400B:
+		/*
+			$400B  llll lhhh
+				7-3 l   長さカウンタインデクス
+				2-0 h   チャンネル周期上位
+		*/
 		twr.frequency = (twr.frequency & 0x00FF) | (uint16(data)&0x07)<<8
 		twr.keyOffCount = (data & 0xF8) >> 3
 	default:
@@ -135,8 +192,14 @@ func (twr *TriangleWaveRegister) write(address uint16, data uint8) {
 }
 
 // MARK: レジスタから三角波のピッチを取得するメソッド
+// Deprecated: APU作動方式の変更に伴って未使用に
 func (twr *TriangleWaveRegister) getFrequency() float32 {
 	return CPU_CLOCK / (32.0*float32(twr.frequency) + 1.0)
+}
+
+// MARK: レジスタから長さカウンタのHALT有効/無効を取得するメソッド
+func (twr *TriangleWaveRegister) LengthCounterHalt() bool {
+	return twr.keyOffCounter
 }
 
 // MARK: ノイズレジスタ
