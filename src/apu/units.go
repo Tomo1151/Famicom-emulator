@@ -259,7 +259,7 @@ func (lc *LengthCounter) reload() {
 
 // MARK: 長さカウンタの更新メソッド
 func (lc *LengthCounter) update(count uint8, enabled bool) {
-	lc.data.count = count
+	lc.data.count = LENGTH_COUNTER_TABLE[count]
 	lc.data.enabled = enabled
 }
 
