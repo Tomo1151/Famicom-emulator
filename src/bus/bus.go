@@ -260,10 +260,13 @@ func (b *Bus) WriteByteAt(address uint16, data uint8) {
 		b.tapu.Write3ch(address, data)
 	case address == 0x400C: // APU 4ch
 		b.apu.Write4ch(address, data)
+		b.tapu.Write4ch(address, data)
 	case address == 0x400E: // APU 4ch
 		b.apu.Write4ch(address, data)
+		b.tapu.Write4ch(address, data)
 	case address == 0x400F: // APU 4ch
 		b.apu.Write4ch(address, data)
+		b.tapu.Write4ch(address, data)
 	case 0x4010 <= address && address <= 0x4013: // APU 5ch
 		b.apu.Write5ch(address, data)
 	case address == 0x4014: // DMA転送

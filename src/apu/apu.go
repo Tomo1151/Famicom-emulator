@@ -311,8 +311,8 @@ func (a *APU) Write4ch(address uint16, data uint8) {
 		a.Ch4Channel <- NoiseWaveEvent{
 			eventType: NOISE_WAVE_NOTE,
 			note: &NoiseNote{
-				hz:        a.Ch4Register.getFrequency(),
-				noiseMode: a.Ch4Register.getMode(),
+				hz:        a.Ch4Register.Frequency(),
+				noiseMode: a.Ch4Register.Mode(),
 			},
 		}
 	}

@@ -67,7 +67,7 @@ func (swr *SquareWaveRegister) write(address uint16, data uint8) {
 			$4000/$4004		ddld nnnn
 				7-6 d   デューティ
 				5   l   エンベロープループ
-				4   d   エンベロープ無効
+				4   e   エンベロープ無効
 				3-0 n   ボリューム/エンベロープ周期
 		*/
 		swr.volume = data & 0x0F
@@ -231,10 +231,21 @@ func (nwr *NoiseWaveRegister) Init() {
 func (nwr *NoiseWaveRegister) write(address uint16, data uint8) {
 	switch address {
 	case 0x400C:
+		/*
+			$400C   --le nnnn
+				5   l   エンベロープループ、長さカウンタ無効
+				4   e   エンベロープ無効フラグ
+				3-0 n   ボリューム/エンベロープ周期
+		*/
 		nwr.volume = data & 0x0F
 		nwr.envelope = (data & 0x10) == 0
-		nwr.keyOffCounter = (data & 0x20) == 0
+		nwr.keyOffCounter = (data & 0x20) != 0
 	case 0x400E:
+		/*
+			$400E   s--- pppp
+				7   s   ランダム生成モード
+				3-0 p   タイマ周期インデクス
+		*/
 		nwr.frequency = data & 0x0F
 		mode := data & 0x80
 
@@ -244,6 +255,10 @@ func (nwr *NoiseWaveRegister) write(address uint16, data uint8) {
 			nwr.mode = NOISE_MODE_SHORT
 		}
 	case 0x400F:
+		/*
+			$400F   llll l---
+				7-3 l   長さインデクス
+		*/
 		nwr.keyOffCount = (data & 0xF8) >> 3
 	default:
 		panic(fmt.Sprintf("APU Error: unexpected write at %04X", address))
@@ -251,20 +266,37 @@ func (nwr *NoiseWaveRegister) write(address uint16, data uint8) {
 }
 
 // MARK: ノイズレジスタから4chのモードを取得するメソッド
-func (nwr *NoiseWaveRegister) getMode() NoiseRegisterMode {
+func (nwr *NoiseWaveRegister) Mode() NoiseRegisterMode {
 	return nwr.mode
 }
 
 // MARK: ノイズレジスタからノイズのピッチを取得するメソッド
-func (nwr *NoiseWaveRegister) getFrequency() float32 {
+func (nwr *NoiseWaveRegister) Frequency() float32 {
 	noiseFrequencyTable := [16]uint16{
-		0x0002, 0x0004, 0x0008, 0x0010,
-		0x0020, 0x0030, 0x0040, 0x0050,
-		0x0065, 0x007F, 0x00BE, 0x00FE,
-		0x017D, 0x01FC, 0x03F9, 0x07F2,
+		4, 8, 16, 32, 64, 96, 128, 160, 202, 254, 380, 508, 762, 1016, 2034, 4068,
 	}
 
-	return CPU_CLOCK / float32(noiseFrequencyTable[nwr.frequency])
+	return float32(noiseFrequencyTable[nwr.frequency])
+}
+
+// MARK: レジスタからボリュームを取得するメソッド
+func (nwr *NoiseWaveRegister) Volume() uint8 {
+	return nwr.volume
+}
+
+// MARK: レジスタからエンベロープの有効/無効を取得するメソッド
+func (nwr *NoiseWaveRegister) EnvelopeEnabled() bool {
+	return nwr.envelope
+}
+
+// MARK: レジスタからエンベロープループの有効/無効を取得するメソッド
+func (nwr *NoiseWaveRegister) EnvelopeLoop() bool {
+	return !nwr.keyOffCounter
+}
+
+// MARK: レジスタから長さカウンタのHALT有効/無効を取得するメソッド
+func (nwr *NoiseWaveRegister) LengthCounterHalt() bool {
+	return nwr.keyOffCounter
 }
 
 // MARK: ノイズシフトレジスタ
