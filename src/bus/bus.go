@@ -289,6 +289,7 @@ func (b *Bus) WriteByteAt(address uint16, data uint8) {
 		b.joypad2.Write(data)
 	case address == 0x4017: // APU フレームカウンタ
 		b.apu.WriteFrameSequencer(data)
+		b.apu.WriteFrameSequencer(data)
 	case 0x6000 <= address && address <= 0x7FFF: // プログラムRAM
 		b.cartridge.Mapper.WriteToProgramRAM(address, data)
 	case PRG_ROM_START <= address && address <= PRG_ROM_END: // プログラムROM

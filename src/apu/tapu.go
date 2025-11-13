@@ -193,6 +193,18 @@ func (a *TAPU) FrameIRQ() bool {
 // MARK: フレームシーケンサの書き込みメソッド
 func (a *TAPU) WriteFrameSequencer(data uint8) {
 	a.frameSequencer.update(data)
+
+	/*
+		@NOTE:
+			5ステップモード時のみ$4017の書き込みの副作用で halfフレーム/quarterフレーム信号を生成する
+	*/
+	if a.frameSequencer.Mode() == 5 {
+		a.clockEnvelopes()
+		a.clockLengthCounter()
+		a.clockSweepUnits()
+		a.status.ClearFrameIRQ()
+	}
+
 	a.step = 0
 	a.cycles = 0
 	a.status.ClearFrameIRQ()
@@ -215,8 +227,8 @@ func (a *TAPU) Write1ch(address uint16, data uint8) {
 		a.channel1.duty = a.channel1.register.Duty()
 		a.channel1.envelope.update(
 			a.channel1.register.Volume(),
-			a.channel1.register.EnvelopeEnabled(),
 			a.channel1.register.EnvelopeLoop(),
+			a.channel1.register.EnvelopeEnabled(),
 		)
 		a.channel1.lengthCounter.update(
 			a.channel1.register.keyOffCount,
@@ -251,10 +263,10 @@ func (a *TAPU) Write1ch(address uint16, data uint8) {
 				$4003への書き込みは長さカウンタのリロード，エンベロープの再起動，パルス生成器の位相のリセットが発生する
 		*/
 		if a.status.is1chEnabled() {
-			// a.channel1.lengthCounter.update(
-			// 	a.channel1.register.keyOffCount,
-			// 	a.channel1.register.LengthCounterHalt(),
-			// )
+			a.channel1.lengthCounter.update(
+				a.channel1.register.keyOffCount,
+				a.channel1.register.LengthCounterHalt(),
+			)
 			a.channel1.lengthCounter.reload()
 			a.channel1.envelope.reset()
 			a.channel1.sweepUnit.reset()
@@ -280,8 +292,8 @@ func (a *TAPU) Write2ch(address uint16, data uint8) {
 		a.channel2.duty = a.channel2.register.Duty()
 		a.channel2.envelope.update(
 			a.channel2.register.Volume(),
-			a.channel2.register.EnvelopeEnabled(),
 			a.channel2.register.EnvelopeLoop(),
+			a.channel2.register.EnvelopeEnabled(),
 		)
 		a.channel2.lengthCounter.update(
 			a.channel2.register.keyOffCount,
@@ -316,10 +328,10 @@ func (a *TAPU) Write2ch(address uint16, data uint8) {
 				$4007への書き込みは長さカウンタのリロード，エンベロープの再起動，パルス生成器の位相のリセットが発生する
 		*/
 		if a.status.is2chEnabled() {
-			// a.channel2.lengthCounter.update(
-			// 	a.channel2.register.keyOffCount,
-			// 	a.channel2.register.LengthCounterHalt(),
-			// )
+			a.channel2.lengthCounter.update(
+				a.channel2.register.keyOffCount,
+				a.channel2.register.LengthCounterHalt(),
+			)
 			a.channel2.lengthCounter.reload()
 			a.channel2.envelope.reset()
 			a.channel2.sweepUnit.reset()
@@ -360,10 +372,10 @@ func (a *TAPU) Write3ch(address uint16, data uint8) {
 				7-3 l   長さカウンタインデクス
 				2-0 h   チャンネル周期上位
 		*/
-		// a.channel3.lengthCounter.update(
-		// 	a.channel3.register.keyOffCount,
-		// 	a.channel3.register.LengthCounterHalt(),
-		// )
+		a.channel3.lengthCounter.update(
+			a.channel3.register.keyOffCount,
+			a.channel3.register.LengthCounterHalt(),
+		)
 		a.channel3.lengthCounter.reload()
 		a.channel3.linearCounter.setReload()
 		a.channel3.frequency = float32(a.channel3.register.frequency)
@@ -386,8 +398,8 @@ func (a *TAPU) Write4ch(address uint16, data uint8) {
 		*/
 		a.channel4.envelope.update(
 			a.channel4.register.Volume(),
-			a.channel4.register.EnvelopeEnabled(),
 			a.channel4.register.EnvelopeLoop(),
+			a.channel4.register.EnvelopeEnabled(),
 		)
 		a.channel4.lengthCounter.update(
 			a.channel4.register.keyOffCount,
@@ -658,11 +670,6 @@ func (nwc *NoiseWaveChannel) output(cycles uint) float32 {
 
 	period := nwc.register.Frequency()
 	nwc.phase += float32(cycles)
-
-	if nwc.phase >= 1.0 {
-		// 0.0 ~ 1.0 の範囲に制限
-		nwc.phase -= 1.0
-	}
 
 	if nwc.phase >= period {
 		for nwc.phase >= period {

@@ -134,7 +134,7 @@ func (swr *SquareWaveRegister) EnvelopeEnabled() bool {
 
 // MARK: レジスタからエンベロープループの有効/無効を取得するメソッド
 func (swr *SquareWaveRegister) EnvelopeLoop() bool {
-	return !swr.keyOffCounter
+	return swr.keyOffCounter
 }
 
 // MARK: レジスタから長さカウンタのHALT有効/無効を取得するメソッド
@@ -291,7 +291,7 @@ func (nwr *NoiseWaveRegister) EnvelopeEnabled() bool {
 
 // MARK: レジスタからエンベロープループの有効/無効を取得するメソッド
 func (nwr *NoiseWaveRegister) EnvelopeLoop() bool {
-	return !nwr.keyOffCounter
+	return nwr.keyOffCounter
 }
 
 // MARK: レジスタから長さカウンタのHALT有効/無効を取得するメソッド
