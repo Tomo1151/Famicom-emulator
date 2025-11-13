@@ -517,7 +517,7 @@ func (a *TAPU) clockFrameSequencer() {
 				a.clockEnvelopes()
 				a.clockLinearCounter()
 			}
-			if a.step == 1 || a.step == 3 {
+			if a.step == 2 || a.step == 4 {
 				// 長さカウンタとスイープユニットのクロック生成
 				a.clockLengthCounter()
 				a.clockSweepUnits()
@@ -679,8 +679,8 @@ func (nwc *NoiseWaveChannel) output(cycles uint) float32 {
 	}
 
 	var value float32
-	if nwc.prev {
-		value = MAX_VOLUME / 6 * float32(nwc.register.Volume())
+	if !nwc.prev {
+		value = MAX_VOLUME * float32(nwc.envelope.volume())
 	} else {
 		value = 0.0
 	}

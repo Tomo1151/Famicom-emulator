@@ -85,6 +85,7 @@ type SweepUnit struct {
 	frequency uint16
 	counter   uint8
 	mute      bool
+	reload    bool
 }
 
 // MARK: スイープの初期化メソッド
@@ -94,6 +95,7 @@ func (su *SweepUnit) Init() {
 	su.frequency = 0
 	su.counter = 0
 	su.mute = true
+	su.reload = false
 }
 
 // MARK: スイープの周波数を取得するメソッド
@@ -108,6 +110,7 @@ func (su *SweepUnit) getFrequency() float32 {
 func (su *SweepUnit) reset() {
 	su.counter = 0
 	su.mute = false
+	su.reload = true
 }
 
 // MARK: スイープユニットによるチャンネルの無効化
@@ -121,40 +124,92 @@ func (su *SweepUnit) update(shift uint8, direction uint8, period uint8, enabled 
 	su.data.direction = direction
 	su.data.timerCount = period
 	su.data.enabled = enabled
+	su.reload = true
 }
 
 // MARK: スイープのサイクルを進めるメソッド
 func (su *SweepUnit) tick(lengthCounter *LengthCounter, isNot bool) {
-	su.counter++
+	if su.counter > 0 {
+		su.counter--
+	}
 
-	if su.counter < su.data.timerCount+1 {
+	if su.reload || su.counter == 0 {
+		su.counter = su.data.timerCount + 1
+		if su.reload {
+			su.reload = false
+			return
+		}
+	} else {
+		return
+	}
+	// if su.reload {
+	// 	su.counter = su.data.timerCount
+	// 	su.reload = false
+	// } else if su.counter > 0 {
+	// 	su.counter--
+	// }
+
+	// if su.counter != 0 {
+	// 	return
+	// }
+
+	// su.counter = su.data.timerCount
+
+	if !su.data.enabled || su.data.shift == 0 || lengthCounter.isMuted() || su.frequency < 8 {
 		return
 	}
 
-	su.counter = 0
+	var target uint16
+	diff := su.frequency >> uint16(su.data.shift)
 
-	if !su.data.enabled || su.data.shift == 0 || lengthCounter.isMuted() {
-		return
-	}
-
-	if su.data.direction == 0 { // 上
-		su.frequency += (su.frequency >> su.data.shift)
-	} else { // 下
-		diff := su.frequency >> su.data.shift
+	if su.data.direction == 0 {
+		target = su.frequency + diff
+	} else {
 		if isNot {
-			// 1の補数を使用する(Ch1)場合
-			su.frequency -= diff
+			target = su.frequency - (diff + 1)
 		} else {
-			// 2の補数を使用する(Ch2)場合
-			su.frequency -= (diff + 1)
+			target = su.frequency - diff
 		}
 	}
 
-	su.mute = su.frequency < 0x08 || su.frequency > 0x7FF
-
-	if su.frequency < 0x08 || su.frequency > 0x7FF {
-		lengthCounter.counter = 0
+	if target > 0x7FF || target < 8 {
+		su.mute = true
+		return
 	}
+
+	su.frequency = target
+	su.mute = false
+
+	// su.counter++
+
+	// if su.counter < su.data.timerCount+1 {
+	// 	return
+	// }
+
+	// su.counter = 0
+
+	// if !su.data.enabled || su.data.shift == 0 || lengthCounter.isMuted() {
+	// 	return
+	// }
+
+	// if su.data.direction == 0 { // 上
+	// 	su.frequency += (su.frequency >> su.data.shift)
+	// } else { // 下
+	// 	diff := su.frequency >> su.data.shift
+	// 	if isNot {
+	// 		// 1の補数を使用する(Ch1)場合
+	// 		su.frequency -= diff + 1
+	// 	} else {
+	// 		// 2の補数を使用する(Ch2)場合
+	// 		su.frequency -= diff
+	// 	}
+	// }
+
+	// su.mute = su.frequency < 0x08 || su.frequency > 0x7FF
+
+	// if su.frequency < 0x08 || su.frequency > 0x7FF {
+	// 	lengthCounter.counter = 0
+	// }
 }
 
 // MARK: スイープの可変部分
