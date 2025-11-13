@@ -262,6 +262,7 @@ func (a *TAPU) Write1ch(address uint16, data uint8) {
 
 				$4003への書き込みは長さカウンタのリロード，エンベロープの再起動，パルス生成器の位相のリセットが発生する
 		*/
+		a.channel1.sweepUnit.frequency = a.channel1.register.frequency
 		if a.status.is1chEnabled() {
 			a.channel1.lengthCounter.update(
 				a.channel1.register.keyOffCount,
@@ -270,7 +271,6 @@ func (a *TAPU) Write1ch(address uint16, data uint8) {
 			a.channel1.lengthCounter.reload()
 			a.channel1.envelope.reset()
 			a.channel1.sweepUnit.reset()
-			a.channel1.sweepUnit.frequency = a.channel1.register.frequency
 			a.channel1.phase = 0
 		}
 	}
@@ -327,6 +327,7 @@ func (a *TAPU) Write2ch(address uint16, data uint8) {
 
 				$4007への書き込みは長さカウンタのリロード，エンベロープの再起動，パルス生成器の位相のリセットが発生する
 		*/
+		a.channel2.sweepUnit.frequency = a.channel2.register.frequency
 		if a.status.is2chEnabled() {
 			a.channel2.lengthCounter.update(
 				a.channel2.register.keyOffCount,
@@ -335,7 +336,6 @@ func (a *TAPU) Write2ch(address uint16, data uint8) {
 			a.channel2.lengthCounter.reload()
 			a.channel2.envelope.reset()
 			a.channel2.sweepUnit.reset()
-			a.channel2.sweepUnit.frequency = a.channel2.register.frequency
 			a.channel2.phase = 0
 		}
 	}
@@ -365,20 +365,20 @@ func (a *TAPU) Write3ch(address uint16, data uint8) {
 			$400A  llll llll
 				7-0 l   チャンネル周期下位
 		*/
-		a.channel3.frequency = float32(a.channel3.register.frequency)
+		a.channel3.frequency = a.channel3.register.frequency
 	case 0x400B:
 		/*
 			$400B  llll lhhh
 				7-3 l   長さカウンタインデクス
 				2-0 h   チャンネル周期上位
 		*/
+		a.channel3.frequency = a.channel3.register.frequency
 		a.channel3.lengthCounter.update(
 			a.channel3.register.keyOffCount,
 			a.channel3.register.LengthCounterHalt(),
 		)
 		a.channel3.lengthCounter.reload()
 		a.channel3.linearCounter.setReload()
-		a.channel3.frequency = float32(a.channel3.register.frequency)
 		a.channel3.phase = 0
 	}
 }
@@ -421,6 +421,7 @@ func (a *TAPU) Write4ch(address uint16, data uint8) {
 
 			$4003への書き込みは長さカウンタのリロード，エンベロープの再起動，パルス生成器の位相のリセットが発生する
 		*/
+		a.channel4.index = a.channel4.register.frequency
 		if a.status.is4chEnabled() {
 			a.channel4.lengthCounter.update(
 				a.channel4.register.keyOffCount,
@@ -596,7 +597,7 @@ type TriangleWaveChannel struct {
 	register      TriangleWaveRegister
 	lengthCounter LengthCounter
 	linearCounter LinearCounter
-	frequency     float32
+	frequency     uint16
 	phase         float32
 	buffer        BlipBuffer
 }

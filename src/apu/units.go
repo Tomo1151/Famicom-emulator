@@ -137,23 +137,10 @@ func (su *SweepUnit) tick(lengthCounter *LengthCounter, isNot bool) {
 		su.counter = su.data.timerCount + 1
 		if su.reload {
 			su.reload = false
-			return
 		}
 	} else {
 		return
 	}
-	// if su.reload {
-	// 	su.counter = su.data.timerCount
-	// 	su.reload = false
-	// } else if su.counter > 0 {
-	// 	su.counter--
-	// }
-
-	// if su.counter != 0 {
-	// 	return
-	// }
-
-	// su.counter = su.data.timerCount
 
 	if !su.data.enabled || su.data.shift == 0 || lengthCounter.isMuted() || su.frequency < 8 {
 		return
@@ -179,37 +166,6 @@ func (su *SweepUnit) tick(lengthCounter *LengthCounter, isNot bool) {
 
 	su.frequency = target
 	su.mute = false
-
-	// su.counter++
-
-	// if su.counter < su.data.timerCount+1 {
-	// 	return
-	// }
-
-	// su.counter = 0
-
-	// if !su.data.enabled || su.data.shift == 0 || lengthCounter.isMuted() {
-	// 	return
-	// }
-
-	// if su.data.direction == 0 { // 上
-	// 	su.frequency += (su.frequency >> su.data.shift)
-	// } else { // 下
-	// 	diff := su.frequency >> su.data.shift
-	// 	if isNot {
-	// 		// 1の補数を使用する(Ch1)場合
-	// 		su.frequency -= diff + 1
-	// 	} else {
-	// 		// 2の補数を使用する(Ch2)場合
-	// 		su.frequency -= diff
-	// 	}
-	// }
-
-	// su.mute = su.frequency < 0x08 || su.frequency > 0x7FF
-
-	// if su.frequency < 0x08 || su.frequency > 0x7FF {
-	// 	lengthCounter.counter = 0
-	// }
 }
 
 // MARK: スイープの可変部分
