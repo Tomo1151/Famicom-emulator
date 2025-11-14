@@ -98,14 +98,6 @@ func (su *SweepUnit) Init() {
 	su.reload = false
 }
 
-// MARK: スイープの周波数を取得するメソッド
-func (su *SweepUnit) getFrequency() float32 {
-	if su.frequency == 0 {
-		return 0.0
-	}
-	return CPU_CLOCK / (16.0 * (float32(su.frequency) + 1.0))
-}
-
 // MARK: スイープのリセット
 func (su *SweepUnit) reset() {
 	su.counter = 0
@@ -215,11 +207,6 @@ func (lc *LinearCounter) tick() {
 // MARK: 線形カウンタが終了したかを取得するメソッド
 func (lc *LinearCounter) isMuted() bool {
 	return lc.counter == 0
-}
-
-// MARK: 線形カウンタをリセットするメソッド
-func (lc *LinearCounter) reset() {
-	lc.counter = lc.data.count
 }
 
 // MARK: 線型カウンタをリロードするメソッド

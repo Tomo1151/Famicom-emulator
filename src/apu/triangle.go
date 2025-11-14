@@ -1,5 +1,6 @@
 package apu
 
+// MARK: 三角波チャンネルの定義
 type TriangleWaveChannel struct {
 	register      TriangleWaveRegister
 	lengthCounter LengthCounter
@@ -9,6 +10,7 @@ type TriangleWaveChannel struct {
 	buffer        BlipBuffer
 }
 
+// MARK: 三角波チャンネルの初期化メソッド
 func (twc *TriangleWaveChannel) Init() {
 	twc.register = TriangleWaveRegister{}
 	twc.register.Init()
@@ -19,6 +21,7 @@ func (twc *TriangleWaveChannel) Init() {
 	twc.buffer.Init()
 }
 
+// MARK: 三角波チャンネルの出力メソッド
 func (twc *TriangleWaveChannel) output(cycles uint) float32 {
 	if twc.lengthCounter.isMuted() || twc.linearCounter.isMuted() || twc.frequency < 2 {
 		return 0.0

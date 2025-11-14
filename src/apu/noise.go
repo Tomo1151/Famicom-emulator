@@ -1,10 +1,11 @@
 package apu
 
+// MARK: ノイズチャンネルの定義
 type NoiseWaveChannel struct {
 	register      NoiseWaveRegister
 	envelope      Envelope
 	lengthCounter LengthCounter
-	mode          NoiseRegisterMode
+	mode          NoiseShiftMode
 	shiftRegister NoiseShiftRegister
 	prev          bool
 	index         uint8
@@ -12,6 +13,7 @@ type NoiseWaveChannel struct {
 	buffer        BlipBuffer
 }
 
+// MARK: ノイズチャンネルの初期化メソッド
 func (nwc *NoiseWaveChannel) Init() {
 	nwc.register = NoiseWaveRegister{}
 	nwc.register.Init()
@@ -26,6 +28,7 @@ func (nwc *NoiseWaveChannel) Init() {
 	nwc.buffer.Init()
 }
 
+// MARK: ノイズチャンネルの出力メソッド
 func (nwc *NoiseWaveChannel) output(cycles uint) float32 {
 	if nwc.lengthCounter.isMuted() {
 		return 0.0

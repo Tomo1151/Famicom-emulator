@@ -1,5 +1,6 @@
 package apu
 
+// MARK: 矩形波チャンネルの定義
 type SquareWaveChannel struct {
 	register      SquareWaveRegister // @FIXME レジスタはAPUに持たせ、ここは参照にする
 	envelope      Envelope
@@ -10,6 +11,7 @@ type SquareWaveChannel struct {
 	buffer        BlipBuffer
 }
 
+// MARK: 矩形波チャンネルの初期化メソッド
 func (swc *SquareWaveChannel) Init() {
 	swc.register = SquareWaveRegister{}
 	swc.register.Init()
@@ -22,6 +24,7 @@ func (swc *SquareWaveChannel) Init() {
 	swc.buffer.Init()
 }
 
+// MARK: 矩形波チャンネルの出力メソッド
 func (swc *SquareWaveChannel) output(cycles uint) float32 {
 	frequency := swc.sweepUnit.frequency
 	if frequency < 8 || frequency > 0x7FF || swc.lengthCounter.isMuted() || swc.sweepUnit.isMuted() {

@@ -2,8 +2,9 @@ package apu
 
 import "fmt"
 
+// MARK: 定数定義
 const (
-	NOISE_MODE_SHORT NoiseRegisterMode = iota
+	NOISE_MODE_SHORT NoiseShiftMode = iota
 	NOISE_MODE_LONG
 )
 
@@ -22,7 +23,7 @@ const (
 	FRAME_COUNTER_MODE_POS = 7
 )
 
-type NoiseRegisterMode uint8
+type NoiseShiftMode uint8
 
 // MARK: 矩形波レジスタ
 type SquareWaveRegister struct {
@@ -211,7 +212,7 @@ type NoiseWaveRegister struct {
 
 	// 0x400E
 	frequency uint8
-	mode      NoiseRegisterMode
+	mode      NoiseShiftMode
 
 	// 0x400F
 	keyOffCount uint8
@@ -266,7 +267,7 @@ func (nwr *NoiseWaveRegister) write(address uint16, data uint8) {
 }
 
 // MARK: ノイズレジスタから4chのモードを取得するメソッド
-func (nwr *NoiseWaveRegister) Mode() NoiseRegisterMode {
+func (nwr *NoiseWaveRegister) Mode() NoiseShiftMode {
 	return nwr.mode
 }
 
@@ -301,7 +302,7 @@ func (nwr *NoiseWaveRegister) LengthCounterHalt() bool {
 
 // MARK: ノイズシフトレジスタ
 type NoiseShiftRegister struct {
-	mode  NoiseRegisterMode
+	mode  NoiseShiftMode
 	value uint16
 }
 

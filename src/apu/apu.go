@@ -25,6 +25,7 @@ type APU struct {
 	cycles uint
 	step   uint8
 
+	// チャンネル
 	channel1 *SquareWaveChannel
 	channel2 *SquareWaveChannel
 	channel3 *TriangleWaveChannel
@@ -89,6 +90,8 @@ func (a *APU) initAudioDevice() {
 	sdl.PauseAudio(false)
 }
 
+// MARK: SDLのオーディオコールバック
+//
 //export AudioMixCallback
 func AudioMixCallback(userdata unsafe.Pointer, stream *C.uint8_t, length C.int) {
 	n := int(length) / 4
@@ -154,26 +157,6 @@ func (a *APU) Tick(cycles uint) {
 		a.channel4.buffer.addDelta(a.sampleClock, delta4)
 		a.prevLevel4 = currentLevel4
 	}
-}
-
-// MARK: 各チャンネルのサンプルをMixするメソッド
-func mixSamples(pulse1 float32, pulse2 float32, triangle float32, noise float32, dmc float32) float32 {
-	/*
-		output = pulse_out + tnd_out
-
-		                           95.88
-		pulse_out = ------------------------------------
-								(8128 / (pulse1 + pulse2)) + 100
-
-																			159.79
-		tnd_out = -------------------------------------------------------------
-																				1
-							----------------------------------------------------- + 100
-								(triangle / 8227) + (noise / 12241) + (dmc / 22638)
-	*/
-	pulseOut := 95.88 / ((8128 / (pulse1 + pulse2)) + 100)
-	tndOut := 159.79 / ((1/(triangle/8227) + (noise / 12241) + (dmc / 22638)) + 100)
-	return pulseOut + tndOut
 }
 
 // MARK: ステータスレジスタの読み込みメソッド
@@ -466,14 +449,14 @@ func (a *APU) EndFrame() {
 	a.channel4.buffer.endFrame(a.sampleClock)
 }
 
-// MARK: エンベロープのクロック
+// MARK: エンベロープのクロック (1ch/2ch/4ch)
 func (a *APU) clockEnvelopes() {
 	a.channel1.envelope.tick()
 	a.channel2.envelope.tick()
 	a.channel4.envelope.tick()
 }
 
-// MARK: スイープユニットのクロック
+// MARK: スイープユニットのクロック (1ch/2ch)
 func (a *APU) clockSweepUnits() {
 	a.channel1.sweepUnit.tick(
 		&a.channel1.lengthCounter,
@@ -485,12 +468,12 @@ func (a *APU) clockSweepUnits() {
 	)
 }
 
-// MARK: 線形カウンタのクロック
+// MARK: 線形カウンタのクロック (3ch)
 func (a *APU) clockLinearCounter() {
 	a.channel3.linearCounter.tick()
 }
 
-// MARK: 長さカウンタのクロック
+// MARK: 長さカウンタのクロック (1ch/2ch/3ch/4ch)
 func (a *APU) clockLengthCounter() {
 	a.channel1.lengthCounter.tick()
 	a.channel2.lengthCounter.tick()
@@ -553,17 +536,22 @@ func (a *APU) clockFrameSequencer() {
 	}
 }
 
-type AudioChannel interface {
-	output() float32
-}
+// MARK: 各チャンネルのサンプルをMixする関数
+func mixSamples(pulse1 float32, pulse2 float32, triangle float32, noise float32, dmc float32) float32 {
+	/*
+		output = pulse_out + tnd_out
 
-type AudioChannelRegister interface {
-	write(uint16, uint8)
-}
+		                           95.88
+		pulse_out = ------------------------------------
+								(8128 / (pulse1 + pulse2)) + 100
 
-var (
-	square1  = SquareWaveChannel{}
-	square2  = SquareWaveChannel{}
-	triangle = TriangleWaveChannel{}
-	noise    = NoiseWaveChannel{}
-)
+																			159.79
+		tnd_out = -------------------------------------------------------------
+																				1
+							----------------------------------------------------- + 100
+								(triangle / 8227) + (noise / 12241) + (dmc / 22638)
+	*/
+	pulseOut := 95.88 / ((8128 / (pulse1 + pulse2)) + 100)
+	tndOut := 159.79 / ((1/(triangle/8227) + (noise / 12241) + (dmc / 22638)) + 100)
+	return pulseOut + tndOut
+}
