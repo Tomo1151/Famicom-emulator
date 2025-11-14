@@ -24,7 +24,7 @@ type Bus struct {
 	wram      [CPU_WRAM_SIZE + 1]uint8 // CPUのWRAM (2kB)
 	cartridge cartridge.Cartridge      // カートリッジ
 	ppu       ppu.PPU                  // PPU
-	tapu      apu.TAPU
+	apu       apu.APU
 	joypad1   *joypad.JoyPad // ポインタに変更
 	joypad2   *joypad.JoyPad // コントローラ (2P)
 	cycles    uint           // CPUサイクル
@@ -53,21 +53,21 @@ func (b *Bus) Init(callback func(*ppu.PPU, *ppu.Canvas, *joypad.JoyPad, *joypad.
 // MARK: Busに各コンポーネントを接続
 func (b *Bus) ConnectComponents(
 	ppu *ppu.PPU,
-	apu *apu.TAPU,
+	apu *apu.APU,
 	cartridge *cartridge.Cartridge,
 	joypad1 *joypad.JoyPad,
 	joypad2 *joypad.JoyPad,
 ) {
 	// コンポーネントをBusと接続
 	b.ppu = *ppu
-	b.tapu = *apu
+	b.apu = *apu
 	b.cartridge = *cartridge
 	b.joypad1 = joypad1
 	b.joypad2 = joypad2
 
 	// 各コンポーネントを初期化
 	b.ppu.Init(b.cartridge.Mapper)
-	b.tapu.Init()
+	b.apu.Init()
 	b.joypad1.Init()
 	b.joypad2.Init()
 }
@@ -79,7 +79,7 @@ func (b *Bus) GetNMIStatus() bool {
 
 // MARK: APUのIRQを取得
 func (b *Bus) GetAPUIRQ() bool {
-	return b.tapu.FrameIRQ()
+	return b.apu.FrameIRQ()
 }
 
 // MARK: マッパーのIRQを取得
@@ -104,11 +104,11 @@ func (b *Bus) Tick(cycles uint) {
 	}
 
 	// APUと同期
-	b.tapu.Tick(cycles)
+	b.apu.Tick(cycles)
 
 	nmiAfter := b.ppu.NMI
 	if !nmiBefore && nmiAfter {
-		b.tapu.EndFrame()
+		b.apu.EndFrame()
 		b.callback(&b.ppu, b.canvas, b.joypad1, b.joypad2)
 	}
 }
@@ -162,7 +162,7 @@ func (b *Bus) ReadByteFrom(address uint16) uint8 {
 	case address == 0x4014: // OAM_DATA (DMA)
 		panic("Error: attempt to read from OAM Data register")
 	case address == 0x4015: // APU
-		return b.tapu.ReadStatus()
+		return b.apu.ReadStatus()
 	case address == 0x4016: // JOYPAD (1P)
 		return b.joypad1.Read()
 	case address == 0x4017: // JOYPAD (2P)
@@ -241,21 +241,21 @@ func (b *Bus) WriteByteAt(address uint16, data uint8) {
 		ptr := address & 0b00100000_00000111
 		b.WriteByteAt(ptr, data)
 	case 0x4000 <= address && address <= 0x4003: // APU 1ch
-		b.tapu.Write1ch(address, data)
+		b.apu.Write1ch(address, data)
 	case 0x4004 <= address && address <= 0x4007: // APU 2ch
-		b.tapu.Write2ch(address, data)
+		b.apu.Write2ch(address, data)
 	case address == 0x4008: // APU 3ch
-		b.tapu.Write3ch(address, data)
+		b.apu.Write3ch(address, data)
 	case address == 0x400A: // APU 3ch
-		b.tapu.Write3ch(address, data)
+		b.apu.Write3ch(address, data)
 	case address == 0x400B: // APU 3ch
-		b.tapu.Write3ch(address, data)
+		b.apu.Write3ch(address, data)
 	case address == 0x400C: // APU 4ch
-		b.tapu.Write4ch(address, data)
+		b.apu.Write4ch(address, data)
 	case address == 0x400E: // APU 4ch
-		b.tapu.Write4ch(address, data)
+		b.apu.Write4ch(address, data)
 	case address == 0x400F: // APU 4ch
-		b.tapu.Write4ch(address, data)
+		b.apu.Write4ch(address, data)
 	case 0x4010 <= address && address <= 0x4013: // APU 5ch
 	case address == 0x4014: // DMA転送
 		var buffer [256]uint8
@@ -269,13 +269,13 @@ func (b *Bus) WriteByteAt(address uint16, data uint8) {
 		}
 		b.ppu.DMATransfer(&buffer)
 	case address == 0x4015: // APU
-		b.tapu.WriteStatus(data)
+		b.apu.WriteStatus(data)
 	case address == 0x4016: // コントローラ (1P/2P)
 		// @FIXME 2PのB・A同時押しの読み取りミスが多い
 		b.joypad1.Write(data)
 		b.joypad2.Write(data)
 	case address == 0x4017: // APU フレームカウンタ
-		b.tapu.WriteFrameSequencer(data)
+		b.apu.WriteFrameSequencer(data)
 	case 0x6000 <= address && address <= 0x7FFF: // プログラムRAM
 		b.cartridge.Mapper.WriteToProgramRAM(address, data)
 	case PRG_ROM_START <= address && address <= PRG_ROM_END: // プログラムROM

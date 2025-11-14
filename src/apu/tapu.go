@@ -21,7 +21,7 @@ const (
 )
 
 // MARK: APUの定義
-type TAPU struct {
+type APU struct {
 	cycles uint
 	step   uint8
 
@@ -43,7 +43,7 @@ type TAPU struct {
 }
 
 // MARK: APUの初期化メソッド
-func (a *TAPU) Init() {
+func (a *APU) Init() {
 	a.cycles = 0
 	a.step = 0
 
@@ -72,7 +72,7 @@ func (a *TAPU) Init() {
 }
 
 // MARK: オーディオデバイスの初期化メソッド
-func (a *TAPU) initAudioDevice() {
+func (a *APU) initAudioDevice() {
 	spec := &sdl.AudioSpec{
 		Freq:     SAMPLE_RATE,
 		Format:   sdl.AUDIO_F32,
@@ -120,7 +120,7 @@ func AudioMixCallback(userdata unsafe.Pointer, stream *C.uint8_t, length C.int) 
 }
 
 // MARK: APUのサイクルを進める
-func (a *TAPU) Tick(cycles uint) {
+func (a *APU) Tick(cycles uint) {
 	a.cycles += cycles
 	a.sampleClock += uint64(cycles)
 	a.clockFrameSequencer()
@@ -177,7 +177,7 @@ func mixSamples(pulse1 float32, pulse2 float32, triangle float32, noise float32,
 }
 
 // MARK: ステータスレジスタの読み込みメソッド
-func (a *TAPU) ReadStatus() uint8 {
+func (a *APU) ReadStatus() uint8 {
 	status := a.status.ToByte()
 	status &= 0xF0
 	// @TODO: 各チャンネルの長さカウントを反映させる
@@ -186,7 +186,7 @@ func (a *TAPU) ReadStatus() uint8 {
 }
 
 // MARK: ステータスレジスタの書き込みメソッド
-func (a *TAPU) WriteStatus(data uint8) {
+func (a *APU) WriteStatus(data uint8) {
 	prev := a.status.ToByte()
 	a.status.update(data)
 
@@ -209,12 +209,12 @@ func (a *TAPU) WriteStatus(data uint8) {
 }
 
 // MARK: フレームIRQを取得
-func (a *TAPU) FrameIRQ() bool {
+func (a *APU) FrameIRQ() bool {
 	return a.status.FrameIRQ()
 }
 
 // MARK: フレームシーケンサの書き込みメソッド
-func (a *TAPU) WriteFrameSequencer(data uint8) {
+func (a *APU) WriteFrameSequencer(data uint8) {
 	a.frameSequencer.update(data)
 
 	/*
@@ -234,7 +234,7 @@ func (a *TAPU) WriteFrameSequencer(data uint8) {
 }
 
 // MARK: 1chへの書き込みメソッド (矩形波)
-func (a *TAPU) Write1ch(address uint16, data uint8) {
+func (a *APU) Write1ch(address uint16, data uint8) {
 	a.channel1.register.write(address, data)
 
 	// @FIXME 既にレジスタに値が反映されているため、AudioChannel側でapply()などを用意し、一本化できるかも
@@ -300,7 +300,7 @@ func (a *TAPU) Write1ch(address uint16, data uint8) {
 }
 
 // MARK: 2chへの書き込みメソッド (矩形波)
-func (a *TAPU) Write2ch(address uint16, data uint8) {
+func (a *APU) Write2ch(address uint16, data uint8) {
 	a.channel2.register.write(address, data)
 
 	switch address {
@@ -365,7 +365,7 @@ func (a *TAPU) Write2ch(address uint16, data uint8) {
 }
 
 // MARK: 3chの書き込みメソッド (三角波)
-func (a *TAPU) Write3ch(address uint16, data uint8) {
+func (a *APU) Write3ch(address uint16, data uint8) {
 	a.channel3.register.write(address, data)
 
 	switch address {
@@ -407,7 +407,7 @@ func (a *TAPU) Write3ch(address uint16, data uint8) {
 }
 
 // MARK: 4chの書き込みメソッド (ノイズ)
-func (a *TAPU) Write4ch(address uint16, data uint8) {
+func (a *APU) Write4ch(address uint16, data uint8) {
 	a.channel4.register.write(address, data)
 
 	// @FIXME 既にレジスタに値が反映されているため、AudioChannel側でapply()などを用意し、一本化できるかも
@@ -458,7 +458,7 @@ func (a *TAPU) Write4ch(address uint16, data uint8) {
 }
 
 // MARK: バッファのフラッシュ
-func (a *TAPU) EndFrame() {
+func (a *APU) EndFrame() {
 	// フレームの終わりまでの時間を処理するため、現在のクロックを渡す
 	a.channel1.buffer.endFrame(a.sampleClock)
 	a.channel2.buffer.endFrame(a.sampleClock)
@@ -467,14 +467,14 @@ func (a *TAPU) EndFrame() {
 }
 
 // MARK: エンベロープのクロック
-func (a *TAPU) clockEnvelopes() {
+func (a *APU) clockEnvelopes() {
 	a.channel1.envelope.tick()
 	a.channel2.envelope.tick()
 	a.channel4.envelope.tick()
 }
 
 // MARK: スイープユニットのクロック
-func (a *TAPU) clockSweepUnits() {
+func (a *APU) clockSweepUnits() {
 	a.channel1.sweepUnit.tick(
 		&a.channel1.lengthCounter,
 		true,
@@ -486,12 +486,12 @@ func (a *TAPU) clockSweepUnits() {
 }
 
 // MARK: 線形カウンタのクロック
-func (a *TAPU) clockLinearCounter() {
+func (a *APU) clockLinearCounter() {
 	a.channel3.linearCounter.tick()
 }
 
 // MARK: 長さカウンタのクロック
-func (a *TAPU) clockLengthCounter() {
+func (a *APU) clockLengthCounter() {
 	a.channel1.lengthCounter.tick()
 	a.channel2.lengthCounter.tick()
 	a.channel3.lengthCounter.tick()
@@ -499,7 +499,7 @@ func (a *TAPU) clockLengthCounter() {
 }
 
 // MARK: フレームシーケンサのクロック
-func (a *TAPU) clockFrameSequencer() {
+func (a *APU) clockFrameSequencer() {
 	if a.cycles >= APU_CYCLE_INTERVAL {
 		// フレームシーケンサは入力の1.789MHzを7457分周する
 		a.cycles %= APU_CYCLE_INTERVAL
