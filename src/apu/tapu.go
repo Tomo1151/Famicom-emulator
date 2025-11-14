@@ -15,7 +15,8 @@ import (
 const (
 	CPU_CLOCK          = 1_789_772.5 // 1.78MHz
 	SAMPLE_RATE        = 44100       // 44.1kHz
-	APU_CYCLE_INTERVAL = 7457
+	APU_CYCLE_INTERVAL = 7457        // 分周器の間隔
+	BUFFER_SIZE        = 16384       // サンプルバッファサイズ
 )
 
 // MARK: APUの定義
@@ -151,6 +152,26 @@ func (a *TAPU) Tick(cycles uint) {
 		a.channel4.buffer.addDelta(a.sampleClock, delta4)
 		a.prevLevel4 = currentLevel4
 	}
+}
+
+// MARK: 各チャンネルのサンプルをMixするメソッド
+func (a *TAPU) mixSamples(pulse1 float32, pulse2 float32, triangle float32, noise float32, dmc float32) float32 {
+	/*
+		output = pulse_out + tnd_out
+
+		                           95.88
+		pulse_out = ------------------------------------
+								(8128 / (pulse1 + pulse2)) + 100
+
+																			159.79
+		tnd_out = -------------------------------------------------------------
+																				1
+							----------------------------------------------------- + 100
+								(triangle / 8227) + (noise / 12241) + (dmc / 22638)
+	*/
+	pulseOut := 95.88 / ((8128 / (pulse1 + pulse2)) + 100)
+	tndOut := 159.79 / ((1/(triangle/8227) + (noise / 12241) + (dmc / 22638)) + 100)
+	return pulseOut + tndOut
 }
 
 // MARK: ステータスレジスタの読み込みメソッド
@@ -486,17 +507,17 @@ func (a *TAPU) clockFrameSequencer() {
 		switch mode {
 		case 4:
 			/*
-				エンベロープ： e e e e   240Hz
-				長さカウンタ： - l - l   120Hz
-				割り込み　　： - - - f    60Hz
+				エンベロープ/線型カウンタ： e e e e   240Hz
+				長さカウンタ/スイープ　　： - l - l   120Hz
+				割り込み　　 　　　　　　： - - - f    60Hz
 			*/
 			if a.step == 1 || a.step == 2 || a.step == 3 || a.step == 4 {
-				// エンベロープと線形カウンタのクロック生成
+				// エンベロープと線形カウンタのクロック生成 (quarter frame)
 				a.clockEnvelopes()
 				a.clockLinearCounter()
 			}
 			if a.step == 2 || a.step == 4 {
-				// 長さカウンタとスイープユニットのクロック生成
+				// 長さカウンタとスイープユニットのクロック生成 (half frame)
 				a.clockLengthCounter()
 				a.clockSweepUnits()
 			}
@@ -509,17 +530,17 @@ func (a *TAPU) clockFrameSequencer() {
 			}
 		case 5:
 			/*
-				エンベロープ： e e e e -   192Hz
-				長さカウンタ： l - l - -    96Hz
-				割り込み　　： - - - - -   割り込みフラグセット無し
+				エンベロープ/線型カウンタ： e e e - e   192Hz
+				長さカウンタ/スイープ　　： - l - - l    96Hz
+				割り込み　　 　　　　　　： - - - - -   割り込みフラグセット無し
 			*/
 			if a.step == 1 || a.step == 2 || a.step == 3 || a.step == 4 {
-				// エンベロープと線形カウンタのクロック生成
+				// エンベロープと線形カウンタのクロック生成 (quarter frame)
 				a.clockEnvelopes()
 				a.clockLinearCounter()
 			}
-			if a.step == 2 || a.step == 4 {
-				// 長さカウンタとスイープユニットのクロック生成
+			if a.step == 2 || a.step == 5 {
+				// 長さカウンタとスイープユニットのクロック生成 (half frame)
 				a.clockLengthCounter()
 				a.clockSweepUnits()
 			}
