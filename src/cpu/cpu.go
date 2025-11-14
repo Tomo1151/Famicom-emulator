@@ -9,16 +9,16 @@ import (
 
 // MARK: CPUの定義
 type CPU struct {
-	Registers      registers      // レジスタ
+	registers      registers      // レジスタ
 	InstructionSet instructionSet // 命令セット
 
-	Bus bus.Bus
-	Log bool // デバッグ出力フラグ
+	bus bus.Bus
+	log bool // デバッグ出力フラグ
 }
 
 // MARK: CPUの初期化メソッド (カートリッジ無し，デバッグ・テスト用)
 func (c *CPU) InitForTest(debug bool) {
-	c.Registers = registers{
+	c.registers = registers{
 		A: 0x00,
 		X: 0x00,
 		Y: 0x00,
@@ -36,16 +36,16 @@ func (c *CPU) InitForTest(debug bool) {
 		PC: 0x0000,
 		// PC: c.ReadWordFrom(0xFFFC),
 	}
-	c.Bus = bus.Bus{}
-	c.Bus.InitForTest()
+	c.bus = bus.Bus{}
+	c.bus.InitForTest()
 	c.InstructionSet = generateInstructionSet(c)
-	c.Log = debug
+	c.log = debug
 }
 
 // MARK: CPUの初期化メソッド (Bus有り)
 func (c *CPU) Init(bus bus.Bus, debug bool) {
-	c.Bus = bus
-	c.Registers = registers{
+	c.bus = bus
+	c.registers = registers{
 		A: 0x00,
 		X: 0x00,
 		Y: 0x00,
@@ -63,39 +63,39 @@ func (c *CPU) Init(bus bus.Bus, debug bool) {
 		PC: c.ReadWordFrom(0xFFFC),
 	}
 	c.InstructionSet = generateInstructionSet(c)
-	c.Log = debug
+	c.log = debug
 }
 
 // MARK:  命令の実行
 func (c *CPU) Step() {
 	// 命令のフェッチ
-	opecode := c.ReadByteFrom(c.Registers.PC)
+	opecode := c.ReadByteFrom(c.registers.PC)
 
-	// 命令の出コード
+	// 命令のデコード
 	instruction, exists := c.InstructionSet[opecode]
 
 	if !exists {
-		log.Fatalf("Error: Unknown opecode $%02X at PC=%04X", opecode, c.Registers.PC)
+		log.Fatalf("Error: Unknown opecode $%02X at PC=%04X", opecode, c.registers.PC)
 	}
 
-	_, isPageCrossed := c.getOperandAddress(instruction.AddressingMode)
+	_, isPageCrossed := c.calcOperandAddress(instruction.AddressingMode)
 	instruction.Handler(instruction.AddressingMode)
 	if isPageCrossed {
-		c.Bus.Tick(uint(1))
+		c.bus.Tick(uint(1))
 	}
 
 	if !instruction.Jump {
 		// オペランド分プログラムカウンタを進める (オペコードの分 -1)
-		c.Registers.PC += uint16(instruction.Bytes)
+		c.registers.PC += uint16(instruction.Bytes)
 	}
 
-	c.Bus.Tick(uint(instruction.Cycles))
+	c.bus.Tick(uint(instruction.Cycles))
 }
 
 // MARK: ループ実行
 func (c *CPU) Run() {
 	c.RunWithCallback(func(c *CPU) {
-		if c.Log {
+		if c.log {
 			fmt.Println(c.Trace())
 		}
 	})
@@ -104,16 +104,16 @@ func (c *CPU) Run() {
 func (c *CPU) RunWithCallback(callback func(c *CPU)) {
 	for {
 		// NMIが発生したら処理をする
-		nmi := c.Bus.GetNMIStatus()
+		nmi := c.bus.NMI()
 		if nmi {
 			c.interrupt(NMI)
 		}
 
-		apuIrq := c.Bus.GetAPUIRQ()
-		mapperIrq := c.Bus.GetMapperIRQ()
+		apuIrq := c.bus.APUIRQ()
+		mapperIrq := c.bus.MapperIRQ()
 
 		// APUまたはマッパーでIRQが発生していて割込み禁止フラグが立っていないならIRQを処理
-		if !c.Registers.P.Interrupt && (apuIrq || mapperIrq) {
+		if !c.registers.P.Interrupt && (apuIrq || mapperIrq) {
 			c.interrupt(IRQ)
 		}
 
@@ -128,37 +128,37 @@ func (c *CPU) RunWithCallback(callback func(c *CPU)) {
 // MARK: NMIのハンドリング
 func (c *CPU) interrupt(interrupt Interrupt) {
 	// 現在のPCを退避
-	c.pushWord(c.Registers.PC)
+	c.pushWord(c.registers.PC)
 
 	// ステータスレジスタをスタックにプッシュ
-	status := c.Registers.P
+	status := c.registers.P
 	status.Break = interrupt.BFlagMask&0b0001_0000 == 1
 	status.Reserved = interrupt.BFlagMask&0b0010_0000 == 1
 	c.pushByte(status.ToByte())
-	c.Registers.P.Interrupt = true
+	c.registers.P.Interrupt = true
 
-	c.Bus.Tick(uint(interrupt.CPUCycles))
-	c.Registers.PC = c.ReadWordFrom(interrupt.VectorAddress) // 割り込みベクタ
+	c.bus.Tick(uint(interrupt.CPUCycles))
+	c.registers.PC = c.ReadWordFrom(interrupt.VectorAddress) // 割り込みベクタ
 }
 
 // MARK: ワーキングメモリの参照 (1byte)
 func (c *CPU) ReadByteFrom(address uint16) uint8 {
-	return c.Bus.ReadByteFrom(address)
+	return c.bus.ReadByteFrom(address)
 }
 
 // MARK: ワーキングメモリの参照 (2byte)
 func (c *CPU) ReadWordFrom(address uint16) uint16 {
-	return c.Bus.ReadWordFrom(address)
+	return c.bus.ReadWordFrom(address)
 }
 
 // MARK: ワーキングメモリへの書き込み (1byte)
 func (c *CPU) WriteByteAt(address uint16, data uint8) {
-	c.Bus.WriteByteAt(address, data)
+	c.bus.WriteByteAt(address, data)
 }
 
 // MARK: ワーキングメモリへの書き込み (2byte)
 func (c *CPU) WriteWordAt(address uint16, data uint16) {
-	c.Bus.WriteWordAt(address, data)
+	c.bus.WriteWordAt(address, data)
 }
 
 func (c *CPU) isPageCrossed(address1 uint16, address2 uint16) bool {
@@ -168,30 +168,30 @@ func (c *CPU) isPageCrossed(address1 uint16, address2 uint16) bool {
 }
 
 // MARK: アドレッシングモードからオペランドアドレスを計算
-func (c *CPU) getOperandAddress(mode AddressingMode) (uint16, bool) {
+func (c *CPU) calcOperandAddress(mode AddressingMode) (uint16, bool) {
 	switch mode {
 	case Immediate:
-		return c.Registers.PC + 1, false
+		return c.registers.PC + 1, false
 	case ZeroPage:
-		return uint16(c.ReadByteFrom(c.Registers.PC + 1)), false
+		return uint16(c.ReadByteFrom(c.registers.PC + 1)), false
 	case Absolute:
-		return c.ReadWordFrom(c.Registers.PC + 1), false
+		return c.ReadWordFrom(c.registers.PC + 1), false
 	case ZeroPageXIndexed:
-		base := c.ReadByteFrom(c.Registers.PC + 1)
-		return uint16(base + c.Registers.X), false
+		base := c.ReadByteFrom(c.registers.PC + 1)
+		return uint16(base + c.registers.X), false
 	case ZeroPageYIndexed:
-		base := c.ReadByteFrom(c.Registers.PC + 1)
-		return uint16(base + c.Registers.Y), false
+		base := c.ReadByteFrom(c.registers.PC + 1)
+		return uint16(base + c.registers.Y), false
 	case AbsoluteXIndexed:
-		base := c.ReadWordFrom(c.Registers.PC + 1)
-		ptr := base + uint16(c.Registers.X)
+		base := c.ReadWordFrom(c.registers.PC + 1)
+		ptr := base + uint16(c.registers.X)
 		return ptr, c.isPageCrossed(base, ptr)
 	case AbsoluteYIndexed:
-		base := c.ReadWordFrom(c.Registers.PC + 1)
-		ptr := base + uint16(c.Registers.Y)
+		base := c.ReadWordFrom(c.registers.PC + 1)
+		ptr := base + uint16(c.registers.Y)
 		return ptr, c.isPageCrossed(base, ptr)
 	case Indirect:
-		ptr := c.ReadWordFrom(c.Registers.PC + 1)
+		ptr := c.ReadWordFrom(c.registers.PC + 1)
 		// ページ境界をまたぐ際のバグを再現
 		if (ptr & 0xFF) == 0xFF {
 			lower := c.ReadByteFrom(ptr)
@@ -201,21 +201,21 @@ func (c *CPU) getOperandAddress(mode AddressingMode) (uint16, bool) {
 			return c.ReadWordFrom(ptr), false
 		}
 	case IndirectXIndexed:
-		base := c.ReadByteFrom(c.Registers.PC + 1)
-		ptr := uint8(base + c.Registers.X)
+		base := c.ReadByteFrom(c.registers.PC + 1)
+		ptr := uint8(base + c.registers.X)
 		lower := c.ReadByteFrom(uint16(ptr))
 		upper := c.ReadByteFrom(uint16(ptr+1) & 0xFF)
 		return uint16(upper)<<8 | uint16(lower), false
 	case IndirectYIndexed:
-		base := c.ReadByteFrom(c.Registers.PC + 1)
+		base := c.ReadByteFrom(c.registers.PC + 1)
 		ptr := uint8(base)
 		lower := c.ReadByteFrom(uint16(ptr))
 		upper := c.ReadByteFrom(uint16(ptr+1) & 0xFF)
 		derefBase := uint16(upper)<<8 | uint16(lower)
-		deref := derefBase + uint16(c.Registers.Y)
+		deref := derefBase + uint16(c.registers.Y)
 		return deref, c.isPageCrossed(deref, derefBase)
 	case Relative:
-		offset := int8(c.ReadByteFrom(c.Registers.PC + 1))
+		offset := int8(c.ReadByteFrom(c.registers.PC + 1))
 		return uint16(offset), false
 	case Accumulator:
 		// log.Fatalf("Error: Mode Accumulator doesn't take any operands")
@@ -233,50 +233,50 @@ func (c *CPU) getOperandAddress(mode AddressingMode) (uint16, bool) {
 func (c *CPU) updateNZFlags(result uint8) {
 	// Nフラグの更新
 	if (result >> 7) != 0 {
-		c.Registers.P.Negative = true
+		c.registers.P.Negative = true
 	} else {
-		c.Registers.P.Negative = false
+		c.registers.P.Negative = false
 	}
 
 	// Zフラグの更新
 	if result == 0 {
-		c.Registers.P.Zero = true
+		c.registers.P.Zero = true
 	} else {
-		c.Registers.P.Zero = false
+		c.registers.P.Zero = false
 	}
 }
 
 // MARK: スタック操作
 func (c *CPU) pushByte(value uint8) {
-	stack_addr := 0x0100 | uint16(c.Registers.SP)
+	stack_addr := 0x0100 | uint16(c.registers.SP)
 	c.WriteByteAt(stack_addr, value)
-	c.Registers.SP--
+	c.registers.SP--
 }
 
 func (c *CPU) pushWord(value uint16) {
-	stack_addr := 0x0100 | uint16(c.Registers.SP)
+	stack_addr := 0x0100 | uint16(c.registers.SP)
 	c.WriteByteAt(stack_addr, (uint8(value >> 8)))
-	c.Registers.SP--
+	c.registers.SP--
 
-	stack_addr = 0x0100 | uint16(c.Registers.SP)
+	stack_addr = 0x0100 | uint16(c.registers.SP)
 	c.WriteByteAt(stack_addr, (uint8(value & 0xFF)))
-	c.Registers.SP--
+	c.registers.SP--
 }
 
 func (c *CPU) popByte() uint8 {
-	c.Registers.SP++
-	stack_addr := 0x0100 | uint16(c.Registers.SP)
+	c.registers.SP++
+	stack_addr := 0x0100 | uint16(c.registers.SP)
 	value := c.ReadByteFrom(stack_addr)
 	return value
 }
 
 func (c *CPU) popWord() uint16 {
-	c.Registers.SP++
-	stack_addr := 0x0100 | uint16(c.Registers.SP)
+	c.registers.SP++
+	stack_addr := 0x0100 | uint16(c.registers.SP)
 	lower := c.ReadByteFrom(stack_addr)
 
-	c.Registers.SP++
-	stack_addr = 0x0100 | uint16(c.Registers.SP)
+	c.registers.SP++
+	stack_addr = 0x0100 | uint16(c.registers.SP)
 	upper := c.ReadByteFrom(stack_addr)
 
 	return uint16(upper)<<8 | uint16(lower)
@@ -284,83 +284,83 @@ func (c *CPU) popWord() uint16 {
 
 // MARK: AAC命令の実装
 func (c *CPU) aac(mode AddressingMode) {
-	addr, _ := c.getOperandAddress(mode)
+	addr, _ := c.calcOperandAddress(mode)
 	value := c.ReadByteFrom(addr)
-	c.Registers.A &= value
+	c.registers.A &= value
 
-	c.updateNZFlags(c.Registers.A)
-	c.Registers.P.Carry = c.Registers.P.Negative
+	c.updateNZFlags(c.registers.A)
+	c.registers.P.Carry = c.registers.P.Negative
 }
 
 // MARK: AAX命令の実装
 func (c *CPU) aax(mode AddressingMode) {
-	addr, _ := c.getOperandAddress(mode)
-	result := c.Registers.X & c.Registers.A
+	addr, _ := c.calcOperandAddress(mode)
+	result := c.registers.X & c.registers.A
 
 	c.WriteByteAt(addr, result)
 }
 
 // MARK: ADC命令の実装
 func (c *CPU) adc(mode AddressingMode) {
-	addr, _ := c.getOperandAddress(mode)
+	addr, _ := c.calcOperandAddress(mode)
 	value := c.ReadByteFrom(addr)
-	sum := uint16(c.Registers.A) + uint16(value)
+	sum := uint16(c.registers.A) + uint16(value)
 
-	if c.Registers.P.Carry {
+	if c.registers.P.Carry {
 		sum++
 	}
 
 	result := uint8(sum)
 
 	// キャリーフラグの設定 (結果が8bitを超えるか)
-	c.Registers.P.Carry = sum > 0xFF
+	c.registers.P.Carry = sum > 0xFF
 
 	// 符号付きオーバーフローの検出
 	// 両方の入力の符号が同じで結果の符号が異なる場合にオーバーフロー
-	c.Registers.P.Overflow = ((c.Registers.A^value)&0x80) == 0 && ((c.Registers.A^result)&0x80) != 0
+	c.registers.P.Overflow = ((c.registers.A^value)&0x80) == 0 && ((c.registers.A^result)&0x80) != 0
 
 	c.updateNZFlags(result)
-	c.Registers.A = result
+	c.registers.A = result
 }
 
 // MARK: AND命令の実装
 func (c *CPU) and(mode AddressingMode) {
-	addr, _ := c.getOperandAddress(mode)
+	addr, _ := c.calcOperandAddress(mode)
 	value := c.ReadByteFrom(addr)
-	c.Registers.A &= value
+	c.registers.A &= value
 
-	c.updateNZFlags(c.Registers.A)
+	c.updateNZFlags(c.registers.A)
 }
 
 // MARK: ARR命令の実装
 func (c *CPU) arr(mode AddressingMode) {
-	addr, _ := c.getOperandAddress(mode)
+	addr, _ := c.calcOperandAddress(mode)
 	value := c.ReadByteFrom(addr)
-	c.Registers.A &= value
+	c.registers.A &= value
 
 	// 1ビット右回転
-	c.Registers.A = c.Registers.A >> 1
+	c.registers.A = c.registers.A >> 1
 
-	if c.Registers.P.Carry {
-		c.Registers.A |= 1 << 7
+	if c.registers.P.Carry {
+		c.registers.A |= 1 << 7
 	}
 
-	c.Registers.P.Carry = c.Registers.A>>6 != 0
-	c.Registers.P.Overflow = (c.Registers.A >> 6) != (c.Registers.A >> 5) // XOR
-	c.updateNZFlags(c.Registers.A)
+	c.registers.P.Carry = c.registers.A>>6 != 0
+	c.registers.P.Overflow = (c.registers.A >> 6) != (c.registers.A >> 5) // XOR
+	c.updateNZFlags(c.registers.A)
 
 }
 
 // MARK: ASL命令の実装
 func (c *CPU) asl(mode AddressingMode) {
 	if mode == Accumulator {
-		c.Registers.P.Carry = (c.Registers.A >> 7) != 0
-		c.Registers.A = c.Registers.A << 1
-		c.updateNZFlags(c.Registers.A)
+		c.registers.P.Carry = (c.registers.A >> 7) != 0
+		c.registers.A = c.registers.A << 1
+		c.updateNZFlags(c.registers.A)
 	} else {
-		addr, _ := c.getOperandAddress(mode)
+		addr, _ := c.calcOperandAddress(mode)
 		value := c.ReadByteFrom(addr)
-		c.Registers.P.Carry = (value >> 7) != 0
+		c.registers.P.Carry = (value >> 7) != 0
 		value <<= 1
 		c.WriteByteAt(addr, value)
 		c.updateNZFlags(value)
@@ -375,204 +375,204 @@ func (c *CPU) asr(mode AddressingMode) {
 
 // MARK: ATX命令の実装
 func (c *CPU) atx(mode AddressingMode) {
-	addr, _ := c.getOperandAddress(mode)
+	addr, _ := c.calcOperandAddress(mode)
 	value := c.ReadByteFrom(addr)
-	c.Registers.A &= value
-	c.Registers.X = c.Registers.A
-	c.updateNZFlags(c.Registers.X)
+	c.registers.A &= value
+	c.registers.X = c.registers.A
+	c.updateNZFlags(c.registers.X)
 }
 
 // MARK: AXA命令の実装
 func (c *CPU) axa(mode AddressingMode) {
-	addr, _ := c.getOperandAddress(mode)
-	result := (c.Registers.X & c.Registers.A) & 7
+	addr, _ := c.calcOperandAddress(mode)
+	result := (c.registers.X & c.registers.A) & 7
 	c.WriteByteAt(addr, result)
 }
 
 // MARK: AXS命令の実装
 func (c *CPU) axs(mode AddressingMode) {
-	addr, _ := c.getOperandAddress(mode)
+	addr, _ := c.calcOperandAddress(mode)
 	value := c.ReadByteFrom(addr)
-	c.Registers.X &= c.Registers.A
+	c.registers.X &= c.registers.A
 
-	c.Registers.P.Carry = c.Registers.X >= value
-	c.Registers.X -= value
+	c.registers.P.Carry = c.registers.X >= value
+	c.registers.X -= value
 
-	c.updateNZFlags(c.Registers.X)
+	c.updateNZFlags(c.registers.X)
 }
 
 // MARK: BCC命令の実装
 func (c *CPU) bcc(mode AddressingMode) {
-	if !c.Registers.P.Carry {
-		c.Bus.Tick(1)
-		offset, _ := c.getOperandAddress(mode)
-		jumpAddr := uint16(int32(c.Registers.PC) + int32(offset)) // 符号反転させなずに足すためint32を用いる
-		if c.isPageCrossed(c.Registers.PC, jumpAddr) {
-			c.Bus.Tick(1)
+	if !c.registers.P.Carry {
+		c.bus.Tick(1)
+		offset, _ := c.calcOperandAddress(mode)
+		jumpAddr := uint16(int32(c.registers.PC) + int32(offset)) // 符号反転させなずに足すためint32を用いる
+		if c.isPageCrossed(c.registers.PC, jumpAddr) {
+			c.bus.Tick(1)
 		}
-		c.Registers.PC = jumpAddr
+		c.registers.PC = jumpAddr
 	}
 }
 
 // MARK: BCS命令の実装
 func (c *CPU) bcs(mode AddressingMode) {
-	if c.Registers.P.Carry {
-		c.Bus.Tick(1)
-		offset, _ := c.getOperandAddress(mode)
-		jumpAddr := uint16(int32(c.Registers.PC) + int32(offset)) // 符号反転させなずに足すためint32を用いる
-		if c.isPageCrossed(c.Registers.PC, jumpAddr) {
-			c.Bus.Tick(1)
+	if c.registers.P.Carry {
+		c.bus.Tick(1)
+		offset, _ := c.calcOperandAddress(mode)
+		jumpAddr := uint16(int32(c.registers.PC) + int32(offset)) // 符号反転させなずに足すためint32を用いる
+		if c.isPageCrossed(c.registers.PC, jumpAddr) {
+			c.bus.Tick(1)
 		}
-		c.Registers.PC = jumpAddr
+		c.registers.PC = jumpAddr
 	}
 }
 
 // MARK: BEQ命令の実装
 func (c *CPU) beq(mode AddressingMode) {
-	if c.Registers.P.Zero {
-		c.Bus.Tick(1)
-		offset, _ := c.getOperandAddress(mode)
-		jumpAddr := uint16(int32(c.Registers.PC) + int32(offset)) // 符号反転させなずに足すためint32を用いる
-		if c.isPageCrossed(c.Registers.PC, jumpAddr) {
-			c.Bus.Tick(1)
+	if c.registers.P.Zero {
+		c.bus.Tick(1)
+		offset, _ := c.calcOperandAddress(mode)
+		jumpAddr := uint16(int32(c.registers.PC) + int32(offset)) // 符号反転させなずに足すためint32を用いる
+		if c.isPageCrossed(c.registers.PC, jumpAddr) {
+			c.bus.Tick(1)
 		}
-		c.Registers.PC = jumpAddr
+		c.registers.PC = jumpAddr
 	}
 }
 
 // MARK: BIT命令の実装
 func (c *CPU) bit(mode AddressingMode) {
-	addr, _ := c.getOperandAddress(mode)
+	addr, _ := c.calcOperandAddress(mode)
 	value := c.ReadByteFrom(addr)
-	mask := c.Registers.A
+	mask := c.registers.A
 
-	c.Registers.P.Zero = (value & mask) == 0x00
-	c.Registers.P.Overflow = (value & 0b0100_0000) != 0
-	c.Registers.P.Negative = (value & 0b1000_0000) != 0
+	c.registers.P.Zero = (value & mask) == 0x00
+	c.registers.P.Overflow = (value & 0b0100_0000) != 0
+	c.registers.P.Negative = (value & 0b1000_0000) != 0
 }
 
 // MARK: BMI命令の実装
 func (c *CPU) bmi(mode AddressingMode) {
-	if c.Registers.P.Negative {
-		c.Bus.Tick(1)
-		offset, _ := c.getOperandAddress(mode)
-		jumpAddr := uint16(int32(c.Registers.PC) + int32(offset)) // 符号反転させなずに足すためint32を用いる
-		if c.isPageCrossed(c.Registers.PC, jumpAddr) {
-			c.Bus.Tick(1)
+	if c.registers.P.Negative {
+		c.bus.Tick(1)
+		offset, _ := c.calcOperandAddress(mode)
+		jumpAddr := uint16(int32(c.registers.PC) + int32(offset)) // 符号反転させなずに足すためint32を用いる
+		if c.isPageCrossed(c.registers.PC, jumpAddr) {
+			c.bus.Tick(1)
 		}
-		c.Registers.PC = jumpAddr
+		c.registers.PC = jumpAddr
 	}
 }
 
 // MARK: BNE命令の実装
 func (c *CPU) bne(mode AddressingMode) {
-	if !c.Registers.P.Zero {
-		c.Bus.Tick(1)
-		offset, _ := c.getOperandAddress(mode)
-		jumpAddr := uint16(int32(c.Registers.PC) + int32(offset)) // 符号反転させなずに足すためint32を用いる
-		if c.isPageCrossed(c.Registers.PC, jumpAddr) {
-			c.Bus.Tick(1)
+	if !c.registers.P.Zero {
+		c.bus.Tick(1)
+		offset, _ := c.calcOperandAddress(mode)
+		jumpAddr := uint16(int32(c.registers.PC) + int32(offset)) // 符号反転させなずに足すためint32を用いる
+		if c.isPageCrossed(c.registers.PC, jumpAddr) {
+			c.bus.Tick(1)
 		}
-		c.Registers.PC = jumpAddr
+		c.registers.PC = jumpAddr
 	}
 }
 
 // MARK: BPL命令の実装
 func (c *CPU) bpl(mode AddressingMode) {
-	if !c.Registers.P.Negative {
-		c.Bus.Tick(1)
-		offset, _ := c.getOperandAddress(mode)
-		jumpAddr := uint16(int32(c.Registers.PC) + int32(offset)) // 符号反転させなずに足すためint32を用いる
-		if c.isPageCrossed(c.Registers.PC, jumpAddr) {
-			c.Bus.Tick(1)
+	if !c.registers.P.Negative {
+		c.bus.Tick(1)
+		offset, _ := c.calcOperandAddress(mode)
+		jumpAddr := uint16(int32(c.registers.PC) + int32(offset)) // 符号反転させなずに足すためint32を用いる
+		if c.isPageCrossed(c.registers.PC, jumpAddr) {
+			c.bus.Tick(1)
 		}
-		c.Registers.PC = jumpAddr
+		c.registers.PC = jumpAddr
 	}
 }
 
 // MARK: BRK命令の実装
 func (c *CPU) brk(mode AddressingMode) {
-	if c.Registers.P.Interrupt {
+	if c.registers.P.Interrupt {
 		return
 	}
 
-	c.pushWord(c.Registers.PC + 1)
-	c.Registers.P.Break = true
-	c.pushByte(c.Registers.P.ToByte())
-	c.Registers.PC = c.ReadWordFrom(0xFFFE)
+	c.pushWord(c.registers.PC + 1)
+	c.registers.P.Break = true
+	c.pushByte(c.registers.P.ToByte())
+	c.registers.PC = c.ReadWordFrom(0xFFFE)
 }
 
 // MARK: BVC命令の実装
 func (c *CPU) bvc(mode AddressingMode) {
-	if !c.Registers.P.Overflow {
-		c.Bus.Tick(1)
-		offset, _ := c.getOperandAddress(mode)
-		jumpAddr := uint16(int32(c.Registers.PC) + int32(offset)) // 符号反転させなずに足すためint32を用いる
-		if c.isPageCrossed(c.Registers.PC, jumpAddr) {
-			c.Bus.Tick(1)
+	if !c.registers.P.Overflow {
+		c.bus.Tick(1)
+		offset, _ := c.calcOperandAddress(mode)
+		jumpAddr := uint16(int32(c.registers.PC) + int32(offset)) // 符号反転させなずに足すためint32を用いる
+		if c.isPageCrossed(c.registers.PC, jumpAddr) {
+			c.bus.Tick(1)
 		}
-		c.Registers.PC = jumpAddr
+		c.registers.PC = jumpAddr
 	}
 }
 
 // MARK: BVS命令の実装
 func (c *CPU) bvs(mode AddressingMode) {
-	if c.Registers.P.Overflow {
-		c.Bus.Tick(1)
-		offset, _ := c.getOperandAddress(mode)
-		jumpAddr := uint16(int32(c.Registers.PC) + int32(offset)) // 符号反転させなずに足すためint32を用いる
-		if c.isPageCrossed(c.Registers.PC, jumpAddr) {
-			c.Bus.Tick(1)
+	if c.registers.P.Overflow {
+		c.bus.Tick(1)
+		offset, _ := c.calcOperandAddress(mode)
+		jumpAddr := uint16(int32(c.registers.PC) + int32(offset)) // 符号反転させなずに足すためint32を用いる
+		if c.isPageCrossed(c.registers.PC, jumpAddr) {
+			c.bus.Tick(1)
 		}
-		c.Registers.PC = jumpAddr
+		c.registers.PC = jumpAddr
 	}
 }
 
 // MARK: CLC命令の実装
 func (c *CPU) clc(mode AddressingMode) {
-	c.Registers.P.Carry = false
+	c.registers.P.Carry = false
 }
 
 // MARK: CLD命令の実装
 func (c *CPU) cld(mode AddressingMode) {
-	c.Registers.P.Decimal = false
+	c.registers.P.Decimal = false
 }
 
 // MARK: CLI命令の実装
 func (c *CPU) cli(mode AddressingMode) {
-	c.Registers.P.Interrupt = false
+	c.registers.P.Interrupt = false
 }
 
 // MARK: CLV命令の実装
 func (c *CPU) clv(mode AddressingMode) {
-	c.Registers.P.Overflow = false
+	c.registers.P.Overflow = false
 }
 
 // MARK: CMP命令の実装
 func (c *CPU) cmp(mode AddressingMode) {
-	addr, _ := c.getOperandAddress(mode)
+	addr, _ := c.calcOperandAddress(mode)
 	value := c.ReadByteFrom(addr)
 
-	c.Registers.P.Carry = c.Registers.A >= value
-	c.updateNZFlags(c.Registers.A - value)
+	c.registers.P.Carry = c.registers.A >= value
+	c.updateNZFlags(c.registers.A - value)
 }
 
 // MARK: CPX命令の実装
 func (c *CPU) cpx(mode AddressingMode) {
-	addr, _ := c.getOperandAddress(mode)
+	addr, _ := c.calcOperandAddress(mode)
 	value := c.ReadByteFrom(addr)
 
-	c.Registers.P.Carry = c.Registers.X >= value
-	c.updateNZFlags(c.Registers.X - value)
+	c.registers.P.Carry = c.registers.X >= value
+	c.updateNZFlags(c.registers.X - value)
 }
 
 // MARK: CPY命令の実装
 func (c *CPU) cpy(mode AddressingMode) {
-	addr, _ := c.getOperandAddress(mode)
+	addr, _ := c.calcOperandAddress(mode)
 	value := c.ReadByteFrom(addr)
 
-	c.Registers.P.Carry = c.Registers.Y >= value
-	c.updateNZFlags(c.Registers.Y - value)
+	c.registers.P.Carry = c.registers.Y >= value
+	c.updateNZFlags(c.registers.Y - value)
 }
 
 // MARK: DCP命令の実装
@@ -583,7 +583,7 @@ func (c *CPU) dcp(mode AddressingMode) {
 
 // MARK: DEC命令の実装
 func (c *CPU) dec(mode AddressingMode) {
-	addr, _ := c.getOperandAddress(mode)
+	addr, _ := c.calcOperandAddress(mode)
 	value := c.ReadByteFrom(addr) - 1
 	c.WriteByteAt(addr, value)
 	c.updateNZFlags(value)
@@ -591,14 +591,14 @@ func (c *CPU) dec(mode AddressingMode) {
 
 // MARK: DEX命令の実装
 func (c *CPU) dex(mode AddressingMode) {
-	c.Registers.X--
-	c.updateNZFlags(c.Registers.X)
+	c.registers.X--
+	c.updateNZFlags(c.registers.X)
 }
 
 // MARK: DEY命令の実装
 func (c *CPU) dey(mode AddressingMode) {
-	c.Registers.Y--
-	c.updateNZFlags(c.Registers.Y)
+	c.registers.Y--
+	c.updateNZFlags(c.registers.Y)
 }
 
 // MARK: DOP命令の実装
@@ -607,15 +607,15 @@ func (c *CPU) dop(mode AddressingMode) {
 
 // MARK: EOR命令の実装
 func (c *CPU) eor(mode AddressingMode) {
-	addr, _ := c.getOperandAddress(mode)
+	addr, _ := c.calcOperandAddress(mode)
 	value := c.ReadByteFrom(addr)
-	c.Registers.A ^= value
-	c.updateNZFlags(c.Registers.A)
+	c.registers.A ^= value
+	c.updateNZFlags(c.registers.A)
 }
 
 // MARK: INC命令の実装
 func (c *CPU) inc(mode AddressingMode) {
-	addr, _ := c.getOperandAddress(mode)
+	addr, _ := c.calcOperandAddress(mode)
 	value := c.ReadByteFrom(addr) + 1
 	c.WriteByteAt(addr, value)
 	c.updateNZFlags(value)
@@ -623,14 +623,14 @@ func (c *CPU) inc(mode AddressingMode) {
 
 // MARK: INX命令の実装
 func (c *CPU) inx(mode AddressingMode) {
-	c.Registers.X++
-	c.updateNZFlags(c.Registers.X)
+	c.registers.X++
+	c.updateNZFlags(c.registers.X)
 }
 
 // MARK: INY命令の実装
 func (c *CPU) iny(mode AddressingMode) {
-	c.Registers.Y++
-	c.updateNZFlags(c.Registers.Y)
+	c.registers.Y++
+	c.updateNZFlags(c.registers.Y)
 }
 
 // MARK: ISC命令の実装
@@ -641,14 +641,14 @@ func (c *CPU) isc(mode AddressingMode) {
 
 // MARK: JMP命令の実装
 func (c *CPU) jmp(mode AddressingMode) {
-	c.Registers.PC, _ = c.getOperandAddress(mode)
+	c.registers.PC, _ = c.calcOperandAddress(mode)
 }
 
 // MARK: JSR命令の実装
 func (c *CPU) jsr(mode AddressingMode) {
-	c.pushWord(c.Registers.PC + 2)
-	addr, _ := c.getOperandAddress(mode)
-	c.Registers.PC = addr
+	c.pushWord(c.registers.PC + 2)
+	addr, _ := c.calcOperandAddress(mode)
+	c.registers.PC = addr
 }
 
 // MARK: KIL命令の実装
@@ -657,13 +657,13 @@ func (c *CPU) kil(mode AddressingMode) {
 
 // MARK: LAR命令の実装
 func (c *CPU) lar(mode AddressingMode) {
-	addr, _ := c.getOperandAddress(mode)
+	addr, _ := c.calcOperandAddress(mode)
 	value := c.ReadByteFrom(addr)
-	result := c.Registers.SP & value
+	result := c.registers.SP & value
 
-	c.Registers.A = result
-	c.Registers.X = result
-	c.Registers.SP = result
+	c.registers.A = result
+	c.registers.X = result
+	c.registers.SP = result
 	c.updateNZFlags(result)
 }
 
@@ -675,41 +675,41 @@ func (c *CPU) lax(mode AddressingMode) {
 
 // MARK: LDA命令の実装
 func (c *CPU) lda(mode AddressingMode) {
-	addr, _ := c.getOperandAddress(mode)
+	addr, _ := c.calcOperandAddress(mode)
 	operand := c.ReadByteFrom(addr)
 
-	c.Registers.A = uint8(operand)
-	c.updateNZFlags(c.Registers.A)
+	c.registers.A = uint8(operand)
+	c.updateNZFlags(c.registers.A)
 }
 
 // MARK: LDX命令の実装
 func (c *CPU) ldx(mode AddressingMode) {
-	addr, _ := c.getOperandAddress(mode)
+	addr, _ := c.calcOperandAddress(mode)
 	operand := c.ReadByteFrom(addr)
 
-	c.Registers.X = uint8(operand)
-	c.updateNZFlags(c.Registers.X)
+	c.registers.X = uint8(operand)
+	c.updateNZFlags(c.registers.X)
 }
 
 // MARK: LDY命令の実装
 func (c *CPU) ldy(mode AddressingMode) {
-	addr, _ := c.getOperandAddress(mode)
+	addr, _ := c.calcOperandAddress(mode)
 	operand := c.ReadByteFrom(addr)
 
-	c.Registers.Y = uint8(operand)
-	c.updateNZFlags(c.Registers.Y)
+	c.registers.Y = uint8(operand)
+	c.updateNZFlags(c.registers.Y)
 }
 
 // MARK: LSR命令の実装
 func (c *CPU) lsr(mode AddressingMode) {
 	if mode == Accumulator {
-		c.Registers.P.Carry = (c.Registers.A & 0x01) != 0
-		c.Registers.A = c.Registers.A >> 1
-		c.updateNZFlags(c.Registers.A)
+		c.registers.P.Carry = (c.registers.A & 0x01) != 0
+		c.registers.A = c.registers.A >> 1
+		c.updateNZFlags(c.registers.A)
 	} else {
-		addr, _ := c.getOperandAddress(mode)
+		addr, _ := c.calcOperandAddress(mode)
 		value := c.ReadByteFrom(addr)
-		c.Registers.P.Carry = (value & 0x01) != 0
+		c.registers.P.Carry = (value & 0x01) != 0
 		value >>= 1
 		c.WriteByteAt(addr, value)
 		c.updateNZFlags(value)
@@ -722,29 +722,29 @@ func (c *CPU) nop(mode AddressingMode) {
 
 // MARK: ORA命令の実装
 func (c *CPU) ora(mode AddressingMode) {
-	addr, _ := c.getOperandAddress(mode)
+	addr, _ := c.calcOperandAddress(mode)
 	value := c.ReadByteFrom(addr)
 
-	c.Registers.A |= value
-	c.updateNZFlags(c.Registers.A)
+	c.registers.A |= value
+	c.updateNZFlags(c.registers.A)
 }
 
 // MARK: PHA命令の実装
 func (c *CPU) pha(mode AddressingMode) {
-	c.pushByte(c.Registers.A)
+	c.pushByte(c.registers.A)
 }
 
 // MARK: PHP命令の実装
 func (c *CPU) php(mode AddressingMode) {
 	// PHPでプッシュされるステータスレジスタはブレークフラグが立つ
 	// 参考: https://pgate1.at-ninja.jp/NES_on_FPGA/nes_cpu.htm#trap
-	c.pushByte(c.Registers.P.ToByte() | 0x30)
+	c.pushByte(c.registers.P.ToByte() | 0x30)
 }
 
 // MARK: PLA命令の実装
 func (c *CPU) pla(mode AddressingMode) {
-	c.Registers.A = c.popByte()
-	c.updateNZFlags(c.Registers.A)
+	c.registers.A = c.popByte()
+	c.updateNZFlags(c.registers.A)
 }
 
 // MARK: PLP命令の実装
@@ -752,34 +752,34 @@ func (c *CPU) plp(mode AddressingMode) {
 	value := c.popByte()
 	// PLPでフラグレジスタを復元するときには常にBreakはリセット, Reservedはセット?
 	value = (value &^ 0x10) | 0x20
-	c.Registers.P.SetFromByte(value)
+	c.registers.P.SetFromByte(value)
 }
 
 // MARK: ROL命令の実装
 func (c *CPU) rol(mode AddressingMode) {
 	if mode == Accumulator {
-		carry := c.Registers.A>>7 != 0
-		c.Registers.A = c.Registers.A << 1
+		carry := c.registers.A>>7 != 0
+		c.registers.A = c.registers.A << 1
 
-		if c.Registers.P.Carry {
-			c.Registers.A |= 0x01
+		if c.registers.P.Carry {
+			c.registers.A |= 0x01
 		}
 
-		c.Registers.P.Carry = carry
-		c.updateNZFlags(c.Registers.A)
+		c.registers.P.Carry = carry
+		c.updateNZFlags(c.registers.A)
 	} else {
-		addr, _ := c.getOperandAddress(mode)
+		addr, _ := c.calcOperandAddress(mode)
 		value := c.ReadByteFrom(addr)
 
 		carry := value>>7 != 0
 		value <<= 1
 
-		if c.Registers.P.Carry {
+		if c.registers.P.Carry {
 			value |= 0x01
 		}
 
-		c.Registers.P.Carry = carry
-		c.Registers.P.Negative = value>>7 != 0
+		c.registers.P.Carry = carry
+		c.registers.P.Negative = value>>7 != 0
 		c.updateNZFlags(value)
 
 		c.WriteByteAt(addr, value)
@@ -795,28 +795,28 @@ func (c *CPU) rla(mode AddressingMode) {
 // MARK: ROR命令の実装
 func (c *CPU) ror(mode AddressingMode) {
 	if mode == Accumulator {
-		carry := c.Registers.A&0x01 != 0
-		c.Registers.A = c.Registers.A >> 1
+		carry := c.registers.A&0x01 != 0
+		c.registers.A = c.registers.A >> 1
 
-		if c.Registers.P.Carry {
-			c.Registers.A |= 1 << 7
+		if c.registers.P.Carry {
+			c.registers.A |= 1 << 7
 		}
 
-		c.Registers.P.Carry = carry
-		c.updateNZFlags(c.Registers.A)
+		c.registers.P.Carry = carry
+		c.updateNZFlags(c.registers.A)
 	} else {
-		addr, _ := c.getOperandAddress(mode)
+		addr, _ := c.calcOperandAddress(mode)
 		value := c.ReadByteFrom(addr)
 
 		carry := value&0x01 != 0
 		value >>= 1
 
-		if c.Registers.P.Carry {
+		if c.registers.P.Carry {
 			value |= 1 << 7
 		}
 
-		c.Registers.P.Carry = carry
-		c.Registers.P.Negative = value>>7 != 0
+		c.registers.P.Carry = carry
+		c.registers.P.Negative = value>>7 != 0
 		c.updateNZFlags(value)
 
 		c.WriteByteAt(addr, value)
@@ -836,51 +836,51 @@ func (c *CPU) rti(mode AddressingMode) {
 
 	// RTIかにて復帰時には常にBreakはリセット, Reservedはセット？
 	status = (status &^ 0x10) | 0x20
-	c.Registers.P.SetFromByte(status)
-	c.Registers.PC = addr
-	c.Registers.P.Break = false
+	c.registers.P.SetFromByte(status)
+	c.registers.PC = addr
+	c.registers.P.Break = false
 }
 
 // MARK: RTS命令の実装
 func (c *CPU) rts(mode AddressingMode) {
 	addr := c.popWord()
-	c.Registers.PC = addr + 1
+	c.registers.PC = addr + 1
 }
 
 // MARK: SBC命令の実装
 func (c *CPU) sbc(mode AddressingMode) {
-	addr, _ := c.getOperandAddress(mode)
+	addr, _ := c.calcOperandAddress(mode)
 	value := c.ReadByteFrom(addr)
 
-	sum := uint16(c.Registers.A) + uint16(^value)
+	sum := uint16(c.registers.A) + uint16(^value)
 
-	if c.Registers.P.Carry {
+	if c.registers.P.Carry {
 		sum++
 	}
 
 	result := uint8(sum)
 
 	// フラグ設定
-	c.Registers.P.Carry = sum > 0xFF
-	c.Registers.P.Overflow = ((c.Registers.A^value)&0x80) != 0 && ((c.Registers.A^result)&0x80) != 0
+	c.registers.P.Carry = sum > 0xFF
+	c.registers.P.Overflow = ((c.registers.A^value)&0x80) != 0 && ((c.registers.A^result)&0x80) != 0
 
 	c.updateNZFlags(result)
-	c.Registers.A = result
+	c.registers.A = result
 }
 
 // MARK: SEC命令の実装
 func (c *CPU) sec(mode AddressingMode) {
-	c.Registers.P.Carry = true
+	c.registers.P.Carry = true
 }
 
 // MARK: SED命令の実装
 func (c *CPU) sed(mode AddressingMode) {
-	c.Registers.P.Decimal = true
+	c.registers.P.Decimal = true
 }
 
 // MARK: SEI命令の実装
 func (c *CPU) sei(mode AddressingMode) {
-	c.Registers.P.Interrupt = true
+	c.registers.P.Interrupt = true
 }
 
 // MARK: SLO命令の実装
@@ -897,46 +897,46 @@ func (c *CPU) sre(mode AddressingMode) {
 
 // MARK: STA命令の実装
 func (c *CPU) sta(mode AddressingMode) {
-	addr, _ := c.getOperandAddress(mode)
-	c.WriteByteAt(addr, c.Registers.A)
+	addr, _ := c.calcOperandAddress(mode)
+	c.WriteByteAt(addr, c.registers.A)
 }
 
 // MARK: STX命令の実装
 func (c *CPU) stx(mode AddressingMode) {
-	addr, _ := c.getOperandAddress(mode)
-	c.WriteByteAt(addr, c.Registers.X)
+	addr, _ := c.calcOperandAddress(mode)
+	c.WriteByteAt(addr, c.registers.X)
 }
 
 // MARK: STY命令の実装
 func (c *CPU) sty(mode AddressingMode) {
-	addr, _ := c.getOperandAddress(mode)
-	c.WriteByteAt(addr, c.Registers.Y)
+	addr, _ := c.calcOperandAddress(mode)
+	c.WriteByteAt(addr, c.registers.Y)
 }
 
 // MARK: SXA命令の実装
 func (c *CPU) sxa(mode AddressingMode) {
-	addr, _ := c.getOperandAddress(mode)
-	result := c.Registers.X & (uint8(addr>>8) + 1)
+	addr, _ := c.calcOperandAddress(mode)
+	result := c.registers.X & (uint8(addr>>8) + 1)
 	c.WriteByteAt(addr, result)
 }
 
 // MARK: SYA命令の実装
 func (c *CPU) sya(mode AddressingMode) {
-	addr, _ := c.getOperandAddress(mode)
-	result := c.Registers.Y & (uint8(addr>>8) + 1)
+	addr, _ := c.calcOperandAddress(mode)
+	result := c.registers.Y & (uint8(addr>>8) + 1)
 	c.WriteByteAt(addr, result)
 }
 
 // MARK: TAX命令の実装
 func (c *CPU) tax(mode AddressingMode) {
-	c.Registers.X = c.Registers.A
-	c.updateNZFlags(c.Registers.X)
+	c.registers.X = c.registers.A
+	c.updateNZFlags(c.registers.X)
 }
 
 // MARK: TAY命令の実装
 func (c *CPU) tay(mode AddressingMode) {
-	c.Registers.Y = c.Registers.A
-	c.updateNZFlags(c.Registers.Y)
+	c.registers.Y = c.registers.A
+	c.updateNZFlags(c.registers.Y)
 }
 
 // MARK: TOP命令の実装
@@ -945,40 +945,40 @@ func (c *CPU) top(mode AddressingMode) {
 
 // MARK: TSX命令の実装
 func (c *CPU) tsx(mode AddressingMode) {
-	c.Registers.X = c.Registers.SP
-	c.updateNZFlags(c.Registers.X)
+	c.registers.X = c.registers.SP
+	c.updateNZFlags(c.registers.X)
 }
 
 // MARK: TXA命令
 func (c *CPU) txa(mode AddressingMode) {
-	c.Registers.A = c.Registers.X
-	c.updateNZFlags(c.Registers.A)
+	c.registers.A = c.registers.X
+	c.updateNZFlags(c.registers.A)
 }
 
 // MARK: TXS命令
 func (c *CPU) txs(mode AddressingMode) {
-	c.Registers.SP = c.Registers.X
+	c.registers.SP = c.registers.X
 }
 
 // MARK: TYA命令
 func (c *CPU) tya(mode AddressingMode) {
-	c.Registers.A = c.Registers.Y
-	c.updateNZFlags(c.Registers.A)
+	c.registers.A = c.registers.Y
+	c.updateNZFlags(c.registers.A)
 }
 
 // MARK: XAA命令の実装
 func (c *CPU) xaa(mode AddressingMode) {
 	// @NOTE 未定義動作
-	addr, _ := c.getOperandAddress(mode)
+	addr, _ := c.calcOperandAddress(mode)
 	value := c.ReadByteFrom(addr)
-	c.Registers.A = (c.Registers.A | 0x80) & c.Registers.X & value
+	c.registers.A = (c.registers.A | 0x80) & c.registers.X & value
 }
 
 // MARK: XAS命令の実装
 func (c *CPU) xas(mode AddressingMode) {
-	addr, _ := c.getOperandAddress(mode)
-	c.Registers.SP = c.Registers.X & c.Registers.A
-	result := c.Registers.SP & (uint8(addr>>8) + 1)
+	addr, _ := c.calcOperandAddress(mode)
+	c.registers.SP = c.registers.X & c.registers.A
+	result := c.registers.SP & (uint8(addr>>8) + 1)
 	c.WriteByteAt(addr, result)
 }
 
@@ -1023,12 +1023,12 @@ func (c *CPU) canPeek(addr uint16) bool {
 
 // MARK: デバッグ用表示メソッド
 func (c *CPU) Trace() string {
-	pc := c.Registers.PC
+	pc := c.registers.PC
 	opcode := c.ReadByteFrom(pc)
 	inst, ok := c.InstructionSet[opcode]
 	if !ok {
 		return fmt.Sprintf("%04X  %02X        ???                         A:%02X X:%02X Y:%02X P:%02X SP:%02X",
-			pc, opcode, c.Registers.A, c.Registers.X, c.Registers.Y, c.Registers.P.ToByte(), c.Registers.SP)
+			pc, opcode, c.registers.A, c.registers.X, c.registers.Y, c.registers.P.ToByte(), c.registers.SP)
 	}
 
 	var b1, b2 uint8
@@ -1082,7 +1082,7 @@ func (c *CPU) Trace() string {
 		operandStr = fmt.Sprintf("$%02X", b1)
 	case ZeroPageXIndexed:
 		base := b1
-		effAddr = uint16(uint8(base + c.Registers.X))
+		effAddr = uint16(uint8(base + c.registers.X))
 		if !isStore {
 			if v, ok := peek(effAddr); ok {
 				operandStr = fmt.Sprintf("$%02X,X @ %02X = %02X", base, effAddr, v)
@@ -1092,7 +1092,7 @@ func (c *CPU) Trace() string {
 		operandStr = fmt.Sprintf("$%02X,X @ %02X", base, effAddr)
 	case ZeroPageYIndexed:
 		base := b1
-		effAddr = uint16(uint8(base + c.Registers.Y))
+		effAddr = uint16(uint8(base + c.registers.Y))
 		if !isStore {
 			if v, ok := peek(effAddr); ok {
 				operandStr = fmt.Sprintf("$%02X,Y @ %02X = %02X", base, effAddr, v)
@@ -1115,7 +1115,7 @@ func (c *CPU) Trace() string {
 		}
 	case AbsoluteXIndexed:
 		base := uint16(b1) | (uint16(b2) << 8)
-		effAddr = base + uint16(c.Registers.X)
+		effAddr = base + uint16(c.registers.X)
 		if !isStore {
 			if v, ok := peek(effAddr); ok {
 				operandStr = fmt.Sprintf("$%04X,X @ %04X = %02X", base, effAddr, v)
@@ -1125,7 +1125,7 @@ func (c *CPU) Trace() string {
 		operandStr = fmt.Sprintf("$%04X,X @ %04X", base, effAddr)
 	case AbsoluteYIndexed:
 		base := uint16(b1) | (uint16(b2) << 8)
-		effAddr = base + uint16(c.Registers.Y)
+		effAddr = base + uint16(c.registers.Y)
 		if !isStore {
 			if v, ok := peek(effAddr); ok {
 				operandStr = fmt.Sprintf("$%04X,Y @ %04X = %02X", base, effAddr, v)
@@ -1146,7 +1146,7 @@ func (c *CPU) Trace() string {
 		operandStr = fmt.Sprintf("($%04X) = %04X", ptr, target)
 	case IndirectXIndexed:
 		base := b1
-		ptr := uint8(base + c.Registers.X)
+		ptr := uint8(base + c.registers.X)
 		low := c.ReadByteFrom(uint16(ptr))
 		high := c.ReadByteFrom(uint16(ptr+1) & 0x00FF)
 		effAddr = uint16(high)<<8 | uint16(low)
@@ -1162,7 +1162,7 @@ func (c *CPU) Trace() string {
 		low := c.ReadByteFrom(uint16(base))
 		high := c.ReadByteFrom(uint16(base+1) & 0x00FF)
 		baseAddr := uint16(high)<<8 | uint16(low)
-		effAddr = baseAddr + uint16(c.Registers.Y)
+		effAddr = baseAddr + uint16(c.registers.Y)
 		if !isStore {
 			if v, ok := peek(effAddr); ok {
 				operandStr = fmt.Sprintf("($%02X),Y = %04X @ %04X = %02X", base, baseAddr, effAddr, v)
@@ -1181,8 +1181,13 @@ func (c *CPU) Trace() string {
 
 	return fmt.Sprintf("%-47s A:%02X X:%02X Y:%02X P:%02X SP:%02X",
 		asm,
-		c.Registers.A, c.Registers.X, c.Registers.Y,
-		c.Registers.P.ToByte(), c.Registers.SP)
+		c.registers.A, c.registers.X, c.registers.Y,
+		c.registers.P.ToByte(), c.registers.SP)
+}
+
+// MARK: デバッグ用ログ出力切り替え
+func (c *CPU) ToggleLog() {
+	c.log = !c.log
 }
 
 // MARK: デバッグ用実行メソッド

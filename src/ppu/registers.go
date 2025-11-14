@@ -70,14 +70,14 @@ type ControlRegister struct {
 		+--------- Vblank開始時に NMI を発生させるか否か (0: off, 1: on)
 	*/
 
-	NameTable1               bool
-	NameTable2               bool
-	VRAMAddIncrement         bool
-	SpritePatternAddress     bool
-	BackgroundPatternAddress bool
-	SpriteSize               bool
-	MasterSlaveSelect        bool
-	GenerateNMI              bool
+	nameTable1               bool
+	nameTable2               bool
+	vramAddressIncrement     bool
+	spritePatternAddress     bool
+	backgroundPatternAddress bool
+	spriteSize               bool
+	masterSlaveSelect        bool
+	generateNMI              bool
 }
 
 // コントロールレジスタのコンストラクタ
@@ -86,8 +86,8 @@ func (cr *ControlRegister) Init() {
 }
 
 // VRAMアドレスの増分を取得するメソッド
-func (cr *ControlRegister) GetVRAMAddrIncrement() uint8 {
-	if !cr.VRAMAddIncrement {
+func (cr *ControlRegister) VRAMAddressIncrement() uint8 {
+	if !cr.vramAddressIncrement {
 		return 1
 	} else {
 		return 32
@@ -95,12 +95,12 @@ func (cr *ControlRegister) GetVRAMAddrIncrement() uint8 {
 }
 
 // ネームテーブルの基準アドレスを取得するメソッド
-func (cr *ControlRegister) GetBaseNameTableAddress() uint16 {
-	if cr.NameTable1 && cr.NameTable2 {
+func (cr *ControlRegister) BaseNameTableAddress() uint16 {
+	if cr.nameTable1 && cr.nameTable2 {
 		return 0x2C00
-	} else if cr.NameTable2 {
+	} else if cr.nameTable2 {
 		return 0x2800
-	} else if cr.NameTable1 {
+	} else if cr.nameTable1 {
 		return 0x2400
 	} else {
 		return 0x2000
@@ -108,8 +108,8 @@ func (cr *ControlRegister) GetBaseNameTableAddress() uint16 {
 }
 
 // スプライトのパターンテーブルの基準アドレスを取得するメソッド
-func (cr *ControlRegister) GetSpritePatternTableAddress() uint16 {
-	if !cr.SpritePatternAddress {
+func (cr *ControlRegister) SpritePatternTableAddress() uint16 {
+	if !cr.spritePatternAddress {
 		return 0x0000
 	} else {
 		return 0x1000
@@ -117,8 +117,8 @@ func (cr *ControlRegister) GetSpritePatternTableAddress() uint16 {
 }
 
 // 背景のパターンテーブルの基準アドレスを取得するメソッド
-func (cr *ControlRegister) GetBackgroundPatternTableAddress() uint16 {
-	if !cr.BackgroundPatternAddress {
+func (cr *ControlRegister) BackgroundPatternTableAddress() uint16 {
+	if !cr.backgroundPatternAddress {
 		return 0x0000
 	} else {
 		return 0x1000
@@ -126,8 +126,8 @@ func (cr *ControlRegister) GetBackgroundPatternTableAddress() uint16 {
 }
 
 // スプライトのサイズを取得するメソッド
-func (cr *ControlRegister) GetSpriteSize() uint8 {
-	if !cr.SpriteSize {
+func (cr *ControlRegister) SpriteSize() uint8 {
+	if !cr.spriteSize {
 		return 8
 	} else {
 		return 16
@@ -135,8 +135,8 @@ func (cr *ControlRegister) GetSpriteSize() uint8 {
 }
 
 // PPUのマスター/スレーブを取得するメソッド
-func (cr *ControlRegister) GetPPUMasterSlaveSelect() uint8 {
-	if !cr.MasterSlaveSelect {
+func (cr *ControlRegister) MasterSlaveSelect() uint8 {
+	if !cr.masterSlaveSelect {
 		return 0
 	} else {
 		return 1
@@ -144,36 +144,36 @@ func (cr *ControlRegister) GetPPUMasterSlaveSelect() uint8 {
 }
 
 // VBlankNMIの状態を取得するメソッド
-func (cr *ControlRegister) GenerateVBlankNMI() bool {
-	return cr.GenerateNMI
+func (cr *ControlRegister) GenerateNMI() bool {
+	return cr.generateNMI
 }
 
 // コントロールレジスタをuint8へ変換するメソッド
 func (cr *ControlRegister) ToByte() uint8 {
 	var value uint8 = 0x00
 
-	if cr.NameTable1 {
+	if cr.nameTable1 {
 		value |= 1 << CONTROL_REG_NAMETABLE1_POS
 	}
-	if cr.NameTable2 {
+	if cr.nameTable2 {
 		value |= 1 << CONTROL_REG_NAMETABLE2_POS
 	}
-	if cr.VRAMAddIncrement {
+	if cr.vramAddressIncrement {
 		value |= 1 << CONTROL_REG_VRAM_ADD_INCREMENT_POS
 	}
-	if cr.SpritePatternAddress {
+	if cr.spritePatternAddress {
 		value |= 1 << CONTROL_REG_SPRITE_PATTERN_ADDR_POS
 	}
-	if cr.BackgroundPatternAddress {
+	if cr.backgroundPatternAddress {
 		value |= 1 << CONTROL_REG_BACKROUND_PATTERN_ADDR_POS
 	}
-	if cr.SpriteSize {
+	if cr.spriteSize {
 		value |= 1 << CONTROL_REG_SPRITE_SIZE_POS
 	}
-	if cr.MasterSlaveSelect {
+	if cr.masterSlaveSelect {
 		value |= 1 << CONTROL_REG_MASTER_SLAVE_SELECT_POS
 	}
-	if cr.GenerateNMI {
+	if cr.generateNMI {
 		value |= 1 << CONTROL_REG_GENERATE_NMI_POS
 	}
 
@@ -182,14 +182,14 @@ func (cr *ControlRegister) ToByte() uint8 {
 
 // uint8の値をコントロールレジスタオブジェクトへ反映するメソッド
 func (cr *ControlRegister) update(value uint8) {
-	cr.NameTable1 = (value & (1 << CONTROL_REG_NAMETABLE1_POS)) != 0
-	cr.NameTable2 = (value & (1 << CONTROL_REG_NAMETABLE2_POS)) != 0
-	cr.VRAMAddIncrement = (value & (1 << CONTROL_REG_VRAM_ADD_INCREMENT_POS)) != 0
-	cr.SpritePatternAddress = (value & (1 << CONTROL_REG_SPRITE_PATTERN_ADDR_POS)) != 0
-	cr.BackgroundPatternAddress = (value & (1 << CONTROL_REG_BACKROUND_PATTERN_ADDR_POS)) != 0
-	cr.SpriteSize = (value & (1 << CONTROL_REG_SPRITE_SIZE_POS)) != 0
-	cr.MasterSlaveSelect = (value & (1 << CONTROL_REG_MASTER_SLAVE_SELECT_POS)) != 0
-	cr.GenerateNMI = (value & (1 << CONTROL_REG_GENERATE_NMI_POS)) != 0
+	cr.nameTable1 = (value & (1 << CONTROL_REG_NAMETABLE1_POS)) != 0
+	cr.nameTable2 = (value & (1 << CONTROL_REG_NAMETABLE2_POS)) != 0
+	cr.vramAddressIncrement = (value & (1 << CONTROL_REG_VRAM_ADD_INCREMENT_POS)) != 0
+	cr.spritePatternAddress = (value & (1 << CONTROL_REG_SPRITE_PATTERN_ADDR_POS)) != 0
+	cr.backgroundPatternAddress = (value & (1 << CONTROL_REG_BACKROUND_PATTERN_ADDR_POS)) != 0
+	cr.spriteSize = (value & (1 << CONTROL_REG_SPRITE_SIZE_POS)) != 0
+	cr.masterSlaveSelect = (value & (1 << CONTROL_REG_MASTER_SLAVE_SELECT_POS)) != 0
+	cr.generateNMI = (value & (1 << CONTROL_REG_GENERATE_NMI_POS)) != 0
 }
 
 // MARK: マスクレジスタ ($2001)
@@ -209,14 +209,14 @@ type MaskRegister struct {
 	   +--------- 青色を強調
 	*/
 
-	Grayscale                bool
-	LeftmostBackgroundEnable bool
-	LeftmostSpriteEnable     bool
-	BackgroundEnable         bool
-	SpriteEnable             bool
-	EmphasizeRed             bool
-	EmphasizeGreen           bool
-	EmphasizeBlue            bool
+	grayscale                bool
+	leftmostBackgroundEnable bool
+	leftmostSpriteEnable     bool
+	backgroundEnable         bool
+	spriteEnable             bool
+	emphasizeRed             bool
+	emphasizeGreen           bool
+	emphasizeBlue            bool
 }
 
 func (mr *MaskRegister) Init() {
@@ -227,28 +227,28 @@ func (mr *MaskRegister) Init() {
 func (mr *MaskRegister) ToByte() uint8 {
 	var value uint8 = 0x00
 
-	if mr.Grayscale {
+	if mr.grayscale {
 		value |= 1 << MASK_REG_GRAYSCALE
 	}
-	if mr.LeftmostBackgroundEnable {
+	if mr.leftmostBackgroundEnable {
 		value |= 1 << MASK_REG_LEFTMOST_BACKGROUND_ENABLE
 	}
-	if mr.LeftmostSpriteEnable {
+	if mr.leftmostSpriteEnable {
 		value |= 1 << MASK_REG_LEFTMOST_SPRITE_ENABLE
 	}
-	if mr.BackgroundEnable {
+	if mr.backgroundEnable {
 		value |= 1 << MASK_REG_BACKGROUND_ENABLE
 	}
-	if mr.SpriteEnable {
+	if mr.spriteEnable {
 		value |= 1 << MASK_REG_SPRITE_ENABLE
 	}
-	if mr.EmphasizeRed {
+	if mr.emphasizeRed {
 		value |= 1 << MASK_REG_EMPHASIZE_RED_POS
 	}
-	if mr.EmphasizeGreen {
+	if mr.emphasizeGreen {
 		value |= 1 << MASK_REG_EMPHASIZE_GREEN_POS
 	}
-	if mr.EmphasizeBlue {
+	if mr.emphasizeBlue {
 		value |= 1 << MASK_REG_EMPHASIZE_BLUE_POS
 	}
 
@@ -257,14 +257,14 @@ func (mr *MaskRegister) ToByte() uint8 {
 
 // uint8の値をマスクレジスタオブジェクトへ反映するメソッド
 func (mr *MaskRegister) update(value uint8) {
-	mr.Grayscale = (value & (1 << MASK_REG_GRAYSCALE)) != 0
-	mr.LeftmostBackgroundEnable = (value & (1 << MASK_REG_LEFTMOST_BACKGROUND_ENABLE)) != 0
-	mr.LeftmostSpriteEnable = (value & (1 << MASK_REG_LEFTMOST_SPRITE_ENABLE)) != 0
-	mr.BackgroundEnable = (value & (1 << MASK_REG_BACKGROUND_ENABLE)) != 0
-	mr.SpriteEnable = (value & (1 << MASK_REG_SPRITE_ENABLE)) != 0
-	mr.EmphasizeRed = (value & (1 << MASK_REG_EMPHASIZE_RED_POS)) != 0
-	mr.EmphasizeGreen = (value & (1 << MASK_REG_EMPHASIZE_GREEN_POS)) != 0
-	mr.EmphasizeBlue = (value & (1 << MASK_REG_EMPHASIZE_BLUE_POS)) != 0
+	mr.grayscale = (value & (1 << MASK_REG_GRAYSCALE)) != 0
+	mr.leftmostBackgroundEnable = (value & (1 << MASK_REG_LEFTMOST_BACKGROUND_ENABLE)) != 0
+	mr.leftmostSpriteEnable = (value & (1 << MASK_REG_LEFTMOST_SPRITE_ENABLE)) != 0
+	mr.backgroundEnable = (value & (1 << MASK_REG_BACKGROUND_ENABLE)) != 0
+	mr.spriteEnable = (value & (1 << MASK_REG_SPRITE_ENABLE)) != 0
+	mr.emphasizeRed = (value & (1 << MASK_REG_EMPHASIZE_RED_POS)) != 0
+	mr.emphasizeGreen = (value & (1 << MASK_REG_EMPHASIZE_GREEN_POS)) != 0
+	mr.emphasizeBlue = (value & (1 << MASK_REG_EMPHASIZE_BLUE_POS)) != 0
 }
 
 // MARK: ステータスレジスタ ($2002)
@@ -280,9 +280,9 @@ type StatusRegister struct {
 		+--------- Vblank フラグ, Statusレジスタを読まれるタイミングでクリアされる
 	*/
 
-	SpriteOverflow bool
-	SpriteZeroHit  bool
-	VBlankFlag     bool
+	spriteOverflow bool
+	spriteZeroHit  bool
+	vBlankFlag     bool
 }
 
 // ステータスレジスタのコンストラクタ
@@ -292,40 +292,40 @@ func (sr *StatusRegister) Init() {
 
 // VBlankフラグの設定メソッド
 func (sr *StatusRegister) SetVBlankStatus(status bool) {
-	sr.VBlankFlag = status
+	sr.vBlankFlag = status
 }
 
 // VBlankフラグの状態
 func (sr *StatusRegister) ClearVBlankStatus() {
-	sr.VBlankFlag = false
+	sr.vBlankFlag = false
 }
 
 // VBlank期間中かどうかを返すメソッド
-func (sr *StatusRegister) IsInVBlank() bool {
-	return sr.VBlankFlag
+func (sr *StatusRegister) VBlank() bool {
+	return sr.vBlankFlag
 }
 
 // スプライト0ヒットの設定メソッド
 func (sr *StatusRegister) SetSpriteZeroHit(status bool) {
-	sr.SpriteZeroHit = status
+	sr.spriteZeroHit = status
 }
 
 // スプライトオーバーフローフラグの設定メソッド
 func (sr *StatusRegister) SetSpriteOverflow(status bool) {
-	sr.SpriteOverflow = status
+	sr.spriteOverflow = status
 }
 
 // ステータスレジスタをuint8へ変換するメソッド
 func (sr *StatusRegister) ToByte() uint8 {
 	var value uint8 = 0x00
 
-	if sr.SpriteOverflow {
+	if sr.spriteOverflow {
 		value |= 1 << STATUS_REG_SPRITE_OVERFLOW
 	}
-	if sr.SpriteZeroHit {
+	if sr.spriteZeroHit {
 		value |= 1 << STATUS_REG_SPRITE_ZERO_HIT
 	}
-	if sr.VBlankFlag {
+	if sr.vBlankFlag {
 		value |= 1 << STATUS_REG_VBLANK_FLAG
 	}
 
@@ -334,9 +334,9 @@ func (sr *StatusRegister) ToByte() uint8 {
 
 // uint8の値をステータスレジスタオブジェクトへ反映するメソッド
 func (sr *StatusRegister) update(value uint8) {
-	sr.SpriteOverflow = (value & (1 << STATUS_REG_SPRITE_OVERFLOW)) != 0
-	sr.SpriteZeroHit = (value & (1 << STATUS_REG_SPRITE_ZERO_HIT)) != 0
-	sr.VBlankFlag = (value & (1 << STATUS_REG_VBLANK_FLAG)) != 0
+	sr.spriteOverflow = (value & (1 << STATUS_REG_SPRITE_OVERFLOW)) != 0
+	sr.spriteZeroHit = (value & (1 << STATUS_REG_SPRITE_ZERO_HIT)) != 0
+	sr.vBlankFlag = (value & (1 << STATUS_REG_VBLANK_FLAG)) != 0
 }
 
 // MARK: T/Vレジスタ (PPU 内部)

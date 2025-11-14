@@ -12,7 +12,7 @@ const (
 
 // MARK: MMC3 TxROM (マッパー4) の定義
 type TxROM struct {
-	Name string
+	name string
 
 	bank       uint8
 	bankData   [8]uint8
@@ -21,19 +21,19 @@ type TxROM struct {
 	irqReload  bool
 	irqEnable  bool
 	irqCounter uint8
-	IRQ        bool
+	irq        bool
 
-	IsCharacterRAM bool
-	Mirroring      Mirroring
-	ProgramROM     []uint8
-	CharacterROM   []uint8
-	ProgramRAM     [PRG_RAM_SIZE]uint8
+	isCharacterRam bool
+	mirroring      Mirroring
+	programRom     []uint8
+	characterRom   []uint8
+	programRam     [PRG_RAM_SIZE]uint8
 }
 
 // MARK: マッパーの初期化
 func (t *TxROM) Init(name string, rom []uint8, save []uint8) {
-	programRom, characterROM := GetROMs(rom)
-	t.Name = name
+	programRom, characterROM := roms(rom)
+	t.name = name
 	t.bank = 0x00
 	t.ramProtect = 0x00
 	t.irqLatch = 0x00
@@ -44,19 +44,19 @@ func (t *TxROM) Init(name string, rom []uint8, save []uint8) {
 		t.bankData[i] = 0x00
 	}
 
-	t.IsCharacterRAM = GetCharacterROMSize(rom) == 0
-	t.Mirroring = GetSimpleMirroring(rom)
-	t.ProgramROM = programRom
-	t.CharacterROM = characterROM
+	t.isCharacterRam = characterRomSize(rom) == 0
+	t.mirroring = simpleMirroring(rom)
+	t.programRom = programRom
+	t.characterRom = characterROM
 
 	// プログラムRAMの初期化
-	for i := range t.ProgramRAM {
-		t.ProgramRAM[i] = 0xFF
+	for i := range t.programRam {
+		t.programRam[i] = 0xFF
 	}
 
 	// セーブデータの読み込み
 	if len(save) != 0 {
-		copy(t.ProgramRAM[:], save)
+		copy(t.programRam[:], save)
 		t.ramProtect = 0x80
 	}
 }
@@ -76,9 +76,9 @@ func (t *TxROM) Write(address uint16, data uint8) {
 		if address&0x01 == 0 {
 			// ミラーリング ($A000~$BFFE, 偶数)
 			if data&0x01 == 0 {
-				t.Mirroring = MIRRORING_VERTICAL
+				t.mirroring = MIRRORING_VERTICAL
 			} else {
-				t.Mirroring = MIRRORING_HORIZONTAL
+				t.mirroring = MIRRORING_HORIZONTAL
 			}
 		} else {
 			// プログラムRAM 保護 ($A001~$BFFF, 奇数)
@@ -103,7 +103,7 @@ func (t *TxROM) Write(address uint16, data uint8) {
 		if address&0x01 == 0 {
 			// IRQ 無効化 ($E000~$FFFE, 偶数)
 			t.irqEnable = false
-			t.IRQ = false
+			t.irq = false
 		} else {
 			// IRQ 有効化 ($E001~$FFFD, 奇数)
 			t.irqEnable = true
@@ -112,7 +112,7 @@ func (t *TxROM) Write(address uint16, data uint8) {
 }
 
 // MARK: プログラムROMの読み取り
-func (t *TxROM) ReadProgramROM(address uint16) uint8 {
+func (t *TxROM) ReadProgramRom(address uint16) uint8 {
 	/*
 		mode         0      1
 		$8000~$9FFF: R6    (-2)
@@ -120,7 +120,7 @@ func (t *TxROM) ReadProgramROM(address uint16) uint8 {
 		$C000~$DFFF: (-2)   R6
 		$E000~$FFFF: (-1)  (-1)
 	*/
-	bankMax := uint(len(t.ProgramROM)) / TXROM_PRG_BANK_SIZE
+	bankMax := uint(len(t.programRom)) / TXROM_PRG_BANK_SIZE
 
 	mode := t.bank & 0x40
 
@@ -141,26 +141,26 @@ func (t *TxROM) ReadProgramROM(address uint16) uint8 {
 	case 0:
 		switch {
 		case PRG_ROM_START <= address && address <= 0x9FFF:
-			return t.ProgramROM[uint(address-PRG_ROM_START)+r6Bank*TXROM_PRG_BANK_SIZE]
+			return t.programRom[uint(address-PRG_ROM_START)+r6Bank*TXROM_PRG_BANK_SIZE]
 		case 0xA000 <= address && address <= 0xBFFF:
-			return t.ProgramROM[uint(address-0xA000)+r7Bank*TXROM_PRG_BANK_SIZE]
+			return t.programRom[uint(address-0xA000)+r7Bank*TXROM_PRG_BANK_SIZE]
 		case 0xC000 <= address && address <= 0xDFFF:
-			return t.ProgramROM[uint(address-0xC000)+lastBank2*TXROM_PRG_BANK_SIZE]
+			return t.programRom[uint(address-0xC000)+lastBank2*TXROM_PRG_BANK_SIZE]
 		case 0xE000 <= address && address <= PRG_ROM_END:
-			return t.ProgramROM[uint(address-0xE000)+lastBank1*TXROM_PRG_BANK_SIZE]
+			return t.programRom[uint(address-0xE000)+lastBank1*TXROM_PRG_BANK_SIZE]
 		default:
 			panic(fmt.Sprintf("Error: unexpected program rom read: $%04X", address))
 		}
 	default:
 		switch {
 		case PRG_ROM_START <= address && address <= 0x9FFF:
-			return t.ProgramROM[uint(address-PRG_ROM_START)+lastBank2*TXROM_PRG_BANK_SIZE]
+			return t.programRom[uint(address-PRG_ROM_START)+lastBank2*TXROM_PRG_BANK_SIZE]
 		case 0xA000 <= address && address <= 0xBFFF:
-			return t.ProgramROM[uint(address-0xA000)+r7Bank*TXROM_PRG_BANK_SIZE]
+			return t.programRom[uint(address-0xA000)+r7Bank*TXROM_PRG_BANK_SIZE]
 		case 0xC000 <= address && address <= 0xDFFF:
-			return t.ProgramROM[uint(address-0xC000)+r6Bank*TXROM_PRG_BANK_SIZE]
+			return t.programRom[uint(address-0xC000)+r6Bank*TXROM_PRG_BANK_SIZE]
 		case 0xE000 <= address && address <= PRG_ROM_END:
-			return t.ProgramROM[uint(address-0xE000)+lastBank1*TXROM_PRG_BANK_SIZE]
+			return t.programRom[uint(address-0xE000)+lastBank1*TXROM_PRG_BANK_SIZE]
 		default:
 			panic(fmt.Sprintf("Error: unexpected program rom read: $%04X", address))
 		}
@@ -168,7 +168,7 @@ func (t *TxROM) ReadProgramROM(address uint16) uint8 {
 }
 
 // MARK: キャラクタROMのアドレス計算
-func (t *TxROM) getCharacterROMAddress(address uint16) uint {
+func (t *TxROM) calcCharacterRomAddress(address uint16) uint {
 	/*
 		mode          0    1
 		$0000~$03FF: R0   R2
@@ -232,29 +232,29 @@ func (t *TxROM) getCharacterROMAddress(address uint16) uint {
 }
 
 // MARK: キャラクタROMの読み取り
-func (t *TxROM) ReadCharacterROM(address uint16) uint8 {
-	return t.CharacterROM[t.getCharacterROMAddress(address)]
+func (t *TxROM) ReadCharacterRom(address uint16) uint8 {
+	return t.characterRom[t.calcCharacterRomAddress(address)]
 }
 
 // MARK: キャラクタROMへの書き込み
-func (t *TxROM) WriteToCharacterROM(address uint16, data uint8) {
-	t.CharacterROM[t.getCharacterROMAddress(address)] = data
+func (t *TxROM) WriteToCharacterRom(address uint16, data uint8) {
+	t.characterRom[t.calcCharacterRomAddress(address)] = data
 }
 
 // MARK: プログラムRAMの読み取り
-func (t *TxROM) ReadProgramRAM(address uint16) uint8 {
+func (t *TxROM) ReadProgramRam(address uint16) uint8 {
 	// RAM有効ビットが立っている場合のみRAMから読み取り、それ以外は0xFF
 	if t.ramProtect&0x80 != 0 {
-		return t.ProgramRAM[address-PRG_RAM_START]
+		return t.programRam[address-PRG_RAM_START]
 	}
 	return 0xFF // 無効なRAMアクセスの場合は0xFFを返す
 }
 
 // MARK: プログラムRAMへの書き込み
-func (t *TxROM) WriteToProgramRAM(address uint16, data uint8) {
+func (t *TxROM) WriteToProgramRam(address uint16, data uint8) {
 	// RAM保護が無効な場合のみ書き込む
 	if t.ramProtect&0x80 != 0 && t.ramProtect&0x40 == 0 {
-		t.ProgramRAM[address-PRG_RAM_START] = data
+		t.programRam[address-PRG_RAM_START] = data
 	}
 }
 
@@ -262,11 +262,11 @@ func (t *TxROM) WriteToProgramRAM(address uint16, data uint8) {
 func (t *TxROM) Save() {
 	// RAM書き込みが有効な場合のみセーブ
 	if t.ramProtect&0x80 != 0 {
-		err := os.WriteFile(SAVE_DATA_DIR+t.Name+".save", t.ProgramRAM[:], 0644)
+		err := os.WriteFile(SAVE_DATA_DIR+t.name+".save", t.programRam[:], 0644)
 		if err != nil {
 			fmt.Printf("Error saving game data: %v\n", err)
 		} else {
-			fmt.Printf("Game saved to: %s\n", SAVE_DATA_DIR+t.Name+".save")
+			fmt.Printf("Game saved to: %s\n", SAVE_DATA_DIR+t.name+".save")
 		}
 	}
 }
@@ -285,39 +285,39 @@ func (t *TxROM) GenerateScanlineIRQ(scanline uint16, renderEnable bool) {
 
 		// カウンタが0になり、かつIRQが有効ならIRQを発生
 		if t.irqCounter == 0 && t.irqEnable {
-			t.IRQ = true
+			t.irq = true
 		}
 	}
 }
 
 // MARK: IRQ状態の取得
-func (t *TxROM) GetIRQ() bool {
-	value := t.IRQ
-	t.IRQ = false
+func (t *TxROM) IRQ() bool {
+	value := t.irq
+	t.irq = false
 	return value
 }
 
 // MARK: ミラーリングの取得
-func (t *TxROM) GetMirroring() Mirroring {
-	return t.Mirroring
+func (t *TxROM) Mirroring() Mirroring {
+	return t.mirroring
 }
 
 // MARK: キャラクタRAMを使用するかどうかを取得
-func (t *TxROM) GetIsCharacterRAM() bool {
-	return t.IsCharacterRAM
+func (t *TxROM) IsCharacterRam() bool {
+	return t.isCharacterRam
 }
 
 // MARK: プログラムROMの取得
-func (t *TxROM) GetProgramROM() []uint8 {
-	return t.ProgramROM
+func (t *TxROM) ProgramRom() []uint8 {
+	return t.programRom
 }
 
 // MARK: キャラクタROMの取得
-func (t *TxROM) GetCharacterROM() []uint8 {
-	return t.CharacterROM
+func (t *TxROM) CharacterRom() []uint8 {
+	return t.characterRom
 }
 
 // MARK: マッパー名の取得
-func (t *TxROM) GetMapperInfo() string {
+func (t *TxROM) MapperInfo() string {
 	return "TxROM (Mapper 4)"
 }

@@ -24,31 +24,31 @@ const (
 // MARK: マッパーのインターフェース
 type Mapper interface {
 	Init(string, []uint8, []uint8)
-	ReadProgramROM(uint16) uint8
-	ReadCharacterROM(uint16) uint8
-	ReadProgramRAM(uint16) uint8
-	WriteToCharacterROM(uint16, uint8)
-	WriteToProgramRAM(uint16, uint8)
+	ReadProgramRom(uint16) uint8
+	ReadCharacterRom(uint16) uint8
+	ReadProgramRam(uint16) uint8
+	WriteToCharacterRom(uint16, uint8)
+	WriteToProgramRam(uint16, uint8)
 	Write(uint16, uint8)
 	Save()
 
 	GenerateScanlineIRQ(uint16, bool)
-	GetIRQ() bool
+	IRQ() bool
 
-	GetMapperInfo() string
-	GetIsCharacterRAM() bool
-	GetMirroring() Mirroring
-	GetProgramROM() []uint8
-	GetCharacterROM() []uint8
+	MapperInfo() string
+	IsCharacterRam() bool
+	Mirroring() Mirroring
+	ProgramRom() []uint8
+	CharacterRom() []uint8
 }
 
 // MARK: カートリッジのバイナリからプログラムROMとキャラクタROMを取得
-func GetROMs(rom []uint8) ([]uint8, []uint8) {
+func roms(rom []uint8) ([]uint8, []uint8) {
 	// それぞれのROMのアドレスとサイズを計算
-	programROMStart := GetProgramROMStartAddress(rom)
-	programmROMSize := GetProgramROMSize(rom)
-	characterROMStart := GetCharacterROMStartAddress(programROMStart, programmROMSize)
-	characterROMSize := GetCharacterROMSize(rom)
+	programROMStart := programRomStartAddress(rom)
+	programmROMSize := programRomSize(rom)
+	characterROMStart := characterRomStartAddress(programROMStart, programmROMSize)
+	characterROMSize := characterRomSize(rom)
 
 	var programROM []uint8
 	var characterROM []uint8
@@ -64,7 +64,7 @@ func GetROMs(rom []uint8) ([]uint8, []uint8) {
 }
 
 // MARK: シンプルなミラーリングの取得
-func GetSimpleMirroring(rom []uint8) Mirroring {
+func simpleMirroring(rom []uint8) Mirroring {
 	isFourScreen := (rom[6] & 0b1000) != 0
 	isVertical := (rom[6] & 0b0001) != 0
 
@@ -82,7 +82,7 @@ func GetSimpleMirroring(rom []uint8) Mirroring {
 }
 
 // MARK: カートリッジのバイナリからプログラムROMのスタートアドレスを取得
-func GetProgramROMStartAddress(rom []uint8) uint {
+func programRomStartAddress(rom []uint8) uint {
 	skipTrainer := (rom[6] & 0b100) != 0
 	var trainerOffset uint
 	if skipTrainer {
@@ -94,16 +94,16 @@ func GetProgramROMStartAddress(rom []uint8) uint {
 }
 
 // MARK: カートリッジのバイナリからプログラムROMのサイズを取得
-func GetProgramROMSize(rom []uint8) uint {
+func programRomSize(rom []uint8) uint {
 	return uint(rom[4]) * PRG_ROM_PAGE_SIZE
 }
 
 // MARK: カートリッジのバイナリからキャラクタROMのスタートアドレスを取得
-func GetCharacterROMStartAddress(programROMStart uint, programROMSize uint) uint {
+func characterRomStartAddress(programROMStart uint, programROMSize uint) uint {
 	return programROMStart + programROMSize
 }
 
 // MARK: カートリッジのバイナリからキャラクタROMのサイズを取得
-func GetCharacterROMSize(rom []uint8) uint {
+func characterRomSize(rom []uint8) uint {
 	return uint(rom[5]) * CHR_ROM_PAGE_SIZE
 }

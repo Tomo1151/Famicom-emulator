@@ -174,7 +174,7 @@ func (f *Famicom) Start() {
 					os.Exit(0)
 				}
 				if e.Keysym.Sym == sdl.K_F12 && e.State == sdl.PRESSED {
-					f.cpu.Log = !f.cpu.Log
+					f.cpu.ToggleLog()
 				}
 				f.handleKeyPress(e, &f.keyboard1, &f.keyboard2)
 			case *sdl.ControllerButtonEvent:

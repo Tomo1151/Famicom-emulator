@@ -31,8 +31,8 @@ type APU struct {
 	channel3 *TriangleWaveChannel
 	channel4 *NoiseWaveChannel
 
-	frameSequencer FrameSequencer
-	status         StatusRegister
+	frameCounter FrameCounter
+	status       StatusRegister
 
 	sampleClock uint64
 
@@ -57,8 +57,8 @@ func (a *APU) Init() {
 	a.channel4 = &noise
 	a.channel4.Init()
 
-	a.frameSequencer = FrameSequencer{}
-	a.frameSequencer.Init()
+	a.frameCounter = FrameCounter{}
+	a.frameCounter.Init()
 
 	a.status = StatusRegister{}
 	a.status.Init()
@@ -198,13 +198,13 @@ func (a *APU) FrameIRQ() bool {
 
 // MARK: フレームシーケンサの書き込みメソッド
 func (a *APU) WriteFrameSequencer(data uint8) {
-	a.frameSequencer.update(data)
+	a.frameCounter.update(data)
 
 	/*
 		@NOTE:
 			5ステップモード時のみ$4017の書き込みの副作用で halfフレーム/quarterフレーム信号を生成する
 	*/
-	if a.frameSequencer.Mode() == 5 {
+	if a.frameCounter.Mode() == 5 {
 		a.clockEnvelopes()
 		a.clockLengthCounter()
 		a.clockSweepUnits()
@@ -487,7 +487,7 @@ func (a *APU) clockFrameSequencer() {
 		// フレームシーケンサは入力の1.789MHzを7457分周する
 		a.cycles %= APU_CYCLE_INTERVAL
 		a.step++
-		mode := a.frameSequencer.Mode()
+		mode := a.frameCounter.Mode()
 
 		switch mode {
 		case 4:
@@ -509,7 +509,7 @@ func (a *APU) clockFrameSequencer() {
 			if a.step == 4 {
 				// 割り込みフラグのセット
 				a.step = 0
-				if !a.frameSequencer.DisableIRQ() {
+				if !a.frameCounter.DisableIRQ() {
 					a.status.SetFrameIRQ()
 				}
 			}

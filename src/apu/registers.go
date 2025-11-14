@@ -192,12 +192,6 @@ func (twr *TriangleWaveRegister) write(address uint16, data uint8) {
 	}
 }
 
-// MARK: レジスタから三角波のピッチを取得するメソッド
-// Deprecated: APU作動方式の変更に伴って未使用に
-func (twr *TriangleWaveRegister) getFrequency() float32 {
-	return CPU_CLOCK / (32.0*float32(twr.frequency) + 1.0)
-}
-
 // MARK: レジスタから長さカウンタのHALT有効/無効を取得するメソッド
 func (twr *TriangleWaveRegister) LengthCounterHalt() bool {
 	return twr.keyOffCounter
@@ -343,7 +337,6 @@ func (nsr *NoiseShiftRegister) next() bool {
 	// シフトレジスタのビット0が1であればチャンネルの出力が0になる
 	result := nsr.value&0x01 != 0
 
-	// fmt.Printf("NoiseShift: mode=%d, value=0x%04X, result=%t\n", nsr.mode, nsr.value, result)
 	return result
 }
 
@@ -489,32 +482,32 @@ func (sr *StatusRegister) update(value uint8) {
 
 }
 
-// MARK: フレームシーケンサ
-type FrameSequencer struct {
+// MARK: フレームカウンタ
+type FrameCounter struct {
 	disableIRQ    bool
 	sequencerMode bool
 }
 
-func (fs *FrameSequencer) Init() {
-	fs.disableIRQ = true
-	fs.sequencerMode = true
+func (fc *FrameCounter) Init() {
+	fc.disableIRQ = true
+	fc.sequencerMode = true
 }
 
-func (fs *FrameSequencer) Mode() uint8 {
-	if fs.sequencerMode {
+func (fc *FrameCounter) Mode() uint8 {
+	if fc.sequencerMode {
 		return 5
 	} else {
 		return 4
 	}
 }
-func (fs *FrameSequencer) DisableIRQ() bool {
-	return fs.disableIRQ
+func (fc *FrameCounter) DisableIRQ() bool {
+	return fc.disableIRQ
 }
 
-func (fs *FrameSequencer) update(data uint8) {
+func (fc *FrameCounter) update(data uint8) {
 	irq := ((data & 0x40) >> FRAME_COUNTER_IRQ_POS) != 0
 	mode := ((data & 0x80) >> FRAME_COUNTER_MODE_POS) != 0
 
-	fs.disableIRQ = irq
-	fs.sequencerMode = mode
+	fc.disableIRQ = irq
+	fc.sequencerMode = mode
 }

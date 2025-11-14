@@ -98,6 +98,14 @@ func (su *SweepUnit) Init() {
 	su.reload = false
 }
 
+// MARK: スイープの周波数を取得するメソッド
+func (su *SweepUnit) Frequency() float32 {
+	if su.frequency == 0 {
+		return 0.0
+	}
+	return CPU_CLOCK / (16.0 * (float32(su.frequency) + 1.0))
+}
+
 // MARK: スイープのリセット
 func (su *SweepUnit) reset() {
 	su.counter = 0

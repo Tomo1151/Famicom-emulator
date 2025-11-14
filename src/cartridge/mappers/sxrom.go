@@ -7,7 +7,7 @@ import (
 
 // MARK: MMC1 SxROM (マッパー1) の定義
 type SxROM struct {
-	Name string
+	name string
 
 	shiftRegister uint8
 	shiftCount    uint8
@@ -17,15 +17,15 @@ type SxROM struct {
 	chrBank1 uint8
 	prgBank  uint8
 
-	IsCharacterRAM bool
-	ProgramROM     []uint8
-	CharacterROM   []uint8
-	ProgramRAM     [PRG_RAM_SIZE]uint8
+	isCharacterRam bool
+	programRom     []uint8
+	characterRom   []uint8
+	programRam     [PRG_RAM_SIZE]uint8
 }
 
 // MARK: マッパーの初期化
 func (s *SxROM) Init(name string, rom []uint8, save []uint8) {
-	s.Name = name
+	s.name = name
 
 	s.shiftRegister = 0x10
 	s.shiftCount = 0
@@ -35,19 +35,19 @@ func (s *SxROM) Init(name string, rom []uint8, save []uint8) {
 	s.chrBank1 = 0
 	s.prgBank = 0
 
-	programROM, characterROM := GetROMs(rom)
-	s.IsCharacterRAM = GetCharacterROMSize(rom) == 0
-	s.ProgramROM = programROM
-	s.CharacterROM = characterROM
+	programRom, characterRom := roms(rom)
+	s.isCharacterRam = characterRomSize(rom) == 0
+	s.programRom = programRom
+	s.characterRom = characterRom
 
 	// プログラムRAMの初期化
-	for i := range s.ProgramRAM {
-		s.ProgramRAM[i] = 0xFF
+	for i := range s.programRam {
+		s.programRam[i] = 0xFF
 	}
 
 	// セーブデータの読み込み
 	if len(save) != 0 {
-		copy(s.ProgramRAM[:], save)
+		copy(s.programRam[:], save)
 	}
 }
 
@@ -80,7 +80,7 @@ func (s *SxROM) Write(address uint16, data uint8) {
 }
 
 // MARK: プログラムROMの読み取り
-func (s *SxROM) ReadProgramROM(address uint16) uint8 {
+func (s *SxROM) ReadProgramRom(address uint16) uint8 {
 	/*
 		4bit0
 		-----
@@ -96,7 +96,7 @@ func (s *SxROM) ReadProgramROM(address uint16) uint8 {
 	*/
 
 	// 最後のバンク番号
-	bankMax := uint(len(s.ProgramROM)) / BANK_SIZE
+	bankMax := uint(len(s.programRom)) / BANK_SIZE
 
 	romBaseAddress := uint(address - PRG_ROM_START)
 
@@ -104,16 +104,16 @@ func (s *SxROM) ReadProgramROM(address uint16) uint8 {
 	case 0, 1:
 		// バンク番号の下位ビットを無視，32KBを$8000~に割り当て
 		bank := s.prgBank & 0x1E
-		return s.ProgramROM[romBaseAddress+(BANK_SIZE*uint(bank))]
+		return s.programRom[romBaseAddress+(BANK_SIZE*uint(bank))]
 	case 2:
 		// 最初のバンクを$8000~に固定，16KBバンクを$C000~に割り当て
 		bank := s.prgBank & 0x1F
 
 		switch {
 		case PRG_ROM_START <= address && address <= 0xBFFF:
-			return s.ProgramROM[romBaseAddress]
+			return s.programRom[romBaseAddress]
 		case 0xC000 <= address && address <= PRG_ROM_END:
-			return s.ProgramROM[uint(address-0xC000)+(BANK_SIZE*uint(bank))]
+			return s.programRom[uint(address-0xC000)+(BANK_SIZE*uint(bank))]
 		default:
 			panic("Error: unexpected program rom bank mode")
 		}
@@ -123,9 +123,9 @@ func (s *SxROM) ReadProgramROM(address uint16) uint8 {
 
 		switch {
 		case PRG_ROM_START <= address && address <= 0xBFFF:
-			return s.ProgramROM[romBaseAddress+(BANK_SIZE*uint(bank))]
+			return s.programRom[romBaseAddress+(BANK_SIZE*uint(bank))]
 		case 0xC000 <= address && address <= PRG_ROM_END:
-			return s.ProgramROM[uint(address-0xC000)+(BANK_SIZE*(bankMax-1))]
+			return s.programRom[uint(address-0xC000)+(BANK_SIZE*(bankMax-1))]
 		default:
 			panic("Error: unexpected program rom bank mode")
 		}
@@ -135,7 +135,7 @@ func (s *SxROM) ReadProgramROM(address uint16) uint8 {
 }
 
 // MARK: キャラクタROMのアドレス計算
-func (s *SxROM) getCharacterROMAddress(address uint16) uint16 {
+func (s *SxROM) calcCharacterRomAddress(address uint16) uint16 {
 	/*
 		4bit0
 		-----
@@ -173,35 +173,35 @@ func (s *SxROM) getCharacterROMAddress(address uint16) uint16 {
 }
 
 // MARK: キャラクタROMの読み取り
-func (s *SxROM) ReadCharacterROM(address uint16) uint8 {
-	return s.CharacterROM[s.getCharacterROMAddress(address)]
+func (s *SxROM) ReadCharacterRom(address uint16) uint8 {
+	return s.characterRom[s.calcCharacterRomAddress(address)]
 }
 
 // MARK: キャラクタROMへの書き込み
-func (s *SxROM) WriteToCharacterROM(address uint16, data uint8) {
-	s.CharacterROM[s.getCharacterROMAddress(address)] = data
+func (s *SxROM) WriteToCharacterRom(address uint16, data uint8) {
+	s.characterRom[s.calcCharacterRomAddress(address)] = data
 }
 
 // MARK: プログラムRAMの読み取り
-func (s *SxROM) ReadProgramRAM(address uint16) uint8 {
-	return s.ProgramRAM[address-PRG_RAM_START]
+func (s *SxROM) ReadProgramRam(address uint16) uint8 {
+	return s.programRam[address-PRG_RAM_START]
 }
 
 // MARK: プログラムRAMへの書き込み
-func (s *SxROM) WriteToProgramRAM(address uint16, data uint8) {
-	s.ProgramRAM[address-PRG_RAM_START] = data
+func (s *SxROM) WriteToProgramRam(address uint16, data uint8) {
+	s.programRam[address-PRG_RAM_START] = data
 
 	// セーブデータの書き出し
-	os.WriteFile(SAVE_DATA_DIR+s.Name+".save", s.ProgramRAM[:], 0644)
+	os.WriteFile(SAVE_DATA_DIR+s.name+".save", s.programRam[:], 0644)
 }
 
 // MARK: セーブデータの書き出し
 func (s *SxROM) Save() {
-	err := os.WriteFile(SAVE_DATA_DIR+s.Name+".save", s.ProgramRAM[:], 0644)
+	err := os.WriteFile(SAVE_DATA_DIR+s.name+".save", s.programRam[:], 0644)
 	if err != nil {
 		fmt.Printf("Error saving game data: %v\n", err)
 	} else {
-		fmt.Printf("Game saved to: %s\n", SAVE_DATA_DIR+s.Name+".save")
+		fmt.Printf("Game saved to: %s\n", SAVE_DATA_DIR+s.name+".save")
 	}
 }
 
@@ -215,10 +215,10 @@ func (s *SxROM) resetShiftRegister() {
 func (s *SxROM) GenerateScanlineIRQ(scanline uint16, backgroundEnable bool) {}
 
 // MARK: IRQ状態の取得
-func (s *SxROM) GetIRQ() bool { return false }
+func (s *SxROM) IRQ() bool { return false }
 
 // MARK: ミラーリングの取得
-func (s *SxROM) GetMirroring() Mirroring {
+func (s *SxROM) Mirroring() Mirroring {
 	switch s.control & 0x03 {
 	case 2:
 		return MIRRORING_VERTICAL
@@ -230,21 +230,21 @@ func (s *SxROM) GetMirroring() Mirroring {
 }
 
 // MARK: キャラクタRAMを使用するかどうかを取得
-func (s *SxROM) GetIsCharacterRAM() bool {
-	return s.IsCharacterRAM
+func (s *SxROM) IsCharacterRam() bool {
+	return s.isCharacterRam
 }
 
 // MARK: プログラムROMの取得
-func (s *SxROM) GetProgramROM() []uint8 {
-	return s.ProgramROM
+func (s *SxROM) ProgramRom() []uint8 {
+	return s.programRom
 }
 
 // MARK: キャラクタROMの取得
-func (s *SxROM) GetCharacterROM() []uint8 {
-	return s.CharacterROM
+func (s *SxROM) CharacterRom() []uint8 {
+	return s.characterRom
 }
 
 // MARK: マッパー名の取得
-func (s *SxROM) GetMapperInfo() string {
+func (s *SxROM) MapperInfo() string {
 	return "MMC1 SxROM (Mapper 1)"
 }

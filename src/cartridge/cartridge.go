@@ -13,8 +13,8 @@ import (
 )
 
 type Cartridge struct {
-	ROM    string
-	Mapper mappers.Mapper
+	ROM    string // ROMファイルのパス
+	mapper mappers.Mapper
 }
 
 type Mirroring uint8
@@ -70,16 +70,16 @@ func (c *Cartridge) Load() error {
 	}
 
 	// マッパーオブジェクトを生成・設定
-	rom := c.GetMapper(mapperNo)
+	rom := c.selectMapper(mapperNo)
 	rom.Init(name, gamefile, savefile)
-	c.Mapper = rom
+	c.mapper = rom
 	c.DumpInfo()
 
 	return nil
 }
 
-// MARK: マッパーオブジェクトの取得
-func (c *Cartridge) GetMapper(mapperNo uint8) mappers.Mapper {
+// MARK: マッパーオブジェクトの選択
+func (c *Cartridge) selectMapper(mapperNo uint8) mappers.Mapper {
 	switch mapperNo {
 	case 0x00:
 		return &mappers.NROM{}
@@ -96,15 +96,20 @@ func (c *Cartridge) GetMapper(mapperNo uint8) mappers.Mapper {
 	}
 }
 
+// MARK: マッパーオブジェクトの取得
+func (c *Cartridge) Mapper() mappers.Mapper {
+	return c.mapper
+}
+
 // MARK: カートリッジの情報を出力
 func (c *Cartridge) DumpInfo() {
 	fmt.Printf("Cartridge loaded:\n")
-	fmt.Printf("  Mapper: %s\n", c.Mapper.GetMapperInfo())
-	fmt.Printf("  PRG ROM Size: %d bytes\n", len(c.Mapper.GetProgramROM()))
-	fmt.Printf("  CHR ROM Size: %d bytes\n", len(c.Mapper.GetCharacterROM()))
-	fmt.Printf("  CHR RAM: %v\n", c.Mapper.GetIsCharacterRAM())
+	fmt.Printf("  Mapper: %s\n", c.mapper.MapperInfo())
+	fmt.Printf("  PRG ROM Size: %d bytes\n", len(c.mapper.ProgramRom()))
+	fmt.Printf("  CHR ROM Size: %d bytes\n", len(c.mapper.CharacterRom()))
+	fmt.Printf("  CHR RAM: %v\n", c.mapper.IsCharacterRam())
 	var mirroringStr string
-	switch c.Mapper.GetMirroring() {
+	switch c.mapper.Mirroring() {
 	case mappers.MIRRORING_VERTICAL:
 		mirroringStr = "Vertical"
 	case mappers.MIRRORING_HORIZONTAL:

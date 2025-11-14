@@ -22,12 +22,12 @@ const (
 // MARK: Busの定義
 type Bus struct {
 	wram      [CPU_WRAM_SIZE + 1]uint8 // CPUのWRAM (2kB)
-	cartridge cartridge.Cartridge      // カートリッジ
-	ppu       ppu.PPU                  // PPU
-	apu       apu.APU
-	joypad1   *joypad.JoyPad // ポインタに変更
-	joypad2   *joypad.JoyPad // コントローラ (2P)
-	cycles    uint           // CPUサイクル
+	cartridge *cartridge.Cartridge     // カートリッジ
+	ppu       *ppu.PPU                 // PPU
+	apu       *apu.APU                 // APU
+	joypad1   *joypad.JoyPad           // ポインタに変更
+	joypad2   *joypad.JoyPad           // コントローラ (2P)
+	cycles    uint                     // CPUサイクル
 	callback  func(*ppu.PPU, *ppu.Canvas, *joypad.JoyPad, *joypad.JoyPad)
 	canvas    *ppu.Canvas
 }
@@ -59,44 +59,44 @@ func (b *Bus) ConnectComponents(
 	joypad2 *joypad.JoyPad,
 ) {
 	// コンポーネントをBusと接続
-	b.ppu = *ppu
-	b.apu = *apu
-	b.cartridge = *cartridge
+	b.ppu = ppu
+	b.apu = apu
+	b.cartridge = cartridge
 	b.joypad1 = joypad1
 	b.joypad2 = joypad2
 
 	// 各コンポーネントを初期化
-	b.ppu.Init(b.cartridge.Mapper)
+	b.ppu.Init(b.cartridge.Mapper())
 	b.apu.Init()
 	b.joypad1.Init()
 	b.joypad2.Init()
 }
 
 // MARK: NMIを取得
-func (b *Bus) GetNMIStatus() bool {
-	return b.ppu.GetNMI()
+func (b *Bus) NMI() bool {
+	return b.ppu.NMI()
 }
 
 // MARK: APUのIRQを取得
-func (b *Bus) GetAPUIRQ() bool {
+func (b *Bus) APUIRQ() bool {
 	return b.apu.FrameIRQ()
 }
 
 // MARK: マッパーのIRQを取得
-func (b *Bus) GetMapperIRQ() bool {
-	return b.cartridge.Mapper.GetIRQ()
+func (b *Bus) MapperIRQ() bool {
+	return b.cartridge.Mapper().IRQ()
 }
 
 // MARK: 終了処理
 func (b *Bus) Shutdown() {
-	b.cartridge.Mapper.Save()
+	b.cartridge.Mapper().Save()
 }
 
 // MARK: サイクルを進める
 func (b *Bus) Tick(cycles uint) {
 	b.cycles += cycles
 
-	nmiBefore := b.ppu.NMI
+	nmiBefore := b.ppu.CheckNMI()
 
 	// PPUはCPUの3倍のクロック周波数
 	for range cycles * 3 {
@@ -106,10 +106,10 @@ func (b *Bus) Tick(cycles uint) {
 	// APUと同期
 	b.apu.Tick(cycles)
 
-	nmiAfter := b.ppu.NMI
+	nmiAfter := b.ppu.CheckNMI()
 	if !nmiBefore && nmiAfter {
 		b.apu.EndFrame()
-		b.callback(&b.ppu, b.canvas, b.joypad1, b.joypad2)
+		b.callback(b.ppu, b.canvas, b.joypad1, b.joypad2)
 	}
 }
 
@@ -157,7 +157,7 @@ func (b *Bus) ReadByteFrom(address uint16) uint8 {
 		return b.ppu.ReadVRAM()
 	case 0x2008 <= address && address <= PPU_REG_END: // PPUレジスタのミラーリング
 		// $2000 ~ $2007 (8bytesを繰り返すようにマスク)
-		ptr := address & 0b00100000_00000111
+		ptr := 0x2000 | (address & 0x07)
 		return b.ReadByteFrom(ptr)
 	case address == 0x4014: // OAM_DATA (DMA)
 		panic("Error: attempt to read from OAM Data register")
@@ -168,12 +168,10 @@ func (b *Bus) ReadByteFrom(address uint16) uint8 {
 	case address == 0x4017: // JOYPAD (2P)
 		return b.joypad2.Read()
 	case 0x6000 <= address && address <= 0x7FFF: // プログラムRAM
-		// fmt.Printf("RAM read: $%04X, %04X\n", address, b.cartridge.Mapper.ReadProgramRAM(address))
-		return b.cartridge.Mapper.ReadProgramRAM(address)
+		return b.cartridge.Mapper().ReadProgramRam(address)
 	case PRG_ROM_START <= address && address <= PRG_ROM_END: // プログラムROM
-		return b.cartridge.Mapper.ReadProgramROM(address)
+		return b.cartridge.Mapper().ReadProgramRom(address)
 	default:
-		// fmt.Printf("Ignoring memory access at $%04X\n", address)
 		return 0x00
 	}
 }
@@ -238,7 +236,7 @@ func (b *Bus) WriteByteAt(address uint16, data uint8) {
 		b.ppu.WriteVRAM(data)
 	case 0x2008 <= address && address <= PPU_REG_END: // PPUレジスタのミラーリング
 		// $2008 ~ $3FFF は $2000 ~ $2007 (8bytesを繰り返すようにマスク) へミラーリング
-		ptr := address & 0b00100000_00000111
+		ptr := 0x2000 | (address & 0x07)
 		b.WriteByteAt(ptr, data)
 	case 0x4000 <= address && address <= 0x4003: // APU 1ch
 		b.apu.Write1ch(address, data)
@@ -277,11 +275,10 @@ func (b *Bus) WriteByteAt(address uint16, data uint8) {
 	case address == 0x4017: // APU フレームカウンタ
 		b.apu.WriteFrameSequencer(data)
 	case 0x6000 <= address && address <= 0x7FFF: // プログラムRAM
-		b.cartridge.Mapper.WriteToProgramRAM(address, data)
+		b.cartridge.Mapper().WriteToProgramRam(address, data)
 	case PRG_ROM_START <= address && address <= PRG_ROM_END: // プログラムROM
-		b.cartridge.Mapper.Write(address, data)
+		b.cartridge.Mapper().Write(address, data)
 	default:
-		// fmt.Printf("Ignoring memory write to $%04X\n", address)
 	}
 }
 
