@@ -17,6 +17,7 @@ const (
 	SAMPLE_RATE        = 44100       // 44.1kHz
 	APU_CYCLE_INTERVAL = 7457        // 分周器の間隔
 	BUFFER_SIZE        = 16384       // サンプルバッファサイズ
+	MAX_VOLUME         = 0.8
 )
 
 // MARK: APUの定義
@@ -107,6 +108,7 @@ func AudioMixCallback(userdata unsafe.Pointer, stream *C.uint8_t, length C.int) 
 		// @FIXME mixのバランス
 		mixed := (ch1[i] + ch2[i] + ch3[i] + ch4[i]) / 25
 		// mixed := (ch1[i] + ch2[i]) / 25
+		// mixed := mixSamples(ch1[i], ch2[i], ch3[i], ch4[i], float32(0))
 
 		if mixed > MAX_VOLUME {
 			mixed = MAX_VOLUME
@@ -155,7 +157,7 @@ func (a *TAPU) Tick(cycles uint) {
 }
 
 // MARK: 各チャンネルのサンプルをMixするメソッド
-func (a *TAPU) mixSamples(pulse1 float32, pulse2 float32, triangle float32, noise float32, dmc float32) float32 {
+func mixSamples(pulse1 float32, pulse2 float32, triangle float32, noise float32, dmc float32) float32 {
 	/*
 		output = pulse_out + tnd_out
 
@@ -565,147 +567,3 @@ var (
 	triangle = TriangleWaveChannel{}
 	noise    = NoiseWaveChannel{}
 )
-
-type SquareWaveChannel struct {
-	register      SquareWaveRegister // @FIXME レジスタはAPUに持たせ、ここは参照にする
-	envelope      Envelope
-	lengthCounter LengthCounter
-	sweepUnit     SweepUnit
-	duty          float32
-	phase         float32
-	buffer        BlipBuffer
-}
-
-func (swc *SquareWaveChannel) Init() {
-	swc.register = SquareWaveRegister{}
-	swc.register.Init()
-	swc.envelope = Envelope{}
-	swc.envelope.Init()
-	swc.lengthCounter = LengthCounter{}
-	swc.lengthCounter.Init()
-	swc.sweepUnit = SweepUnit{}
-	swc.sweepUnit.Init()
-	swc.buffer.Init()
-}
-
-func (swc *SquareWaveChannel) output(cycles uint) float32 {
-	frequency := swc.sweepUnit.frequency
-	if frequency < 8 || frequency > 0x7FF || swc.lengthCounter.isMuted() || swc.sweepUnit.isMuted() {
-		// ミュートの時は0.0を返す
-		return 0.0
-	}
-
-	// 進める位相 (進んだクロック数 / 1周期に必要なクロック数)
-	period := float32(16.0 * (frequency + 1))
-	swc.phase += float32(cycles) / period
-
-	if swc.phase >= 1.0 {
-		// 0.0 ~ 1.0 の範囲に制限
-		swc.phase -= 1.0
-	}
-
-	value := 0.0
-	if swc.phase <= swc.duty {
-		value = 1.0
-	} else {
-		value = -1.0
-	}
-
-	return float32(value) * swc.envelope.volume()
-}
-
-type TriangleWaveChannel struct {
-	register      TriangleWaveRegister
-	lengthCounter LengthCounter
-	linearCounter LinearCounter
-	frequency     uint16
-	phase         float32
-	buffer        BlipBuffer
-}
-
-func (twc *TriangleWaveChannel) Init() {
-	twc.register = TriangleWaveRegister{}
-	twc.register.Init()
-	twc.lengthCounter = LengthCounter{}
-	twc.lengthCounter.Init()
-	twc.linearCounter = LinearCounter{}
-	twc.linearCounter.Init()
-	twc.buffer.Init()
-}
-
-func (twc *TriangleWaveChannel) output(cycles uint) float32 {
-	if twc.lengthCounter.isMuted() || twc.linearCounter.isMuted() || twc.frequency < 2 {
-		return 0.0
-	}
-
-	period := float32((twc.frequency + 1) * 32)
-	twc.phase += float32(cycles) / period
-
-	if twc.phase >= 1.0 {
-		// 0.0 ~ 1.0 の範囲に制限
-		twc.phase -= 1.0
-	}
-
-	// -1.0 から 1.0 の範囲で線形に変化する三角波を生成
-	var value float32
-	if twc.phase < 0.5 {
-		// 0.0 -> 0.5 の区間で 1.0 -> -1.0 に変化
-		value = 1.0 - 4.0*twc.phase
-	} else {
-		// 0.5 -> 1.0 の区間で -1.0 -> 1.0 に変化
-		value = -1.0 + 4.0*(twc.phase-0.5)
-	}
-
-	return value
-}
-
-type NoiseWaveChannel struct {
-	register      NoiseWaveRegister
-	envelope      Envelope
-	lengthCounter LengthCounter
-	mode          NoiseRegisterMode
-	shiftRegister NoiseShiftRegister
-	prev          bool
-	index         uint8
-	phase         float32
-	buffer        BlipBuffer
-}
-
-func (nwc *NoiseWaveChannel) Init() {
-	nwc.register = NoiseWaveRegister{}
-	nwc.register.Init()
-	nwc.envelope = Envelope{}
-	nwc.envelope.Init()
-	nwc.lengthCounter = LengthCounter{}
-	nwc.lengthCounter.Init()
-	nwc.mode = NOISE_MODE_SHORT
-	nwc.shiftRegister = NoiseShiftRegister{}
-	nwc.shiftRegister.InitWithShortMode()
-	nwc.buffer = BlipBuffer{}
-	nwc.buffer.Init()
-}
-
-func (nwc *NoiseWaveChannel) output(cycles uint) float32 {
-	if nwc.lengthCounter.isMuted() {
-		return 0.0
-	}
-
-	period := nwc.register.Frequency()
-	nwc.phase += float32(cycles)
-
-	if nwc.phase >= period {
-		for nwc.phase >= period {
-			nwc.prev = nwc.shiftRegister.next()
-			nwc.phase -= period
-		}
-	}
-
-	var value float32
-	if !nwc.prev {
-		value = MAX_VOLUME * float32(nwc.envelope.volume())
-	} else {
-		value = 0.0
-	}
-
-	return value
-}

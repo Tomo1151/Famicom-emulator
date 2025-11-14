@@ -35,7 +35,7 @@ type InputState struct {
 type Famicom struct {
 	cpu       cpu.CPU
 	ppu       ppu.PPU
-	apu       apu.APU
+	apu       apu.TAPU
 	joypad1   joypad.JoyPad
 	joypad2   joypad.JoyPad
 	bus       bus.Bus
@@ -62,7 +62,7 @@ func (f *Famicom) Init(cartridge cartridge.Cartridge) {
 	// 各コンポーネントの定義 / 接続
 	f.cpu = cpu.CPU{}
 	f.ppu = ppu.PPU{}
-	f.apu = apu.APU{}
+	f.apu = apu.TAPU{}
 	f.joypad1 = joypad.JoyPad{}
 	f.joypad2 = joypad.JoyPad{}
 	f.bus = bus.Bus{}
