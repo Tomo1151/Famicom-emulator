@@ -67,7 +67,7 @@ func (b *Bus) ConnectComponents(
 
 	// 各コンポーネントを初期化
 	b.ppu.Init(b.cartridge.Mapper())
-	b.apu.Init()
+	b.apu.Init(b.ReadByteFrom)
 	b.joypad1.Init()
 	b.joypad2.Init()
 }
@@ -104,7 +104,9 @@ func (b *Bus) Tick(cycles uint) {
 	}
 
 	// APUと同期
-	b.apu.Tick(cycles)
+	for range cycles {
+		b.apu.Tick(1)
+	}
 
 	nmiAfter := b.ppu.CheckNMI()
 	if !nmiBefore && nmiAfter {
@@ -255,6 +257,8 @@ func (b *Bus) WriteByteAt(address uint16, data uint8) {
 	case address == 0x400F: // APU 4ch
 		b.apu.Write4ch(address, data)
 	case 0x4010 <= address && address <= 0x4013: // APU 5ch
+		b.apu.Write5ch(address, data)
+		// fmt.Printf("W 5ch: %04X -> %02X\n", address, data)
 	case address == 0x4014: // DMA転送
 		var buffer [256]uint8
 		upper := uint16(data) << 8

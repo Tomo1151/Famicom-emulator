@@ -1,5 +1,11 @@
 package apu
 
+// MARK: 変数定義
+var triangleSequence = [32]uint8{
+	15, 14, 13, 12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1, 0,
+	0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15,
+}
+
 // MARK: 三角波チャンネルの定義
 type TriangleWaveChannel struct {
 	register      TriangleWaveRegister
@@ -27,23 +33,12 @@ func (twc *TriangleWaveChannel) output(cycles uint) float32 {
 		return 0.0
 	}
 
-	period := float32((twc.frequency + 1) * 32)
-	twc.phase += float32(cycles) / period
+	// タイマー値から現在のシーケンス位置を計算
+	period := (twc.frequency + 1)
+	twc.phase += float32(cycles)
 
-	if twc.phase >= 1.0 {
-		// 0.0 ~ 1.0 の範囲に制限
-		twc.phase -= 1.0
-	}
+	// 32ステップのシーケンサ
+	step := uint(twc.phase/float32(period)) % 32
 
-	// -1.0 から 1.0 の範囲で線形に変化する三角波を生成
-	var value float32
-	if twc.phase < 0.5 {
-		// 0.0 -> 0.5 の区間で 1.0 -> -1.0 に変化
-		value = 1.0 - 4.0*twc.phase
-	} else {
-		// 0.5 -> 1.0 の区間で -1.0 -> 1.0 に変化
-		value = -1.0 + 4.0*(twc.phase-0.5)
-	}
-
-	return value
+	return float32(triangleSequence[step])
 }

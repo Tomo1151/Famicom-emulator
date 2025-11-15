@@ -41,12 +41,10 @@ func (swc *SquareWaveChannel) output(cycles uint) float32 {
 		swc.phase -= 1.0
 	}
 
-	value := 0.0
+	// パルスがHIGHの時だけエンベロープの音量を返す
 	if swc.phase <= swc.duty {
-		value = 1.0
+		return swc.envelope.Volume()
 	} else {
-		value = -1.0
+		return 0.0
 	}
-
-	return float32(value) * swc.envelope.volume()
 }

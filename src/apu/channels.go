@@ -6,4 +6,5 @@ var (
 	square2  = SquareWaveChannel{}
 	triangle = TriangleWaveChannel{}
 	noise    = NoiseWaveChannel{}
+	dmc      = DMCWaveChannel{}
 )

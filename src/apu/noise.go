@@ -44,12 +44,9 @@ func (nwc *NoiseWaveChannel) output(cycles uint) float32 {
 		}
 	}
 
-	var value float32
 	if !nwc.prev {
-		value = MAX_VOLUME * float32(nwc.envelope.volume())
+		return nwc.envelope.Volume()
 	} else {
-		value = 0.0
+		return 0.0
 	}
-
-	return value
 }

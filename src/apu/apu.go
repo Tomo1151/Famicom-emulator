@@ -16,12 +16,17 @@ const (
 	CPU_CLOCK          = 1_789_772.5 // 1.78MHz
 	SAMPLE_RATE        = 44100       // 44.1kHz
 	APU_CYCLE_INTERVAL = 7457        // 分周器の間隔
-	BUFFER_SIZE        = 16384       // サンプルバッファサイズ
-	MAX_VOLUME         = 0.8
+	BUFFER_SIZE        = 4096        // サンプルバッファサイズ
+	MAX_VOLUME         = 1.0         // 最大音量
+	MASTER_VOLUME      = 0.15        // 全体音量
 )
+
+// CPUバスからデータを読み取るための関数型
+type CpuBusReader func(uint16) uint8
 
 // MARK: APUの定義
 type APU struct {
+	volume float32
 	cycles uint
 	step   uint8
 
@@ -30,23 +35,28 @@ type APU struct {
 	channel2 *SquareWaveChannel
 	channel3 *TriangleWaveChannel
 	channel4 *NoiseWaveChannel
+	channel5 *DMCWaveChannel
 
 	frameCounter FrameCounter
 	status       StatusRegister
 
 	sampleClock uint64
+	cpuRead     CpuBusReader
 
 	// 各チャンネルの前回レベルを保持
 	prevLevel1 float32
 	prevLevel2 float32
 	prevLevel3 float32
 	prevLevel4 float32
+	prevLevel5 float32
 }
 
 // MARK: APUの初期化メソッド
-func (a *APU) Init() {
+func (a *APU) Init(reader CpuBusReader) {
+	a.volume = 1.0
 	a.cycles = 0
 	a.step = 0
+	a.cpuRead = reader
 
 	a.channel1 = &square1
 	a.channel1.Init()
@@ -56,6 +66,8 @@ func (a *APU) Init() {
 	a.channel3.Init()
 	a.channel4 = &noise
 	a.channel4.Init()
+	a.channel5 = &dmc
+	a.channel5.Init(a.cpuRead)
 
 	a.frameCounter = FrameCounter{}
 	a.frameCounter.Init()
@@ -67,6 +79,7 @@ func (a *APU) Init() {
 	a.prevLevel2 = 0.0
 	a.prevLevel3 = 0.0
 	a.prevLevel4 = 0.0
+	a.prevLevel5 = 0.0
 
 	// オーディオデバイスの初期化
 	a.initAudioDevice()
@@ -101,24 +114,32 @@ func AudioMixCallback(userdata unsafe.Pointer, stream *C.uint8_t, length C.int) 
 	ch2 := make([]float32, BUFFER_SIZE)[:n]
 	ch3 := make([]float32, BUFFER_SIZE)[:n]
 	ch4 := make([]float32, BUFFER_SIZE)[:n]
+	ch5 := make([]float32, BUFFER_SIZE)[:n]
 
 	square1.buffer.Read(ch1, n)
 	square2.buffer.Read(ch2, n)
 	triangle.buffer.Read(ch3, n)
 	noise.buffer.Read(ch4, n)
+	dmc.buffer.Read(ch5, n)
 
 	for i := range n {
 		// @FIXME mixのバランス
-		mixed := (ch1[i] + ch2[i] + ch3[i] + ch4[i]) / 25
+		// mixed := (ch1[i] + ch2[i] + ch3[i] + ch4[i] + ch5[i]) / 25
 		// mixed := (ch1[i] + ch2[i]) / 25
-		// mixed := mixSamples(ch1[i], ch2[i], ch3[i], ch4[i], float32(0))
+		// stage1Input := ch5[i]
+		// dmcFilterStage1 += (ch5[i] - dmcFilterStage1) * dmcFilterAlpha1
+		// dmcFilterStage2 += (dmcFilterStage1 - dmcFilterStage2) * dmcFilterAlpha2
+		// dmcFilterStage3 += (dmcFilterStage2 - dmcFilterStage3) * dmcFilterAlpha3
+		// filteredDmc := dmcFilterStage3
+
+		mixed := mixSamples(ch1[i], ch2[i], ch3[i], ch4[i], ch5[i])
 
 		if mixed > MAX_VOLUME {
 			mixed = MAX_VOLUME
 		} else if mixed < -MAX_VOLUME {
 			mixed = -MAX_VOLUME
 		}
-		buffer[i] = mixed
+		buffer[i] = mixed * MASTER_VOLUME
 	}
 }
 
@@ -128,17 +149,33 @@ func (a *APU) Tick(cycles uint) {
 	a.sampleClock += uint64(cycles)
 	a.clockFrameSequencer()
 
+	// DMCタイマーを進める
+	a.channel5.tick(cycles)
+
 	// 現在のレベルを計算
-	currentLevel1 := a.channel1.output(cycles)
-	currentLevel2 := a.channel2.output(cycles)
-	currentLevel3 := a.channel3.output(cycles)
-	currentLevel4 := a.channel4.output(cycles)
+	var currentLevel1, currentLevel2, currentLevel3, currentLevel4, currentLevel5 float32
+	if a.status.is1chEnabled() {
+		currentLevel1 = a.channel1.output(cycles)
+	}
+	if a.status.is2chEnabled() {
+		currentLevel2 = a.channel2.output(cycles)
+	}
+	if a.status.is3chEnabled() {
+		currentLevel3 = a.channel3.output(cycles)
+	}
+	if a.status.is4chEnabled() {
+		currentLevel4 = a.channel4.output(cycles)
+	}
+	if a.status.is5chEnabled() {
+		currentLevel5 = a.channel5.output()
+	}
 
 	// 前回レベルとの差分を計算
 	delta1 := currentLevel1 - a.prevLevel1
 	delta2 := currentLevel2 - a.prevLevel2
 	delta3 := currentLevel3 - a.prevLevel3
 	delta4 := currentLevel4 - a.prevLevel4
+	delta5 := currentLevel5 - a.prevLevel5
 
 	// レベルが変化した場合のみ、差分をバッファに追加
 	if delta1 != 0 {
@@ -157,6 +194,11 @@ func (a *APU) Tick(cycles uint) {
 		a.channel4.buffer.addDelta(a.sampleClock, delta4)
 		a.prevLevel4 = currentLevel4
 	}
+	if delta5 != 0 {
+		a.channel5.buffer.addDelta(a.sampleClock, delta5)
+		a.prevLevel5 = currentLevel5
+	}
+	// a.channel5.buffer.Write(a.sampleClock, currentLevel5)
 }
 
 // MARK: ステータスレジスタの読み込みメソッド
@@ -188,6 +230,11 @@ func (a *APU) WriteStatus(data uint8) {
 	}
 	if (prev&(1<<STATUS_REG_ENABLE_4CH_POS)) != 0 && !a.status.is4chEnabled() {
 		a.channel4.lengthCounter.counter = 0
+	}
+	if (prev&(1<<STATUS_REG_ENABLE_5CH_POS)) != 0 && !a.status.is5chEnabled() {
+		a.channel5.setEnabled(false)
+	} else if (prev&(1<<STATUS_REG_ENABLE_5CH_POS)) == 0 && a.status.is5chEnabled() {
+		a.channel5.setEnabled(true)
 	}
 }
 
@@ -440,6 +487,43 @@ func (a *APU) Write4ch(address uint16, data uint8) {
 	}
 }
 
+// MARK: 5chの書き込みメソッド (DMC)
+func (a *APU) Write5ch(address uint16, data uint8) {
+	a.channel5.register.write(address, data)
+
+	switch address {
+	case 0x4010:
+		/*
+			$4010    il-- ffff
+				7   i    割り込み有効フラグ
+				6   l    ループフラグ
+				3-0 f    周期インデックス
+		*/
+		a.channel5.timerPeriod = dmcFrequencyTable[a.channel5.register.frequencyIndex]
+		a.channel5.timerValue = a.channel5.timerPeriod
+	case 0x4011:
+		/*
+			$4011    -ddd dddd
+				6-0 d    デルタカウンタ初期値
+		*/
+		a.channel5.deltaCounter = a.channel5.register.deltaCounter
+	case 0x4012:
+		/*
+			$4012    aaaa aaaa
+				7-0 a    サンプル開始アドレス
+		*/
+		// a.channel5.baseAddress = uint16(a.channel5.register.sampleStartAddress)*0x40 + 0xC000
+	case 0x4013:
+		/*
+			$4013    llll llll
+				7-0 l    サンプルバイト数
+
+				llll.llll0001 = (l * 16) + 1
+		*/
+		// a.channel5.byteCount = (uint16(data) << 4) + 1
+	}
+}
+
 // MARK: バッファのフラッシュ
 func (a *APU) EndFrame() {
 	// フレームの終わりまでの時間を処理するため、現在のクロックを渡す
@@ -447,6 +531,15 @@ func (a *APU) EndFrame() {
 	a.channel2.buffer.endFrame(a.sampleClock)
 	a.channel3.buffer.endFrame(a.sampleClock)
 	a.channel4.buffer.endFrame(a.sampleClock)
+	a.channel5.buffer.endFrame(a.sampleClock)
+
+	// クロックとバッファの lastTime をリセット
+	a.sampleClock = 0
+	a.channel1.buffer.resetTime()
+	a.channel2.buffer.resetTime()
+	a.channel3.buffer.resetTime()
+	a.channel4.buffer.resetTime()
+	a.channel5.buffer.resetTime()
 }
 
 // MARK: エンベロープのクロック (1ch/2ch/4ch)
@@ -551,7 +644,19 @@ func mixSamples(pulse1 float32, pulse2 float32, triangle float32, noise float32,
 							----------------------------------------------------- + 100
 								(triangle / 8227) + (noise / 12241) + (dmc / 22638)
 	*/
-	pulseOut := 95.88 / ((8128 / (pulse1 + pulse2)) + 100)
-	tndOut := 159.79 / ((1/(triangle/8227) + (noise / 12241) + (dmc / 22638)) + 100)
+	// 矩形波チャンネルのミックス
+	var pulseOut float32
+	pulseSum := pulse1 + pulse2
+	if pulseSum > 0 {
+		pulseOut = 95.88 / (8128/pulseSum + 100)
+	}
+
+	// 三角波、ノイズ、DMCチャンネルのミックス
+	var tndOut float32
+	tndSum := (triangle / 8227.0) + (noise / 12241.0) + (dmc / 22638.0)
+	if tndSum > 0 {
+		tndOut = 159.79 / (1/tndSum + 100)
+	}
+
 	return pulseOut + tndOut
 }

@@ -25,11 +25,11 @@ func (e *Envelope) Init() {
 }
 
 // MARK: エンベロープからボリュームを取得するメソッド
-func (e *Envelope) volume() float32 {
+func (e *Envelope) Volume() float32 {
 	if e.data.enabled {
-		return float32(e.counter) / 15.0
+		return float32(e.counter)
 	} else {
-		return float32(e.data.rate) / 15.0
+		return float32(e.data.rate)
 	}
 }
 
@@ -96,14 +96,6 @@ func (su *SweepUnit) Init() {
 	su.counter = 0
 	su.mute = true
 	su.reload = false
-}
-
-// MARK: スイープの周波数を取得するメソッド
-func (su *SweepUnit) Frequency() float32 {
-	if su.frequency == 0 {
-		return 0.0
-	}
-	return CPU_CLOCK / (16.0 * (float32(su.frequency) + 1.0))
 }
 
 // MARK: スイープのリセット

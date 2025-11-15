@@ -19,7 +19,7 @@ type BlipBuffer struct {
 func (b *BlipBuffer) Init() {
 	b.sampleRate = float64(SAMPLE_RATE)
 	b.tickRate = float64(CPU_CLOCK)
-	b.samples = make([]float32, 0, 8192)
+	b.samples = make([]float32, 0, BUFFER_SIZE)
 }
 
 // MARK: レベルの差分を追加するメソッド
@@ -71,4 +71,90 @@ func (b *BlipBuffer) Read(out []float32, count int) int {
 func (b *BlipBuffer) endFrame(time uint64) {
 	// 最後のイベントから現在時刻までをフラッシュ
 	b.addDelta(time, 0)
+}
+
+// MARK: 時間のリセットをするメソッド
+func (b *BlipBuffer) resetTime() {
+	b.mutex.Lock()
+	defer b.mutex.Unlock()
+	b.lastTime = 0
+	b.frac = 0
+}
+
+// MARK: ResamplingBufferの定義
+type ResamplingBuffer struct {
+	sampleRate float64
+	tickRate   float64
+	lastTime   uint64
+	lastLevel  float32
+	frac       float64
+	samples    []float32
+	mutex      sync.Mutex
+}
+
+// MARK: ResamplingBuffer初期化メソッド
+func (b *ResamplingBuffer) Init() {
+	b.sampleRate = float64(SAMPLE_RATE)
+	b.tickRate = float64(CPU_CLOCK)
+	b.samples = make([]float32, 0, BUFFER_SIZE)
+}
+
+// MARK: ResamplingBufferの書き込みメソッド
+func (b *ResamplingBuffer) Write(time uint64, level float32) {
+	b.mutex.Lock()
+	defer b.mutex.Unlock()
+
+	dt := time - b.lastTime
+	if dt <= 0 {
+		b.lastLevel = level
+		return
+	}
+
+	samplesToGen := b.frac + (float64(dt) * b.sampleRate / b.tickRate)
+	count := int(samplesToGen)
+
+	if count > 0 {
+		// 線形補間を行う
+		step := (level - b.lastLevel) / float32(count)
+		current := b.lastLevel
+
+		for range count {
+			b.samples = append(b.samples, current)
+			current += step
+		}
+	}
+
+	b.frac = samplesToGen - float64(count)
+	b.lastTime = time
+	b.lastLevel = level
+}
+
+// MARK: ResamplingBufferの読み取りメソッド
+func (b *ResamplingBuffer) Read(out []float32, count int) int {
+	b.mutex.Lock()
+	defer b.mutex.Unlock()
+
+	n := min(len(b.samples), count)
+	if n > 0 {
+		copy(out, b.samples[:n])
+		b.samples = b.samples[n:]
+	}
+
+	for i := n; i < count && i < len(out); i++ {
+		out[i] = 0
+	}
+	return n
+}
+
+// MARK: バッファのフラッシュをするメソッド
+func (b *ResamplingBuffer) endFrame(time uint64) {
+	b.Write(time, b.lastLevel)
+}
+
+// MARK: 時間のリセットをするメソッド
+func (b *ResamplingBuffer) resetTime() {
+	b.mutex.Lock()
+	defer b.mutex.Unlock()
+	b.lastTime = 0
+	b.frac = 0
 }
