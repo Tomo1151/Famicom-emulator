@@ -21,6 +21,14 @@ const (
 	MASTER_VOLUME      = 0.15        // 全体音量
 )
 
+var (
+	ch1Buffer [BUFFER_SIZE]float32
+	ch2Buffer [BUFFER_SIZE]float32
+	ch3Buffer [BUFFER_SIZE]float32
+	ch4Buffer [BUFFER_SIZE]float32
+	ch5Buffer [BUFFER_SIZE]float32
+)
+
 // CPUバスからデータを読み取るための関数型
 type CpuBusReader func(uint16) uint8
 
@@ -91,7 +99,7 @@ func (a *APU) initAudioDevice() {
 		Freq:     SAMPLE_RATE,
 		Format:   sdl.AUDIO_F32,
 		Channels: 1,
-		Samples:  2048,
+		Samples:  512,
 		Callback: sdl.AudioCallback(C.AudioMixCallback),
 	}
 
@@ -110,11 +118,11 @@ func AudioMixCallback(userdata unsafe.Pointer, stream *C.uint8_t, length C.int) 
 	n := int(length) / 4
 	buffer := unsafe.Slice((*float32)(unsafe.Pointer(stream)), n)
 
-	ch1 := make([]float32, BUFFER_SIZE)[:n]
-	ch2 := make([]float32, BUFFER_SIZE)[:n]
-	ch3 := make([]float32, BUFFER_SIZE)[:n]
-	ch4 := make([]float32, BUFFER_SIZE)[:n]
-	ch5 := make([]float32, BUFFER_SIZE)[:n]
+	ch1 := ch1Buffer[:n]
+	ch2 := ch2Buffer[:n]
+	ch3 := ch3Buffer[:n]
+	ch4 := ch4Buffer[:n]
+	ch5 := ch5Buffer[:n]
 
 	square1.buffer.Read(ch1, n)
 	square2.buffer.Read(ch2, n)
@@ -175,7 +183,7 @@ func (a *APU) Tick(cycles uint) {
 	delta2 := currentLevel2 - a.prevLevel2
 	delta3 := currentLevel3 - a.prevLevel3
 	delta4 := currentLevel4 - a.prevLevel4
-	delta5 := currentLevel5 - a.prevLevel5
+	// delta5 := currentLevel5 - a.prevLevel5
 
 	// レベルが変化した場合のみ、差分をバッファに追加
 	if delta1 != 0 {
@@ -194,11 +202,12 @@ func (a *APU) Tick(cycles uint) {
 		a.channel4.buffer.addDelta(a.sampleClock, delta4)
 		a.prevLevel4 = currentLevel4
 	}
-	if delta5 != 0 {
-		a.channel5.buffer.addDelta(a.sampleClock, delta5)
-		a.prevLevel5 = currentLevel5
-	}
-	// a.channel5.buffer.Write(a.sampleClock, currentLevel5)
+	// if delta5 != 0 {
+	// a.channel5.buffer.addDelta(a.sampleClock, delta5)
+	// a.prevLevel5 = currentLevel5
+	// }
+	a.channel5.buffer.Write(a.sampleClock, currentLevel5)
+	a.prevLevel5 = currentLevel5
 }
 
 // MARK: ステータスレジスタの読み込みメソッド
@@ -533,13 +542,13 @@ func (a *APU) EndFrame() {
 	a.channel4.buffer.endFrame(a.sampleClock)
 	a.channel5.buffer.endFrame(a.sampleClock)
 
-	// クロックとバッファの lastTime をリセット
-	a.sampleClock = 0
-	a.channel1.buffer.resetTime()
-	a.channel2.buffer.resetTime()
-	a.channel3.buffer.resetTime()
-	a.channel4.buffer.resetTime()
-	a.channel5.buffer.resetTime()
+	// // クロックとバッファの lastTime をリセット
+	// a.sampleClock = 0
+	// a.channel1.buffer.resetTime()
+	// a.channel2.buffer.resetTime()
+	// a.channel3.buffer.resetTime()
+	// a.channel4.buffer.resetTime()
+	// a.channel5.buffer.resetTime()
 }
 
 // MARK: エンベロープのクロック (1ch/2ch/4ch)

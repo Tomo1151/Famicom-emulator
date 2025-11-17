@@ -30,7 +30,7 @@ type DMCWaveChannel struct {
 	bitsLeft    uint8
 	bytesLeft   uint16
 
-	buffer BlipBuffer
+	buffer ResamplingBuffer
 }
 
 // MARK: DMCの初期化メソッド
@@ -101,9 +101,6 @@ func (dwc *DMCWaveChannel) tick(cycles uint) {
 
 // MARK: DMCの出力メソッド
 func (dwc *DMCWaveChannel) output() float32 {
-	if !dwc.enabled {
-		return 0.0
-	}
 	return float32(dwc.deltaCounter)
 }
 

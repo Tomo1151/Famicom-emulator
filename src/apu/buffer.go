@@ -54,15 +54,17 @@ func (b *BlipBuffer) Read(out []float32, count int) int {
 	b.mutex.Lock()
 	defer b.mutex.Unlock()
 
+	var last float32 = b.lastLevel
 	n := min(len(b.samples), count)
 	if n > 0 {
+		last = b.samples[n-1]
 		copy(out, b.samples[:n])
 		b.samples = b.samples[n:]
 	}
 
 	// 足りない分を0で埋める
 	for i := n; i < count && i < len(out); i++ {
-		out[i] = 0
+		out[i] = last
 	}
 	return n
 }
@@ -134,14 +136,16 @@ func (b *ResamplingBuffer) Read(out []float32, count int) int {
 	b.mutex.Lock()
 	defer b.mutex.Unlock()
 
+	var last float32 = b.lastLevel
 	n := min(len(b.samples), count)
 	if n > 0 {
+		last = b.samples[n-1]
 		copy(out, b.samples[:n])
 		b.samples = b.samples[n:]
 	}
 
 	for i := n; i < count && i < len(out); i++ {
-		out[i] = 0
+		out[i] = last
 	}
 	return n
 }
