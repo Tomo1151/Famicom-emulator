@@ -1,6 +1,7 @@
 package apu
 
 import (
+	"fmt"
 	"sync"
 )
 
@@ -56,6 +57,11 @@ func (b *BlipBuffer) Read(out []float32, count int) int {
 
 	var last float32 = b.lastLevel
 	n := min(len(b.samples), count)
+
+	if len(b.samples) < count {
+		fmt.Printf("[BlipBuffer] Warning: couldn't read enough samples (want: %4d, got: %4d)\n", count, len(b.samples))
+	}
+
 	if n > 0 {
 		last = b.samples[n-1]
 		copy(out, b.samples[:n])
@@ -138,6 +144,11 @@ func (b *ResamplingBuffer) Read(out []float32, count int) int {
 
 	var last float32 = b.lastLevel
 	n := min(len(b.samples), count)
+
+	if len(b.samples) < count {
+		fmt.Printf("[BlipBuffer] Warning: couldn't read enough samples (want: %4d, got: %4d)\n", count, len(b.samples))
+	}
+
 	if n > 0 {
 		last = b.samples[n-1]
 		copy(out, b.samples[:n])
