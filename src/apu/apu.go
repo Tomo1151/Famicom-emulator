@@ -16,7 +16,7 @@ const (
 	CPU_CLOCK          = 1_789_772.5 // 1.78MHz
 	SAMPLE_RATE        = 44100       // 44.1kHz
 	APU_CYCLE_INTERVAL = 7457        // 分周器の間隔
-	BUFFER_SIZE        = 4096        // サンプルバッファサイズ
+	BUFFER_SIZE        = 1024 * 4    // サンプルバッファサイズ
 	MAX_VOLUME         = 1.0         // 最大音量
 	MASTER_VOLUME      = 0.15        // 全体音量
 )
@@ -99,7 +99,7 @@ func (a *APU) initAudioDevice() {
 		Freq:     SAMPLE_RATE,
 		Format:   sdl.AUDIO_F32,
 		Channels: 1,
-		Samples:  512,
+		Samples:  BUFFER_SIZE / 2,
 		Callback: sdl.AudioCallback(C.AudioMixCallback),
 	}
 
@@ -183,7 +183,7 @@ func (a *APU) Tick(cycles uint) {
 	delta2 := currentLevel2 - a.prevLevel2
 	delta3 := currentLevel3 - a.prevLevel3
 	delta4 := currentLevel4 - a.prevLevel4
-	// delta5 := currentLevel5 - a.prevLevel5
+	delta5 := currentLevel5 - a.prevLevel5
 
 	// レベルが変化した場合のみ、差分をバッファに追加
 	if delta1 != 0 {
@@ -202,12 +202,10 @@ func (a *APU) Tick(cycles uint) {
 		a.channel4.buffer.addDelta(a.sampleClock, delta4)
 		a.prevLevel4 = currentLevel4
 	}
-	// if delta5 != 0 {
-	// a.channel5.buffer.addDelta(a.sampleClock, delta5)
-	// a.prevLevel5 = currentLevel5
-	// }
-	a.channel5.buffer.Write(a.sampleClock, currentLevel5)
-	a.prevLevel5 = currentLevel5
+	if delta5 != 0 {
+		a.channel5.buffer.addDelta(a.sampleClock, delta5)
+		a.prevLevel5 = currentLevel5
+	}
 }
 
 // MARK: ステータスレジスタの読み込みメソッド

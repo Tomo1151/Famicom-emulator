@@ -30,7 +30,7 @@ type DMCWaveChannel struct {
 	bitsLeft    uint8
 	bytesLeft   uint16
 
-	buffer ResamplingBuffer
+	buffer BlipBuffer
 }
 
 // MARK: DMCの初期化メソッド
