@@ -9,7 +9,6 @@ import (
 	"Famicom-emulator/ppu"
 	"log"
 	"runtime"
-	"sync/atomic"
 	"time"
 
 	// gotk3 (GTK3 bindings)
@@ -47,12 +46,9 @@ type Famicom struct {
 	controller1 InputState // 1P Gamepad (HID)
 	controller2 InputState // 2P Gamepad (HID)
 
-	lastFrameUnixNano int64 // 前回描画時刻 (原子操作)
-
 	// フレーム転送用バッファとフラグ (GTKメインスレッドでのみUI更新)
-	frameBuf   []byte
-	srcPixbuf  *gdk.Pixbuf
-	frameReady int32 // 0=未準備,1=準備完了
+	frameBuf  []byte
+	srcPixbuf *gdk.Pixbuf
 }
 
 // MARK: Famicomの初期化メソッド
@@ -156,25 +152,15 @@ func (f *Famicom) Start() {
 		log.Fatalf("srcPixbuf create error: %v", perr2)
 	}
 
+	// チャンネル作成
+	renderChan := make(chan struct{})
+	resumeChan := make(chan struct{})
+
 	// NMI コールバック: フレーム生成のみ (UI操作しない)
 	f.bus.Init(func(p *ppu.PPU, c *ppu.Canvas, j1 *joypad.JoyPad, j2 *joypad.JoyPad) {
 		// JoyPad 状態更新 (入力は即時反映でOK)
 		f.updateJoyPad(j1, &f.keyboard1, &f.controller1)
 		f.updateJoyPad(j2, &f.keyboard2, &f.controller2)
-
-		// FPS制御: 前回フレーム生成時刻からの経過チェック
-		now := time.Now().UnixNano()
-		last := atomic.LoadInt64(&f.lastFrameUnixNano)
-		frameDuration := int64(time.Second / FRAME_PER_SECOND)
-		if now-last < frameDuration {
-			return // 次フレームまだ早いので生成しない
-		}
-		atomic.StoreInt64(&f.lastFrameUnixNano, now)
-
-		// 既に未消費フレームがあれば捨て (UI遅延時のバックプレッシャー)
-		if atomic.LoadInt32(&f.frameReady) == 1 {
-			return
-		}
 
 		// 内部キャンバス 512x240 の左半分 (256x240) だけを表示用にコピー
 		bufFull := c.Buffer[:]
@@ -184,23 +170,36 @@ func (f *Famicom) Start() {
 			srcRowStart := y * rowBytes
 			copy(f.frameBuf[y*visibleRowBytes:(y+1)*visibleRowBytes], bufFull[srcRowStart:srcRowStart+visibleRowBytes])
 		}
-		atomic.StoreInt32(&f.frameReady, 1)
 
-		// UIスレッドで描画更新をスケジュール
-		glib.IdleAdd(func() bool {
-			if atomic.LoadInt32(&f.frameReady) == 1 {
-				// f.srcPixbuf を使用してスケーリング
-				scaledPixbuf, err := f.srcPixbuf.ScaleSimple(windowWidth, windowHeight, gdk.INTERP_NEAREST)
-				if err == nil {
-					image.SetFromPixbuf(scaledPixbuf)
-				} else {
-					log.Printf("Pixbuf scale error: %v", err)
-				}
-				atomic.StoreInt32(&f.frameReady, 0)
-			}
-			return false // 1回だけ実行
-		})
+		// 描画準備完了を通知
+		renderChan <- struct{}{}
+
+		// メインスレッドの描画完了を待機 (FPS制御)
+		<-resumeChan
 	})
+
+	// FPS制御用タイマー (メインスレッド側で制御)
+	go func() {
+		ticker := time.NewTicker(time.Second / FRAME_PER_SECOND)
+		defer ticker.Stop()
+		for range ticker.C {
+			glib.IdleAdd(func() bool {
+				select {
+				case <-renderChan:
+					// 描画処理
+					scaledPixbuf, err := f.srcPixbuf.ScaleSimple(windowWidth, windowHeight, gdk.INTERP_NEAREST)
+					if err == nil {
+						image.SetFromPixbuf(scaledPixbuf)
+					}
+					// CPU再開
+					resumeChan <- struct{}{}
+				default:
+					// CPUがまだフレームを生成していない場合はスキップ
+				}
+				return false
+			})
+		}
+	}()
 
 	// CPU 初期化 & 実行
 	f.cpu.Init(f.bus, false)
