@@ -99,12 +99,62 @@ func (f *Famicom) Start() {
 		gtk.MainQuit()
 	})
 
+	// 垂直ボックスを作成 (メニューバーとゲーム画面を配置)
+	vbox, err := gtk.BoxNew(gtk.ORIENTATION_VERTICAL, 0)
+	if err != nil {
+		log.Fatalf("GTK box error: %v", err)
+	}
+	window.Add(vbox)
+
+	// メニューバーを作成
+	menubar, err := gtk.MenuBarNew()
+	if err != nil {
+		log.Fatalf("GTK menubar error: %v", err)
+	}
+	vbox.PackStart(menubar, false, false, 0)
+
+	// "File" メニュー項目を作成
+	fileMenuItem, err := gtk.MenuItemNewWithLabel("File")
+	if err != nil {
+		log.Fatalf("GTK menu item error: %v", err)
+	}
+	menubar.Append(fileMenuItem)
+
+	// "File" のサブメニューを作成
+	fileMenu, err := gtk.MenuNew()
+	if err != nil {
+		log.Fatalf("GTK menu error: %v", err)
+	}
+	fileMenuItem.SetSubmenu(fileMenu)
+
+	// "Open" 項目を作成
+	openMenuItem, err := gtk.MenuItemNewWithLabel("Open")
+	if err != nil {
+		log.Fatalf("GTK menu item error: %v", err)
+	}
+	openMenuItem.Connect("activate", func() {
+		log.Println("Open menu item clicked")
+		// TODO: ファイル選択ダイアログの実装
+	})
+	fileMenu.Append(openMenuItem)
+
+	// "Quit" 項目を作成
+	quitMenuItem, err := gtk.MenuItemNewWithLabel("Quit")
+	if err != nil {
+		log.Fatalf("GTK menu item error: %v", err)
+	}
+	quitMenuItem.Connect("activate", func() {
+		f.bus.Shutdown()
+		gtk.MainQuit()
+	})
+	fileMenu.Append(quitMenuItem)
+
 	// Image ウィジェットで表示 (Pixbuf を毎フレーム更新)
 	image, err := gtk.ImageNew()
 	if err != nil {
 		log.Fatalf("GTK image error: %v", err)
 	}
-	window.Add(image)
+	vbox.PackStart(image, true, true, 0)
 
 	// キーイベント (GTK3)
 	window.SetCanFocus(true)
@@ -140,7 +190,12 @@ func (f *Famicom) Start() {
 	window.SetDefaultSize(windowWidth, windowHeight)
 	image.SetSizeRequest(windowWidth, windowHeight)
 	window.SetResizable(false)
+	window.SetPosition(gtk.WIN_POS_CENTER)
 	window.ShowAll()
+
+	// ウィンドウを最前面に表示するための処理
+	window.SetKeepAbove(true)
+	window.Present()
 
 	// フレームバッファ初期化 (元解像度256x240のRGBデータ)
 	f.frameBuf = make([]byte, originalWidth*originalHeight*3)
