@@ -47,8 +47,8 @@ type Famicom struct {
 	controller2 InputState // 2P Gamepad (HID)
 
 	// フレーム転送用バッファとフラグ (GTKメインスレッドでのみUI更新)
-	frameBuf  []byte
-	srcPixbuf *gdk.Pixbuf
+	frameBuf   []byte
+	destPixbuf *gdk.Pixbuf
 }
 
 // MARK: Famicomの初期化メソッド
@@ -145,12 +145,14 @@ func (f *Famicom) Start() {
 	// フレームバッファ初期化 (元解像度256x240のRGBデータ)
 	f.frameBuf = make([]byte, originalWidth*originalHeight*3)
 
-	// srcPixbuf 初期化 (f.frameBuf をラップ)
+	// destPixbuf 初期化 (スケーリング後の描画先)
 	var perr2 error
-	f.srcPixbuf, perr2 = gdk.PixbufNewFromData(f.frameBuf, gdk.COLORSPACE_RGB, false, 8, originalWidth, originalHeight, originalWidth*3)
+	f.destPixbuf, perr2 = gdk.PixbufNew(gdk.COLORSPACE_RGB, false, 8, windowWidth, windowHeight)
 	if perr2 != nil {
-		log.Fatalf("srcPixbuf create error: %v", perr2)
+		log.Fatalf("destPixbuf create error: %v", perr2)
 	}
+	// 初期表示
+	image.SetFromPixbuf(f.destPixbuf)
 
 	// チャンネル作成
 	renderChan := make(chan struct{})
@@ -166,7 +168,7 @@ func (f *Famicom) Start() {
 		bufFull := c.Buffer[:]
 		rowBytes := int(ppu.CANVAS_WIDTH) * 3
 		visibleRowBytes := originalWidth * 3
-		for y := 0; y < originalHeight; y++ {
+		for y := range originalHeight {
 			srcRowStart := y * rowBytes
 			copy(f.frameBuf[y*visibleRowBytes:(y+1)*visibleRowBytes], bufFull[srcRowStart:srcRowStart+visibleRowBytes])
 		}
@@ -186,11 +188,17 @@ func (f *Famicom) Start() {
 			glib.IdleAdd(func() bool {
 				select {
 				case <-renderChan:
-					// 描画処理
-					scaledPixbuf, err := f.srcPixbuf.ScaleSimple(windowWidth, windowHeight, gdk.INTERP_NEAREST)
+					// 描画処理: 毎回 PixbufNewFromData で一時的な Pixbuf を作成し、destPixbuf へスケーリング転送する
+					srcPixbuf, err := gdk.PixbufNewFromData(f.frameBuf, gdk.COLORSPACE_RGB, false, 8, originalWidth, originalHeight, originalWidth*3)
 					if err == nil {
-						image.SetFromPixbuf(scaledPixbuf)
+						// destPixbuf へスケーリングして描画
+						srcPixbuf.Scale(f.destPixbuf, 0, 0, windowWidth, windowHeight, 0, 0, float64(SCALE_FACTOR), float64(SCALE_FACTOR), gdk.INTERP_NEAREST)
+						// 再描画要求 (SetFromPixbuf を再度呼ぶことで更新を確実にする)
+						image.SetFromPixbuf(f.destPixbuf)
+					} else {
+						log.Printf("Pixbuf create error: %v", err)
 					}
+
 					// CPU再開
 					resumeChan <- struct{}{}
 				default:
@@ -203,13 +211,12 @@ func (f *Famicom) Start() {
 
 	// CPU 初期化 & 実行
 	f.cpu.Init(f.bus, false)
-	go f.cpu.Run() // CPU は別 goroutine (GTK操作しない)
+	go f.cpu.Run()
 
 	gtk.Main()
 }
 
-// MARK: キーボードの状態を検知
-// SDL -> GTK キー対応
+// MARK: キーボードの状態を反映
 func (f *Famicom) mapKey(keyVal uint, pressed bool) {
 	// 1P
 	switch keyVal {
@@ -253,10 +260,6 @@ func (f *Famicom) mapKey(keyVal uint, pressed bool) {
 		}
 	}
 }
-
-// Bus内のキャンバスへのアクセサ
-// bus のキャンバス取得 (Bus.Canvas() を利用)
-func (f *Famicom) busCanvas() *ppu.Canvas { return f.bus.Canvas() }
 
 // MARK: コントローラーのボタン状態を検知
 // HID Gamepad スタブ (未実装詳細)
