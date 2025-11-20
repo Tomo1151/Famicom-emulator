@@ -1,14 +1,7 @@
 package apu
 
-/*
-#include <stdint.h>
-void AudioMixCallback(void* userdata, uint8_t* stream, int length);
-*/
-import "C"
 import (
-	"unsafe"
-
-	"github.com/veandco/go-sdl2/sdl"
+	"github.com/gordonklaus/portaudio"
 )
 
 // MARK: 定数定義
@@ -57,6 +50,9 @@ type APU struct {
 	prevLevel3 float32
 	prevLevel4 float32
 	prevLevel5 float32
+
+	// PortAudio stream (for shutdown)
+	stream *portaudio.Stream
 }
 
 // MARK: APUの初期化メソッド
@@ -89,66 +85,55 @@ func (a *APU) Init(reader CpuBusReader) {
 	a.prevLevel4 = 0.0
 	a.prevLevel5 = 0.0
 
-	// オーディオデバイスの初期化
+	// オーディオデバイスの初期化 (PortAudio)
 	a.initAudioDevice()
 }
 
 // MARK: オーディオデバイスの初期化メソッド
 func (a *APU) initAudioDevice() {
-	spec := &sdl.AudioSpec{
-		Freq:     SAMPLE_RATE,
-		Format:   sdl.AUDIO_F32,
-		Channels: 1,
-		Samples:  BUFFER_SIZE / 2,
-		Callback: sdl.AudioCallback(C.AudioMixCallback),
-	}
-
-	if err := sdl.OpenAudio(spec, nil); err != nil {
+	// PortAudio 初期化
+	if err := portaudio.Initialize(); err != nil {
 		panic(err)
 	}
 
-	// オーディオ再生開始
-	sdl.PauseAudio(false)
-}
+	framesPerBuffer := BUFFER_SIZE / 2 // SDL 仕様に近づける
 
-// MARK: SDLのオーディオコールバック
-//
-//export AudioMixCallback
-func AudioMixCallback(userdata unsafe.Pointer, stream *C.uint8_t, length C.int) {
-	n := int(length) / 4
-	buffer := unsafe.Slice((*float32)(unsafe.Pointer(stream)), n)
+	// 出力のみ (mono float32) ストリーム
+	stream, err := portaudio.OpenDefaultStream(0, 1, SAMPLE_RATE, framesPerBuffer, func(out []float32) {
+		n := len(out)
+		ch1 := ch1Buffer[:n]
+		ch2 := ch2Buffer[:n]
+		ch3 := ch3Buffer[:n]
+		ch4 := ch4Buffer[:n]
+		ch5 := ch5Buffer[:n]
 
-	ch1 := ch1Buffer[:n]
-	ch2 := ch2Buffer[:n]
-	ch3 := ch3Buffer[:n]
-	ch4 := ch4Buffer[:n]
-	ch5 := ch5Buffer[:n]
+		// チャンネルバッファから読み込み
+		square1.buffer.Read(ch1, n)
+		square2.buffer.Read(ch2, n)
+		triangle.buffer.Read(ch3, n)
+		noise.buffer.Read(ch4, n)
+		dmc.buffer.Read(ch5, n)
 
-	square1.buffer.Read(ch1, n)
-	square2.buffer.Read(ch2, n)
-	triangle.buffer.Read(ch3, n)
-	noise.buffer.Read(ch4, n)
-	dmc.buffer.Read(ch5, n)
-
-	for i := range n {
-		// @FIXME mixのバランス
-		// mixed := (ch1[i] + ch2[i] + ch3[i] + ch4[i] + ch5[i]) / 25
-		// mixed := (ch1[i] + ch2[i]) / 25
-		// stage1Input := ch5[i]
-		// dmcFilterStage1 += (ch5[i] - dmcFilterStage1) * dmcFilterAlpha1
-		// dmcFilterStage2 += (dmcFilterStage1 - dmcFilterStage2) * dmcFilterAlpha2
-		// dmcFilterStage3 += (dmcFilterStage2 - dmcFilterStage3) * dmcFilterAlpha3
-		// filteredDmc := dmcFilterStage3
-
-		mixed := mixSamples(ch1[i], ch2[i], ch3[i], ch4[i], ch5[i])
-
-		if mixed > MAX_VOLUME {
-			mixed = MAX_VOLUME
-		} else if mixed < -MAX_VOLUME {
-			mixed = -MAX_VOLUME
+		for i := 0; i < n; i++ {
+			mixed := mixSamples(ch1[i], ch2[i], ch3[i], ch4[i], ch5[i])
+			if mixed > MAX_VOLUME {
+				mixed = MAX_VOLUME
+			} else if mixed < -MAX_VOLUME {
+				mixed = -MAX_VOLUME
+			}
+			out[i] = mixed * MASTER_VOLUME
 		}
-		buffer[i] = mixed * MASTER_VOLUME
+	})
+	if err != nil {
+		panic(err)
 	}
+
+	if err := stream.Start(); err != nil {
+		panic(err)
+	}
+
+	// 保存して後で終了処理に使用
+	a.stream = stream
 }
 
 // MARK: APUのサイクルを進める
@@ -547,6 +532,18 @@ func (a *APU) EndFrame() {
 	// a.channel3.buffer.resetTime()
 	// a.channel4.buffer.resetTime()
 	// a.channel5.buffer.resetTime()
+}
+
+// MARK: 終了処理 (PortAudioストリーム停止)
+func (a *APU) Shutdown() {
+	if a.stream != nil {
+		// ストリーム停止 & クローズ
+		_ = a.stream.Stop()
+		_ = a.stream.Close()
+		a.stream = nil
+	}
+	// PortAudio 終了
+	_ = portaudio.Terminate()
 }
 
 // MARK: エンベロープのクロック (1ch/2ch/4ch)

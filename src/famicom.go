@@ -7,31 +7,32 @@ import (
 	"Famicom-emulator/cpu"
 	"Famicom-emulator/joypad"
 	"Famicom-emulator/ppu"
-	"fmt"
 	"log"
-	"os"
+	"runtime"
+	"sync/atomic"
 	"time"
-	"unsafe"
 
-	"github.com/veandco/go-sdl2/sdl"
+	// gotk3 (GTK3 bindings)
+	"github.com/gotk3/gotk3/gdk"
+	"github.com/gotk3/gotk3/glib"
+	"github.com/gotk3/gotk3/gtk"
+
+	// HID (gamepad stub)
+	"github.com/sstallion/go-hid"
 )
 
 // MARK: 定数定義
 const (
 	FRAME_PER_SECOND = 60
-	SCALE_FACTOR     = 3
-
-	INPUT_MODE_KEYBOARD = 0
-	INPUT_MODE_JOYPAD   = 1
+	// スケールは要求により廃止 (内部キャンバス 512x240 -> 表示 256x240 をそのまま出す)
+	SCALE_FACTOR = 1
 )
 
-// MARK: InputStateの定義
+// MARK: InputState の定義
 type InputState struct {
 	Left, Right, Up, Down bool
 	A, B, Start, Select   bool
 }
-
-// MARK: Famicomの定義
 type Famicom struct {
 	cpu       cpu.CPU
 	ppu       ppu.PPU
@@ -41,13 +42,16 @@ type Famicom struct {
 	bus       bus.Bus
 	cartridge cartridge.Cartridge
 
-	keyboard1   InputState // 1Pの入力状態 (キーボード)
-	keyboard2   InputState // 2Pの入力状態 (キーボード)
-	controller1 InputState // 1Pの入力状態 (コントローラ)
-	controller2 InputState // 2Pの入力状態 (コントローラ)
+	keyboard1   InputState // 1P キーボード
+	keyboard2   InputState // 2P キーボード
+	controller1 InputState // 1P Gamepad (HID)
+	controller2 InputState // 2P Gamepad (HID)
 
-	gamepad1 sdl.JoystickID // SDLのコントローラID (1P)
-	gamepad2 sdl.JoystickID // SDLのコントローラID (2P)
+	lastFrameUnixNano int64 // 前回描画時刻 (原子操作)
+
+	// フレーム転送用バッファとフラグ (GTKメインスレッドでのみUI更新)
+	frameBuf   []byte
+	frameReady int32 // 0=未準備,1=準備完了
 }
 
 // MARK: Famicomの初期化メソッド
@@ -83,213 +87,177 @@ func (f *Famicom) Init(cartridge cartridge.Cartridge) {
 
 // MARK: Famicomの起動
 func (f *Famicom) Start() {
-	// SDLの初期化
-	if err := sdl.Init(sdl.INIT_VIDEO | sdl.INIT_GAMECONTROLLER); err != nil {
-		panic(err)
-	}
-	defer sdl.Quit()
+	// GTKはメインスレッド固定が必要
+	runtime.LockOSThread()
+	// GTK 初期化 (gotk3)
+	gtk.Init(nil)
 
-	// ウィンドウの作成
-	window, err := sdl.CreateWindow("Famicom emu", sdl.WINDOWPOS_UNDEFINED, sdl.WINDOWPOS_UNDEFINED,
-		int32(ppu.SCREEN_WIDTH)*SCALE_FACTOR, int32(ppu.SCREEN_HEIGHT)*SCALE_FACTOR, sdl.WINDOW_SHOWN)
+	window, err := gtk.WindowNew(gtk.WINDOW_TOPLEVEL)
 	if err != nil {
-		panic(err)
+		log.Fatalf("GTK window error: %v", err)
 	}
-	defer window.Destroy()
-
-	// 接続済みコントローラを検知
-	var gamepad1, gamepad2 *sdl.GameController
-	if sdl.NumJoysticks() == 0 {
-		fmt.Println("No controller detected")
-	}
-	if sdl.NumJoysticks() > 0 {
-		gamepad1 = sdl.GameControllerOpen(0)
-		if gamepad1 != nil {
-			f.gamepad1 = gamepad1.Joystick().InstanceID()
-			fmt.Println("Controller opened for 1P:", gamepad1.Name())
-			defer gamepad1.Close()
-		}
-	}
-	if sdl.NumJoysticks() > 1 {
-		gamepad2 = sdl.GameControllerOpen(1)
-		if gamepad2 != nil {
-			f.gamepad2 = gamepad2.Joystick().InstanceID()
-			fmt.Println("Controller opened for 2P:", gamepad2.Name())
-			defer gamepad2.Close()
-		}
-	}
-
-	// レンダラーの作成
-	renderer, err := sdl.CreateRenderer(window, -1, sdl.RENDERER_ACCELERATED)
-	if err != nil {
-		panic(err)
-	}
-	defer renderer.Destroy()
-
-	// テクスチャの作成
-	texture, err := renderer.CreateTexture(
-		sdl.PIXELFORMAT_RGB24,
-		sdl.TEXTUREACCESS_STREAMING,
-		int32(ppu.SCREEN_WIDTH), int32(ppu.SCREEN_HEIGHT))
-	if err != nil {
-		panic(err)
-	}
-	defer texture.Destroy()
-
-	// SDL2イベントポンプを取得
-	eventPump := sdl.PollEvent
-
-	// 1フレーム目の時間を取得
-	var lastFrameTime = time.Now()
-
-	// BusのNMIコールバックで描画とイベント処理
-	f.bus.Init(func(p *ppu.PPU, c *ppu.Canvas, j1 *joypad.JoyPad, j2 *joypad.JoyPad) {
-
-		// フレームレート調整 (60FPS)
-		now := time.Now()
-		elapsed := now.Sub(lastFrameTime)
-		const frameDuration = time.Second / FRAME_PER_SECOND
-		if elapsed < frameDuration {
-			time.Sleep(frameDuration - elapsed)
-		}
-		lastFrameTime = time.Now()
-
-		// キャンバスのバッファを元にテクスチャの更新
-		texture.Update(nil, unsafe.Pointer(&c.Buffer[0]), int(c.Width*3))
-
-		// 再レンダリング
-		renderer.Clear()
-		renderer.Copy(texture, nil, nil)
-		renderer.Present()
-
-		// SDLイベント処理
-		for event := eventPump(); event != nil; event = eventPump() {
-			switch e := event.(type) {
-			case *sdl.QuitEvent:
-				f.bus.Shutdown()
-				os.Exit(0)
-			case *sdl.KeyboardEvent:
-				if e.Keysym.Sym == sdl.K_ESCAPE && e.State == sdl.PRESSED {
-					f.bus.Shutdown()
-					os.Exit(0)
-				}
-				if e.Keysym.Sym == sdl.K_F12 && e.State == sdl.PRESSED {
-					f.cpu.ToggleLog()
-				}
-				f.handleKeyPress(e, &f.keyboard1, &f.keyboard2)
-			case *sdl.ControllerButtonEvent:
-				switch e.Which {
-				case f.gamepad1:
-					f.handleButtonPress(e, &f.controller1)
-				case f.gamepad2:
-					f.handleButtonPress(e, &f.controller2)
-				}
-			case *sdl.ControllerAxisEvent:
-				switch e.Which {
-				case f.gamepad1:
-					f.handleAxisMotion(e, &f.controller1)
-				case f.gamepad2:
-					f.handleAxisMotion(e, &f.controller2)
-				}
-			}
-
-			// 操作結果を反映
-			f.updateJoyPad(j1, &f.keyboard1, &f.controller1)
-			f.updateJoyPad(j2, &f.keyboard2, &f.controller2)
-		}
+	window.SetTitle("Famicom emu (GTK3)")
+	window.Connect("destroy", func() {
+		f.bus.Shutdown()
+		gtk.MainQuit()
 	})
 
-	// CPUの初期化
-	f.cpu.Init(f.bus, false)
+	// Image ウィジェットで表示 (Pixbuf を毎フレーム更新)
+	image, err := gtk.ImageNew()
+	if err != nil {
+		log.Fatalf("GTK image error: %v", err)
+	}
+	window.Add(image)
 
-	// CPUの起動
-	f.cpu.Run()
+	// キーイベント (GTK3)
+	window.SetCanFocus(true)
+	window.Connect("key-press-event", func(_ *gtk.Window, ev *gdk.Event) {
+		keyEvent := gdk.EventKeyNewFromEvent(ev)
+		f.mapKey(uint(keyEvent.KeyVal()), true)
+	})
+	window.Connect("key-release-event", func(_ *gtk.Window, ev *gdk.Event) {
+		keyEvent := gdk.EventKeyNewFromEvent(ev)
+		f.mapKey(uint(keyEvent.KeyVal()), false)
+	})
+
+	// HID 初期化 (ゲームパッド探索: 簡易スタブ)
+	if err := hid.Init(); err == nil {
+		defer hid.Exit()
+		// TODO: enumerate devices & map buttons
+	} else {
+		log.Printf("HID init failed: %v", err)
+	}
+
+	// 表示サイズは NES 本来の 256x240 をそのまま使用 (スケーリング無し)
+	displayWidth := int(ppu.SCREEN_WIDTH)
+	displayHeight := int(ppu.SCREEN_HEIGHT)
+	pixbuf, perr := gdk.PixbufNew(gdk.COLORSPACE_RGB, false, 8, displayWidth, displayHeight)
+	if perr != nil {
+		log.Fatalf("Pixbuf create error: %v", perr)
+	}
+	image.SetFromPixbuf(pixbuf)
+	window.SetDefaultSize(displayWidth, displayHeight)
+	image.SetSizeRequest(displayWidth, displayHeight)
+	window.SetResizable(false)
+	window.ShowAll()
+
+	// フレームバッファ初期化 (元解像度256x240のRGBデータ)
+	f.frameBuf = make([]byte, displayWidth*displayHeight*3)
+
+	// NMI コールバック: フレーム生成のみ (UI操作しない)
+	f.bus.Init(func(p *ppu.PPU, c *ppu.Canvas, j1 *joypad.JoyPad, j2 *joypad.JoyPad) {
+		// JoyPad 状態更新 (入力は即時反映でOK)
+		f.updateJoyPad(j1, &f.keyboard1, &f.controller1)
+		f.updateJoyPad(j2, &f.keyboard2, &f.controller2)
+
+		// FPS制御: 前回フレーム生成時刻からの経過チェック
+		now := time.Now().UnixNano()
+		last := atomic.LoadInt64(&f.lastFrameUnixNano)
+		frameDuration := int64(time.Second / FRAME_PER_SECOND)
+		if now-last < frameDuration {
+			return // 次フレームまだ早いので生成しない
+		}
+		atomic.StoreInt64(&f.lastFrameUnixNano, now)
+
+		// 既に未消費フレームがあれば捨て (UI遅延時のバックプレッシャー)
+		if atomic.LoadInt32(&f.frameReady) == 1 {
+			return
+		}
+
+		// 内部キャンバス 512x240 の左半分 (256x240) だけを表示用にコピー
+		bufFull := c.Buffer[:]
+		rowBytes := int(ppu.CANVAS_WIDTH) * 3
+		visibleRowBytes := displayWidth * 3
+		for y := 0; y < displayHeight; y++ {
+			srcRowStart := y * rowBytes
+			copy(f.frameBuf[y*visibleRowBytes:(y+1)*visibleRowBytes], bufFull[srcRowStart:srcRowStart+visibleRowBytes])
+		}
+		atomic.StoreInt32(&f.frameReady, 1)
+
+		// UIスレッドで描画更新をスケジュール
+		glib.IdleAdd(func() bool {
+			if atomic.LoadInt32(&f.frameReady) == 1 {
+				pixbuf, err := gdk.PixbufNewFromData(f.frameBuf, gdk.COLORSPACE_RGB, false, 8, displayWidth, displayHeight, displayWidth*3)
+				if err == nil {
+					image.SetFromPixbuf(pixbuf)
+				} else {
+					log.Printf("Pixbuf update error: %v", err)
+				}
+				atomic.StoreInt32(&f.frameReady, 0)
+			}
+			return false // 1回だけ実行
+		})
+	})
+
+	// CPU 初期化 & 実行
+	f.cpu.Init(f.bus, false)
+	go f.cpu.Run() // CPU は別 goroutine (GTK操作しない)
+
+	gtk.Main()
 }
 
 // MARK: キーボードの状態を検知
-func (f *Famicom) handleKeyPress(e *sdl.KeyboardEvent, c1 *InputState, c2 *InputState) {
-	pressed := e.State == sdl.PRESSED
-	switch e.Keysym.Sym {
+// SDL -> GTK キー対応
+func (f *Famicom) mapKey(keyVal uint, pressed bool) {
 	// 1P
-	case sdl.K_k:
-		c1.A = pressed
-	case sdl.K_j:
-		c1.B = pressed
-	case sdl.K_w:
-		c1.Up = pressed
-	case sdl.K_s:
-		c1.Down = pressed
-	case sdl.K_a:
-		c1.Left = pressed
-	case sdl.K_d:
-		c1.Right = pressed
-	case sdl.K_RETURN, sdl.K_KP_ENTER:
-		c1.Start = pressed
-	case sdl.K_BACKSPACE:
-		c1.Select = pressed
-
+	switch keyVal {
+	case gdk.KEY_k:
+		f.keyboard1.A = pressed
+	case gdk.KEY_j:
+		f.keyboard1.B = pressed
+	case gdk.KEY_w:
+		f.keyboard1.Up = pressed
+	case gdk.KEY_s:
+		f.keyboard1.Down = pressed
+	case gdk.KEY_a:
+		f.keyboard1.Left = pressed
+	case gdk.KEY_d:
+		f.keyboard1.Right = pressed
+	case gdk.KEY_Return:
+		f.keyboard1.Start = pressed
+	case gdk.KEY_BackSpace:
+		f.keyboard1.Select = pressed
 	// 2P
-	case sdl.K_COLON:
-		c2.A = pressed
-	case sdl.K_SEMICOLON:
-		c2.B = pressed
-	case sdl.K_t:
-		c2.Up = pressed
-	case sdl.K_g:
-		c2.Down = pressed
-	case sdl.K_f:
-		c2.Left = pressed
-	case sdl.K_h:
-		c2.Right = pressed
-	case sdl.K_GREATER:
-		c2.Select = pressed
-	case sdl.K_TAB:
-		c2.Start = pressed
+	case gdk.KEY_colon:
+		f.keyboard2.A = pressed
+	case gdk.KEY_semicolon:
+		f.keyboard2.B = pressed
+	case gdk.KEY_t:
+		f.keyboard2.Up = pressed
+	case gdk.KEY_g:
+		f.keyboard2.Down = pressed
+	case gdk.KEY_f:
+		f.keyboard2.Left = pressed
+	case gdk.KEY_h:
+		f.keyboard2.Right = pressed
+	case gdk.KEY_greater:
+		f.keyboard2.Select = pressed
+	case gdk.KEY_Tab:
+		f.keyboard2.Start = pressed
+	case gdk.KEY_Escape:
+		if pressed {
+			f.bus.Shutdown()
+			gtk.MainQuit()
+		}
 	}
 }
 
+// Bus内のキャンバスへのアクセサ
+// bus のキャンバス取得 (Bus.Canvas() を利用)
+func (f *Famicom) busCanvas() *ppu.Canvas { return f.bus.Canvas() }
+
 // MARK: コントローラーのボタン状態を検知
-func (f *Famicom) handleButtonPress(e *sdl.ControllerButtonEvent, c *InputState) {
-	pressed := e.State == sdl.PRESSED
-	switch e.Button {
-	case joypad.JOYCON_R_BUTTON_A, joypad.JOYCON_R_BUTTON_X:
-		c.A = pressed
-	case joypad.JOYCON_R_BUTTON_B, joypad.JOYCON_R_BUTTON_Y:
-		c.B = pressed
-	case joypad.JOYCON_R_BUTTON_PLUS:
-		c.Start = pressed
-	case joypad.JOYCON_R_BUTTON_HOME:
-		c.Select = pressed
-	}
+// HID Gamepad スタブ (未実装詳細)
+func (f *Famicom) pollGamepads() {
+	// TODO: 実際の HID デバイス列挙とボタン/軸のマッピング
+	// devices, _ := hid.Enum() // 利用可能デバイス一覧
+	// 今はノーオペレーション
 }
 
 // MARK: コントローラーのスティック状態を検知
-func (f *Famicom) handleAxisMotion(e *sdl.ControllerAxisEvent, c *InputState) {
-	const threshold = 8000 // デッドゾーン
-	switch e.Axis {
-	case 0: // X軸 (左スティック左右)
-		if e.Value < -threshold {
-			c.Left = true
-			c.Right = false
-		} else if e.Value > threshold {
-			c.Left = false
-			c.Right = true
-		} else {
-			c.Left = false
-			c.Right = false
-		}
-	case 1: // Y軸 (左スティック上下)
-		if e.Value < -threshold {
-			c.Up = true
-			c.Down = false
-		} else if e.Value > threshold {
-			c.Up = false
-			c.Down = true
-		} else {
-			c.Up = false
-			c.Down = false
-		}
-	}
+// 軸入力スタブ
+func (f *Famicom) updateAxisStub(c *InputState) {
+	// TODO: HID 軸入力の反映
 }
 
 // MARK: JoyPadの状態を更新

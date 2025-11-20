@@ -90,6 +90,14 @@ func (b *Bus) MapperIRQ() bool {
 // MARK: 終了処理
 func (b *Bus) Shutdown() {
 	b.cartridge.Mapper().Save()
+	if b.apu != nil {
+		b.apu.Shutdown()
+	}
+}
+
+// MARK: Canvas取得メソッド
+func (b *Bus) Canvas() *ppu.Canvas {
+	return b.canvas
 }
 
 // MARK: サイクルを進める
