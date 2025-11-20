@@ -24,8 +24,8 @@ import (
 // MARK: 定数定義
 const (
 	FRAME_PER_SECOND = 60
-	// スケールは要求により廃止 (内部キャンバス 512x240 -> 表示 256x240 をそのまま出す)
-	SCALE_FACTOR = 1
+	// スケール設定
+	SCALE_FACTOR = 3
 )
 
 // MARK: InputState の定義
@@ -51,6 +51,7 @@ type Famicom struct {
 
 	// フレーム転送用バッファとフラグ (GTKメインスレッドでのみUI更新)
 	frameBuf   []byte
+	srcPixbuf  *gdk.Pixbuf
 	frameReady int32 // 0=未準備,1=準備完了
 }
 
@@ -128,21 +129,32 @@ func (f *Famicom) Start() {
 		log.Printf("HID init failed: %v", err)
 	}
 
-	// 表示サイズは NES 本来の 256x240 をそのまま使用 (スケーリング無し)
-	displayWidth := int(ppu.SCREEN_WIDTH)
-	displayHeight := int(ppu.SCREEN_HEIGHT)
-	pixbuf, perr := gdk.PixbufNew(gdk.COLORSPACE_RGB, false, 8, displayWidth, displayHeight)
+	// 表示サイズ設定
+	originalWidth := int(ppu.SCREEN_WIDTH)
+	originalHeight := int(ppu.SCREEN_HEIGHT)
+	windowWidth := originalWidth * SCALE_FACTOR
+	windowHeight := originalHeight * SCALE_FACTOR
+
+	// 初期Pixbuf (黒画面)
+	pixbuf, perr := gdk.PixbufNew(gdk.COLORSPACE_RGB, false, 8, windowWidth, windowHeight)
 	if perr != nil {
 		log.Fatalf("Pixbuf create error: %v", perr)
 	}
 	image.SetFromPixbuf(pixbuf)
-	window.SetDefaultSize(displayWidth, displayHeight)
-	image.SetSizeRequest(displayWidth, displayHeight)
+	window.SetDefaultSize(windowWidth, windowHeight)
+	image.SetSizeRequest(windowWidth, windowHeight)
 	window.SetResizable(false)
 	window.ShowAll()
 
 	// フレームバッファ初期化 (元解像度256x240のRGBデータ)
-	f.frameBuf = make([]byte, displayWidth*displayHeight*3)
+	f.frameBuf = make([]byte, originalWidth*originalHeight*3)
+
+	// srcPixbuf 初期化 (f.frameBuf をラップ)
+	var perr2 error
+	f.srcPixbuf, perr2 = gdk.PixbufNewFromData(f.frameBuf, gdk.COLORSPACE_RGB, false, 8, originalWidth, originalHeight, originalWidth*3)
+	if perr2 != nil {
+		log.Fatalf("srcPixbuf create error: %v", perr2)
+	}
 
 	// NMI コールバック: フレーム生成のみ (UI操作しない)
 	f.bus.Init(func(p *ppu.PPU, c *ppu.Canvas, j1 *joypad.JoyPad, j2 *joypad.JoyPad) {
@@ -167,8 +179,8 @@ func (f *Famicom) Start() {
 		// 内部キャンバス 512x240 の左半分 (256x240) だけを表示用にコピー
 		bufFull := c.Buffer[:]
 		rowBytes := int(ppu.CANVAS_WIDTH) * 3
-		visibleRowBytes := displayWidth * 3
-		for y := 0; y < displayHeight; y++ {
+		visibleRowBytes := originalWidth * 3
+		for y := 0; y < originalHeight; y++ {
 			srcRowStart := y * rowBytes
 			copy(f.frameBuf[y*visibleRowBytes:(y+1)*visibleRowBytes], bufFull[srcRowStart:srcRowStart+visibleRowBytes])
 		}
@@ -177,11 +189,12 @@ func (f *Famicom) Start() {
 		// UIスレッドで描画更新をスケジュール
 		glib.IdleAdd(func() bool {
 			if atomic.LoadInt32(&f.frameReady) == 1 {
-				pixbuf, err := gdk.PixbufNewFromData(f.frameBuf, gdk.COLORSPACE_RGB, false, 8, displayWidth, displayHeight, displayWidth*3)
+				// f.srcPixbuf を使用してスケーリング
+				scaledPixbuf, err := f.srcPixbuf.ScaleSimple(windowWidth, windowHeight, gdk.INTERP_NEAREST)
 				if err == nil {
-					image.SetFromPixbuf(pixbuf)
+					image.SetFromPixbuf(scaledPixbuf)
 				} else {
-					log.Printf("Pixbuf update error: %v", err)
+					log.Printf("Pixbuf scale error: %v", err)
 				}
 				atomic.StoreInt32(&f.frameReady, 0)
 			}
