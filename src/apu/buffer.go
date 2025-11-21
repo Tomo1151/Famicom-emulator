@@ -2,7 +2,13 @@ package apu
 
 import (
 	"fmt"
+	"math"
 	"sync"
+)
+
+const (
+	sincTapCount = 63
+	sincCutoff   = 0.45 // 正規化カットオフ（Nyquist比）
 )
 
 // BlipBuffer の定義
@@ -14,6 +20,10 @@ type BlipBuffer struct {
 	frac       float64
 	samples    []float32
 	mutex      sync.Mutex
+
+	filterTaps  []float64
+	filterState []float32
+	filterIndex int
 }
 
 // MARK: BlipBufferの初期化メソッド
@@ -21,6 +31,9 @@ func (b *BlipBuffer) Init() {
 	b.sampleRate = float64(SAMPLE_RATE)
 	b.tickRate = float64(CPU_CLOCK)
 	b.samples = make([]float32, 0, BUFFER_SIZE)
+	b.filterTaps = designSincLowPass(sincTapCount, sincCutoff)
+	b.filterState = make([]float32, len(b.filterTaps))
+	b.filterIndex = 0
 }
 
 // MARK: レベルの差分を追加するメソッド
@@ -62,11 +75,12 @@ func (b *BlipBuffer) Read(out []float32, count int) int {
 		fmt.Printf("[BlipBuffer] Warning: couldn't read enough samples (want: %4d, got: %4d)\n", count, len(b.samples))
 	}
 
-	if n > 0 {
-		last = b.samples[n-1]
-		copy(out, b.samples[:n])
-		b.samples = b.samples[n:]
+	for i := range n {
+		filtered := b.filterSample(b.samples[i])
+		out[i] = filtered
+		last = filtered
 	}
+	b.samples = b.samples[n:]
 
 	// 足りない分を0で埋める
 	for i := n; i < count && i < len(out); i++ {
@@ -87,6 +101,58 @@ func (b *BlipBuffer) resetTime() {
 	defer b.mutex.Unlock()
 	b.lastTime = 0
 	b.frac = 0
+}
+
+func (b *BlipBuffer) filterSample(sample float32) float32 {
+	if len(b.filterTaps) == 0 {
+		return sample
+	}
+
+	b.filterState[b.filterIndex] = sample
+
+	sum := 0.0
+	idx := b.filterIndex
+	for i := range len(b.filterTaps) {
+		sum += b.filterTaps[i] * float64(b.filterState[idx])
+		idx--
+		if idx < 0 {
+			idx = len(b.filterState) - 1
+		}
+	}
+
+	b.filterIndex++
+	if b.filterIndex == len(b.filterState) {
+		b.filterIndex = 0
+	}
+	return float32(sum)
+}
+
+func designSincLowPass(numTaps int, cutoff float64) []float64 {
+	if numTaps%2 == 0 {
+		numTaps++
+	}
+	taps := make([]float64, numTaps)
+	mid := float64(numTaps-1) / 2
+	var sum float64
+
+	for n := range numTaps {
+		x := float64(n) - mid
+		var sinc float64
+		if x == 0 {
+			sinc = 1.0
+		} else {
+			sinc = math.Sin(2*math.Pi*cutoff*x) / (2 * math.Pi * cutoff * x)
+		}
+		window := 0.54 - 0.46*math.Cos(2*math.Pi*float64(n)/float64(numTaps-1))
+		tap := 2 * cutoff * sinc * window
+		taps[n] = tap
+		sum += tap
+	}
+
+	for n := range taps {
+		taps[n] /= sum
+	}
+	return taps
 }
 
 // MARK: ResamplingBufferの定義
