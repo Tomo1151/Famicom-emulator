@@ -7,8 +7,7 @@ import (
 	"github.com/veandco/go-sdl2/sdl"
 )
 
-// CharacterWindow displays CHR 0x0000-0x1FFF as two 16x16 pattern tables.
-// It uses a single streaming texture and a preallocated RGB buffer.
+// MARK: CharacterWindowの定義
 type CharacterWindow struct {
 	window   *sdl.Window
 	renderer *sdl.Renderer
@@ -21,7 +20,7 @@ type CharacterWindow struct {
 	scale    int
 }
 
-// NewCharacterWindow creates a CHR viewer window.
+// MARK: CharacterWindow の作成メソッド
 func NewCharacterWindow(p *ppu.PPU, scale int, onClose func(id uint32)) (*CharacterWindow, error) {
 	const tileSize = 8
 	const colsPerTable = 16
@@ -61,11 +60,13 @@ func NewCharacterWindow(p *ppu.PPU, scale int, onClose func(id uint32)) (*Charac
 	return &CharacterWindow{window: win, renderer: r, texture: t, ppu: p, buf: buf, onClose: onClose, baseW: w, baseH: h, scale: scale}, nil
 }
 
+// MARK: ウィンドウのID取得メソッド
 func (c *CharacterWindow) ID() uint32 {
 	id, _ := c.window.GetID()
 	return id
 }
 
+// MARK: イベント処理メソッド
 func (c *CharacterWindow) HandleEvent(event sdl.Event) {
 	switch e := event.(type) {
 	case *sdl.WindowEvent:
@@ -86,6 +87,7 @@ func (c *CharacterWindow) HandleEvent(event sdl.Event) {
 	}
 }
 
+// MARK: スケール設定メソッド
 func (c *CharacterWindow) setScale(s int) {
 	if s < 1 {
 		s = 1
@@ -102,6 +104,7 @@ func (c *CharacterWindow) setScale(s int) {
 	}
 }
 
+// MARK: ウィンドウの更新メソッド
 func (c *CharacterWindow) Update() {
 	const tileSize = 8
 	const colsPerTable = 16
@@ -110,19 +113,19 @@ func (c *CharacterWindow) Update() {
 
 	width := colsPerTable * tileSize * tables
 
-	// simple grayscale palette
+	// パレットはグレースケールで用意
 	palette := [4][3]uint8{{0, 0, 0}, {85, 85, 85}, {170, 170, 170}, {255, 255, 255}}
 
-	for t := 0; t < tables; t++ {
-		for ty := 0; ty < rowsPerTable; ty++ {
-			for tx := 0; tx < colsPerTable; tx++ {
+	for t := range tables {
+		for ty := range rowsPerTable {
+			for tx := range colsPerTable {
 				tileIdx := t*256 + ty*colsPerTable + tx
 
 				basePx := tx*tileSize + t*colsPerTable*tileSize
 				basePy := ty * tileSize
 
 				ppuBase := uint16(tileIdx * 16)
-				for row := 0; row < tileSize; row++ {
+				for row := range tileSize {
 					b0 := c.ppu.Mapper.ReadCharacterRom(ppuBase + uint16(row))
 					b1 := c.ppu.Mapper.ReadCharacterRom(ppuBase + uint16(row) + 8)
 					for col := 0; col < tileSize; col++ {
@@ -144,12 +147,14 @@ func (c *CharacterWindow) Update() {
 	c.texture.Update(nil, unsafe.Pointer(&c.buf[0]), int(width*3))
 }
 
+// MARK: 描画メソッド
 func (c *CharacterWindow) Render() {
 	c.renderer.Clear()
 	c.renderer.Copy(c.texture, nil, nil)
 	c.renderer.Present()
 }
 
+// MARK: SDLリソースの解放メソッド
 func (c *CharacterWindow) Close() {
 	if c.texture != nil {
 		c.texture.Destroy()
@@ -165,6 +170,7 @@ func (c *CharacterWindow) Close() {
 	c.window = nil
 }
 
+// MARK: ウィンドウを閉じるメソッド
 func (c *CharacterWindow) requestClose() {
 	if c.onClose != nil {
 		c.onClose(c.ID())

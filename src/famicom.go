@@ -77,7 +77,10 @@ func (f *Famicom) Init(cartridge cartridge.Cartridge, cfg *config.Config) {
 	if cfg != nil {
 		f.config = cfg
 	} else {
-		f.config = config.New()
+		f.config = &config.Config{
+			SCALE_FACTOR: 3,
+			SOUND_VOLUME: 1.0,
+		}
 	}
 
 	// 入力データの定義
@@ -89,18 +92,17 @@ func (f *Famicom) Init(cartridge cartridge.Cartridge, cfg *config.Config) {
 
 // MARK: Famicomの起動
 func (f *Famicom) Start() {
-	if f.config == nil {
-		f.config = config.New()
-	}
-
+	// SDLの初期化
 	if err := sdl.Init(sdl.INIT_VIDEO | sdl.INIT_GAMECONTROLLER); err != nil {
 		panic(err)
 	}
 	defer sdl.Quit()
 
+	// ウィンドウマネージャの作成
 	f.windows = ui.NewWindowManager()
 	defer f.windows.CloseAll()
 
+	// ゲームコントローラの接続
 	var gamepad1, gamepad2 *sdl.GameController
 	if sdl.NumJoysticks() == 0 {
 		fmt.Println("No controller detected")
@@ -122,6 +124,7 @@ func (f *Famicom) Start() {
 		}
 	}
 
+	// 状態変数の定義
 	eventPump := sdl.PollEvent
 	lastFrameTime := time.Now()
 
@@ -179,7 +182,7 @@ func (f *Famicom) Start() {
 		if vramWindowOpen {
 			return
 		}
-		vwin, err := ui.NewNameTableWindow(p, f.config.ScaleFactor, func(id uint32) {
+		vwin, err := ui.NewNameTableWindow(p, f.config.SCALE_FACTOR, func(id uint32) {
 			closeVramWindow()
 		})
 		if err != nil {
@@ -192,8 +195,7 @@ func (f *Famicom) Start() {
 	}
 
 	openChrWindow := func(p *ppu.PPU) {
-		// open CharacterWindow using current PPU
-		cwin, err := ui.NewCharacterWindow(p, f.config.ScaleFactor, func(id uint32) {
+		cwin, err := ui.NewCharacterWindow(p, f.config.SCALE_FACTOR, func(id uint32) {
 			// onClose
 			if id != 0 {
 				f.windows.Remove(id)
@@ -222,13 +224,12 @@ func (f *Famicom) Start() {
 		chrWindowID = 0
 	}
 
-	// APU window closures (managed by WindowManager, keep Famicom struct minimal)
 	openAPUWindow := func() {
 		if apuWindowOpen || f.windows == nil {
 			return
 		}
 
-		aw, err := ui.NewAPUWindow(&f.apu, f.config.ScaleFactor, func(id uint32) {
+		aw, err := ui.NewAPUWindow(&f.apu, f.config.SCALE_FACTOR, func(id uint32) {
 			if id != 0 {
 				f.windows.Remove(id)
 			}
@@ -255,7 +256,9 @@ func (f *Famicom) Start() {
 		apuWindowID = 0
 	}
 
+	// Busの初期化とフレーム毎に実行されるコールバックの定義
 	f.bus.Init(func(p *ppu.PPU, c *ppu.Canvas, j1 *joypad.JoyPad, j2 *joypad.JoyPad) {
+		// フレームレート制御
 		frameDuration := time.Second / FRAME_PER_SECOND
 		now := time.Now()
 		if elapsed := now.Sub(lastFrameTime); elapsed < frameDuration {
@@ -263,8 +266,10 @@ func (f *Famicom) Start() {
 		}
 		lastFrameTime = time.Now()
 
+		// 全ウィンドウの描画
 		f.windows.RenderAll()
 
+		// イベント処理
 		for event := eventPump(); event != nil; event = eventPump() {
 			switch e := event.(type) {
 			case *sdl.QuitEvent:
@@ -322,11 +327,13 @@ func (f *Famicom) Start() {
 			f.windows.HandleEvent(event)
 		}
 
+		// コントローラの状態更新
 		f.updateJoyPad(j1, &f.keyboard1, &f.controller1)
 		f.updateJoyPad(j2, &f.keyboard2, &f.controller2)
 	})
 
-	gameWindow, err := ui.NewGameWindow(f.config.ScaleFactor, f.bus.Canvas(), func() {
+	// ゲームウィンドウの作成
+	gameWindow, err := ui.NewGameWindow(f.config.SCALE_FACTOR, f.bus.Canvas(), func() {
 		f.requestShutdown()
 	})
 	if err != nil {
@@ -334,10 +341,12 @@ func (f *Famicom) Start() {
 	}
 	f.windows.Add(gameWindow)
 
+	// CPU の作成と起動
 	f.cpu.Init(f.bus, false)
 	f.cpu.Run()
 }
 
+// MARK: ゲームの終了メソッド
 func (f *Famicom) requestShutdown() {
 	if f.windows != nil {
 		f.windows.CloseAll()
@@ -346,7 +355,7 @@ func (f *Famicom) requestShutdown() {
 	os.Exit(0)
 }
 
-// MARK: キーボードの状態を検知
+// MARK: キーボードの状態を検知するメソッド
 func (f *Famicom) handleKeyPress(e *sdl.KeyboardEvent, c1 *InputState, c2 *InputState) {
 	pressed := e.State == sdl.PRESSED
 	switch e.Keysym.Sym {
@@ -388,7 +397,7 @@ func (f *Famicom) handleKeyPress(e *sdl.KeyboardEvent, c1 *InputState, c2 *Input
 	}
 }
 
-// MARK: コントローラーのボタン状態を検知
+// MARK: コントローラーのボタン状態を検知するメソッド
 func (f *Famicom) handleButtonPress(e *sdl.ControllerButtonEvent, c *InputState) {
 	pressed := e.State == sdl.PRESSED
 	switch e.Button {
@@ -403,7 +412,7 @@ func (f *Famicom) handleButtonPress(e *sdl.ControllerButtonEvent, c *InputState)
 	}
 }
 
-// MARK: コントローラーのスティック状態を検知
+// MARK: コントローラーのスティック状態を検知するメソッド
 func (f *Famicom) handleAxisMotion(e *sdl.ControllerAxisEvent, c *InputState) {
 	const threshold = 8000 // デッドゾーン
 	switch e.Axis {
@@ -432,7 +441,7 @@ func (f *Famicom) handleAxisMotion(e *sdl.ControllerAxisEvent, c *InputState) {
 	}
 }
 
-// MARK: JoyPadの状態を更新
+// MARK: JoyPadの状態を更新するメソッド
 func (f *Famicom) updateJoyPad(j *joypad.JoyPad, k *InputState, c *InputState) {
 	// キーボードとコントローラの入力を統合
 	buttonA := k.A || c.A

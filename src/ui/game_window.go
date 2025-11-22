@@ -7,7 +7,7 @@ import (
 	"github.com/veandco/go-sdl2/sdl"
 )
 
-// GameWindow renders the main NES screen.
+// MARK: GameWindow の定義
 type GameWindow struct {
 	window   *sdl.Window
 	renderer *sdl.Renderer
@@ -16,7 +16,7 @@ type GameWindow struct {
 	onClose  func()
 }
 
-// NewGameWindow creates the primary game viewport.
+// MARK: GameWindow の作成メソッド
 func NewGameWindow(scale int, canvas *ppu.Canvas, onClose func()) (*GameWindow, error) {
 	w, err := sdl.CreateWindow(
 		"Famicom emu",
@@ -51,13 +51,13 @@ func NewGameWindow(scale int, canvas *ppu.Canvas, onClose func()) (*GameWindow, 
 	return &GameWindow{window: w, renderer: r, texture: t, canvas: canvas, onClose: onClose}, nil
 }
 
-// ID returns the SDL window identifier.
+// MARK: ウィンドウのID取得メソッド
 func (g *GameWindow) ID() uint32 {
 	id, _ := g.window.GetID()
 	return id
 }
 
-// HandleEvent reacts to SDL events routed to this window.
+// MARK: イベント処理メソッド
 func (g *GameWindow) HandleEvent(event sdl.Event) {
 	switch e := event.(type) {
 	case *sdl.WindowEvent:
@@ -67,19 +67,19 @@ func (g *GameWindow) HandleEvent(event sdl.Event) {
 	}
 }
 
-// Update refreshes the SDL texture with the latest PPU frame buffer.
+// MARK: ウィンドウの更新メソッド
 func (g *GameWindow) Update() {
 	g.texture.Update(nil, unsafe.Pointer(&g.canvas.Buffer[0]), int(g.canvas.Width*3))
 }
 
-// Render draws the latest frame.
+// MARK: 描画メソッド
 func (g *GameWindow) Render() {
 	g.renderer.Clear()
 	g.renderer.Copy(g.texture, nil, nil)
 	g.renderer.Present()
 }
 
-// Close releases SDL resources.
+// MARK: SDLリソースの解放メソッド
 func (g *GameWindow) Close() {
 	if g.texture != nil {
 		g.texture.Destroy()

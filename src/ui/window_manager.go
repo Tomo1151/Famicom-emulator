@@ -2,7 +2,7 @@ package ui
 
 import "github.com/veandco/go-sdl2/sdl"
 
-// Window defines the behaviour each SDL window wrapper must implement.
+// MARK: Window インターフェースの定義
 type Window interface {
 	ID() uint32
 	HandleEvent(event sdl.Event)
@@ -11,22 +11,22 @@ type Window interface {
 	Close()
 }
 
-// WindowManager keeps track of every open SDL window.
+// MARK: WindowManager の定義
 type WindowManager struct {
 	windows map[uint32]Window
 }
 
-// NewWindowManager returns an initialized WindowManager.
+// MARK: WindowManager の作成メソッド
 func NewWindowManager() *WindowManager {
 	return &WindowManager{windows: make(map[uint32]Window)}
 }
 
-// Add registers a window to be managed.
+// MARK: ウィンドウの登録メソッド
 func (wm *WindowManager) Add(w Window) {
 	wm.windows[w.ID()] = w
 }
 
-// Remove closes and unregisters the window with the given ID.
+// MARK: ID指定でウィンドウを削除するメソッド
 func (wm *WindowManager) Remove(id uint32) {
 	if w, ok := wm.windows[id]; ok {
 		w.Close()
@@ -34,12 +34,12 @@ func (wm *WindowManager) Remove(id uint32) {
 	}
 }
 
-// Get retrieves a window reference by ID.
+// MARK: ID指定でウィンドウを取得するメソッド
 func (wm *WindowManager) Get(id uint32) Window {
 	return wm.windows[id]
 }
 
-// HandleEvent routes an SDL event to the appropriate window.
+// MARK: イベント処理メソッド
 func (wm *WindowManager) HandleEvent(event sdl.Event) {
 	switch e := event.(type) {
 	case *sdl.WindowEvent:
@@ -58,14 +58,14 @@ func (wm *WindowManager) HandleEvent(event sdl.Event) {
 	case *sdl.MouseWheelEvent:
 		wm.dispatch(e.WindowID, event)
 	default:
-		// dispatch to all windows when no specific target exists (e.g. controller events)
+		// イベントのウィンドウ指定がなければすべてにイベントを投げる
 		for _, w := range wm.windows {
 			w.HandleEvent(event)
 		}
 	}
 }
 
-// RenderAll updates and renders every managed window.
+// MARK: すべてのウィンドウを描画するメソッド
 func (wm *WindowManager) RenderAll() {
 	for _, w := range wm.windows {
 		w.Update()
@@ -73,13 +73,14 @@ func (wm *WindowManager) RenderAll() {
 	}
 }
 
-// CloseAll releases every window.
+// MARK: すべてのウィンドウを閉じるメソッド
 func (wm *WindowManager) CloseAll() {
 	for id := range wm.windows {
 		wm.Remove(id)
 	}
 }
 
+// MARK: ID指定でイベントをウィンドウに投げるメソッド
 func (wm *WindowManager) dispatch(windowID uint32, event sdl.Event) {
 	if windowID == 0 {
 		return

@@ -7,9 +7,7 @@ import (
 	"github.com/veandco/go-sdl2/sdl"
 )
 
-// NameTableWindow visualizes the PPU name tables in a compact form.
-// It displays the two 1KB name tables side-by-side as a 64x30 image
-// (32x30 tiles per table) and reuses a preallocated RGB buffer.
+// MARK: NameTableWindow の定義
 type NameTableWindow struct {
 	window   *sdl.Window
 	renderer *sdl.Renderer
@@ -22,7 +20,7 @@ type NameTableWindow struct {
 	scale    int
 }
 
-// NewNameTableWindow creates a lightweight name-table viewer.
+// MARK: NameTableWindow の作成メソッド
 func NewNameTableWindow(p *ppu.PPU, scale int, onClose func(id uint32)) (*NameTableWindow, error) {
 	const tileSize = 8
 	const cols = 32
@@ -60,11 +58,13 @@ func NewNameTableWindow(p *ppu.PPU, scale int, onClose func(id uint32)) (*NameTa
 	return &NameTableWindow{window: win, renderer: r, texture: t, ppu: p, buf: buf, onClose: onClose, baseW: w, baseH: h, scale: scale}, nil
 }
 
+// MARK: ウィンドウのIDを取得するメソッド
 func (n *NameTableWindow) ID() uint32 {
 	id, _ := n.window.GetID()
 	return id
 }
 
+// MARK: イベント処理メソッド
 func (n *NameTableWindow) HandleEvent(event sdl.Event) {
 	switch e := event.(type) {
 	case *sdl.WindowEvent:
@@ -85,6 +85,7 @@ func (n *NameTableWindow) HandleEvent(event sdl.Event) {
 	}
 }
 
+// MARK: スケール設定メソッド
 func (n *NameTableWindow) setScale(s int) {
 	if s < 1 {
 		s = 1
@@ -102,34 +103,33 @@ func (n *NameTableWindow) setScale(s int) {
 	}
 }
 
+// MARK: 更新メソッド
 func (n *NameTableWindow) Update() {
-	// Render each tile as an 8x8 block using CHR ROM + name table attribute palettes.
 	vramPtr := n.ppu.VRAM()
 	paletteTable := n.ppu.PaletteTable()
 	bankBase := n.ppu.BackgroundPatternTableAddress()
 
-	// convenience aliases
 	const cols = 32
 	const rows = 30
 	const ntSize = 1024
 	const tileSize = 8
 	width := cols * 2 * tileSize
 
-	for nt := 0; nt < 2; nt++ {
+	for nt := range 2 {
 		base := nt * ntSize
-		// attribute table slice
 		attrStart := base + 0x3C0
-		// For each tile in the name table
-		for ty := 0; ty < rows; ty++ {
-			for tx := 0; tx < cols; tx++ {
+
+		// 全てのタイルに対して処理
+		for ty := range rows {
+			for tx := range cols {
 				idx := base + ty*cols + tx
 				tileIndex := (*vramPtr)[idx]
 
-				// compute attribute table index
+				// 属性テーブルのインデックスを計算
 				attrTableIdx := (ty/4)*8 + (tx / 4)
 				attrByte := (*vramPtr)[attrStart+attrTableIdx]
 
-				// select palette quadrant
+				// パレットインデックスの計算
 				var paletteIdx uint8
 				if tx%4/2 == 0 && ty%4/2 == 0 {
 					paletteIdx = (attrByte) & 0b11
@@ -141,8 +141,8 @@ func (n *NameTableWindow) Update() {
 					paletteIdx = (attrByte >> 6) & 0b11
 				}
 
+				// パレットの決定
 				paletteStart := 1 + uint(paletteIdx)*4
-				// paletteIndices are indices into ppu.PALETTE
 				paletteIndices := [4]uint8{
 					(*paletteTable)[0],
 					(*paletteTable)[paletteStart+0],
@@ -150,14 +150,14 @@ func (n *NameTableWindow) Update() {
 					(*paletteTable)[paletteStart+2],
 				}
 
-				// fetch tile pattern (16 bytes per tile)
+				// タイルパターンのフェッチ
 				tileBase := bankBase + uint16(tileIndex)*uint16(tileSize*2)
 
-				for row := 0; row < tileSize; row++ {
+				for row := range tileSize {
 					upper := n.ppu.Mapper.ReadCharacterRom(tileBase + uint16(row))
 					lower := n.ppu.Mapper.ReadCharacterRom(tileBase + uint16(row) + uint16(tileSize))
-					for col := 0; col < tileSize; col++ {
-						// Match PPU: lower plane contributes the high bit, upper plane the low bit
+
+					for col := range tileSize {
 						bit := (((lower >> (7 - uint(col))) & 1) << 1) | ((upper >> (7 - uint(col))) & 1)
 						colorIdx := paletteIndices[bit]
 						color := ppu.PALETTE[colorIdx]
@@ -177,12 +177,14 @@ func (n *NameTableWindow) Update() {
 	n.texture.Update(nil, unsafe.Pointer(&n.buf[0]), int(width*3))
 }
 
+// MARK: 描画メソッド
 func (n *NameTableWindow) Render() {
 	n.renderer.Clear()
 	n.renderer.Copy(n.texture, nil, nil)
 	n.renderer.Present()
 }
 
+// MARK: SDLリソースの解放メソッド
 func (n *NameTableWindow) Close() {
 	if n.texture != nil {
 		n.texture.Destroy()
@@ -198,6 +200,7 @@ func (n *NameTableWindow) Close() {
 	n.window = nil
 }
 
+// MARK: ウィンドウを閉じるメソッド
 func (n *NameTableWindow) requestClose() {
 	if n.onClose != nil {
 		n.onClose(n.ID())

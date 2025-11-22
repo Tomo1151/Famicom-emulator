@@ -1,5 +1,6 @@
 package apu
 
+// MARK: 変数定義
 var (
 	dmcFrequencyTable = [16]uint16{
 		0x1AC, 0x17C, 0x154, 0x140,

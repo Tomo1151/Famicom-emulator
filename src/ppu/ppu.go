@@ -60,29 +60,6 @@ type PPU struct {
 	lineBuffer [SCREEN_WIDTH]Pixel // 次のスキャンラインのバッファ
 }
 
-// PaletteTable provides read-only access to the internal palette table
-// for external debug viewers. Internal ppu code should use the
-// lowercase `paletteTable` field to avoid the method call overhead.
-func (p *PPU) PaletteTable() *[PALETTE_TABLE_SIZE + 1]uint8 {
-	return &p.paletteTable
-}
-
-// VRAM returns a read-only pointer to the internal VRAM buffer.
-func (p *PPU) VRAM() *[VRAM_SIZE]uint8 {
-	return &p.vram
-}
-
-// OAM returns a read-only pointer to the internal OAM buffer.
-func (p *PPU) OAM() *[OAM_DATA_SIZE]uint8 {
-	return &p.oam
-}
-
-// BackgroundPatternTableAddress exposes the currently selected background
-// pattern table base address (0x0000 or 0x1000) for external viewers.
-func (p *PPU) BackgroundPatternTableAddress() uint16 {
-	return p.control.BackgroundPatternTableAddress()
-}
-
 // MARK: PPUの初期化メソッド
 func (p *PPU) Init(mapper mappers.Mapper) {
 	p.Mapper = mapper
@@ -104,16 +81,12 @@ func (p *PPU) Init(mapper mappers.Mapper) {
 	p.status.Init()
 
 	// 内部レジスタの初期化
-	p.t = InternalAddressRegiseter{}
 	p.t.Init()
-	p.v = InternalAddressRegiseter{}
 	p.v.Init()
-	p.x = InternalXRegister{}
 	p.x.Init()
-	p.w = InternalWRegister{}
 	p.w.Init()
+
 	// vLineStartも初期化
-	p.vLineStart = InternalAddressRegiseter{}
 	p.vLineStart.Init()
 
 	p.oamAddress = 0
@@ -754,4 +727,24 @@ func (p *PPU) Tick(canvas *Canvas, cycles uint) bool {
 		}
 	}
 	return false
+}
+
+// MARK: PaletteTable の取得メソッド
+func (p *PPU) PaletteTable() *[PALETTE_TABLE_SIZE + 1]uint8 {
+	return &p.paletteTable
+}
+
+// MARK: VRAM の取得メソッド
+func (p *PPU) VRAM() *[VRAM_SIZE]uint8 {
+	return &p.vram
+}
+
+// MARK: OAM の取得メソッド
+func (p *PPU) OAM() *[OAM_DATA_SIZE]uint8 {
+	return &p.oam
+}
+
+// MARK: BG pattern table address の取得メソッド
+func (p *PPU) BackgroundPatternTableAddress() uint16 {
+	return p.control.BackgroundPatternTableAddress()
 }

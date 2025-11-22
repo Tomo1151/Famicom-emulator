@@ -8,8 +8,7 @@ import (
 	"github.com/veandco/go-sdl2/sdl"
 )
 
-// APUWindow renders per-channel waveforms in a square window.
-// The window is vertically split into 5 equal regions for ch1..ch5.
+// MARK: APUウィンドウの定義
 type APUWindow struct {
 	window   *sdl.Window
 	renderer *sdl.Renderer
@@ -20,9 +19,8 @@ type APUWindow struct {
 	scale    int
 }
 
+// MARK: APUウィンドウの作成メソッド
 func NewAPUWindow(a *apu.APU, scale int, onClose func(id uint32)) (*APUWindow, error) {
-	// Use two-screen width (like CHR viewer) and scale factor.
-	// Width = 2 * SCREEN_WIDTH * scale, Height = SCREEN_HEIGHT * scale
 	baseW := int(ppu.SCREEN_WIDTH * 2)
 	baseH := int(ppu.SCREEN_HEIGHT)
 	width := int32(baseW * scale)
@@ -48,12 +46,15 @@ func NewAPUWindow(a *apu.APU, scale int, onClose func(id uint32)) (*APUWindow, e
 	return &APUWindow{window: w, renderer: r, apu: a, onClose: onClose, baseW: baseW, baseH: baseH, scale: scale}, nil
 }
 
+// MARK: ウィンドウのID取得メソッド
 func (aw *APUWindow) ID() uint32 {
 	id, _ := aw.window.GetID()
 	return id
 }
 
+// MARK: イベント処理メソッド
 func (aw *APUWindow) HandleEvent(event sdl.Event) {
+	// ウィンドウ固有のイベントを処理する（閉じる・スケール変更）
 	switch e := event.(type) {
 	case *sdl.WindowEvent:
 		if e.Event == sdl.WINDOWEVENT_CLOSE {
@@ -73,6 +74,7 @@ func (aw *APUWindow) HandleEvent(event sdl.Event) {
 	}
 }
 
+// MARK: スケール設定メソッド
 func (aw *APUWindow) setScale(s int) {
 	if s < 1 {
 		s = 1
@@ -89,10 +91,10 @@ func (aw *APUWindow) setScale(s int) {
 	}
 }
 
-func (aw *APUWindow) Update() {
-	// No stateful updates required; samples are read during Render().
-}
+// MARK: 更新メソッド
+func (aw *APUWindow) Update() {}
 
+// MARK: 描画メソッド
 func (aw *APUWindow) Render() {
 	if aw.renderer == nil {
 		return
@@ -100,7 +102,7 @@ func (aw *APUWindow) Render() {
 	aw.renderer.SetDrawColor(16, 16, 16, 255)
 	aw.renderer.Clear()
 
-	// Sample count used by the audio callback
+	// オーディオコールバックで渡されるサンプル数を取得し、同数分を参照する。
 	n := apu.AudioCallbackSampleCount()
 	samples := apu.GetRecentChannelSamples(n)
 	if samples == nil {
@@ -112,7 +114,7 @@ func (aw *APUWindow) Render() {
 	width := int(w)
 	height := int(h)
 	regionH := height / 5
-	// thickness in pixels scaled by UI scale (approx)
+
 	thickness := int32(1)
 	if aw.scale >= 2 {
 		thickness = int32(aw.scale)
@@ -121,8 +123,8 @@ func (aw *APUWindow) Render() {
 		thickness = 1
 	}
 
-	for ch := 0; ch < 5; ch++ {
-		// background for region
+	for ch := range 5 {
+		// 各チャンネル領域の背景を塗る
 		r := sdl.Rect{X: 0, Y: int32(ch * regionH), W: int32(width), H: int32(regionH)}
 		if ch%2 == 0 {
 			aw.renderer.SetDrawColor(24, 24, 24, 255)
@@ -131,23 +133,23 @@ func (aw *APUWindow) Render() {
 		}
 		aw.renderer.FillRect(&r)
 
-		// draw mid-line
+		// 中央の基準線を描画
 		aw.renderer.SetDrawColor(80, 80, 80, 255)
 		midY := int32(ch*regionH + regionH/2)
 		aw.renderer.DrawLine(0, midY, int32(width), midY)
 
-		// draw waveform as a connected polyline (thickened)
+		// 波形をポリラインとして描画（太線化あり）
 		aw.renderer.SetDrawColor(160, 220-uint8(ch*20), 80+uint8(ch*20), 255)
 		channelSamples := samples[ch]
 		if len(channelSamples) == 0 {
 			continue
 		}
-		// We'll compute a y for each x across the window and connect with DrawLine.
+
+		// X方向の各画素に対応するサンプル位置を求め、線形補間してY座標を算出する。
 		var prevSet bool
 		var prevX, prevY int32
 		sampleCount := len(channelSamples)
 		for x := 0; x < width; x++ {
-			// Map x -> fractional sample index and linearly interpolate
 			if sampleCount == 0 {
 				break
 			}
@@ -169,6 +171,9 @@ func (aw *APUWindow) Render() {
 				s1 = float64(channelSamples[idx0+1])
 			}
 			val := s0*(1.0-frac) + s1*frac
+
+			// チャンネル毎の振幅レンジで正規化する。
+			// pulse系(1-4ch)は0..15，DMCは0..127程度の幅
 			var denom float64 = 1.0
 			if ch >= 0 && ch <= 3 {
 				denom = 15.0
@@ -189,15 +194,14 @@ func (aw *APUWindow) Render() {
 			cy := y
 
 			if prevSet {
-				// draw main line
+				// メインの線を引き、視認性のために平行オフセットを描いて太線化する。
 				aw.renderer.DrawLine(prevX, prevY, cx, cy)
-				// thicken by drawing parallel horizontal offsets
 				for t := int32(1); t < thickness; t++ {
 					aw.renderer.DrawLine(prevX, prevY+t, cx, cy+t)
 					aw.renderer.DrawLine(prevX, prevY-t, cx, cy-t)
 				}
 			}
-			// draw a small square at the point to ensure visibility on thin segments
+			// 各点に小さな長方形を描いて、細いセグメントも見えるようにする。
 			pr := sdl.Rect{X: cx - thickness/2, Y: cy - thickness/2, W: thickness, H: thickness}
 			aw.renderer.FillRect(&pr)
 			prevX = cx
@@ -209,6 +213,7 @@ func (aw *APUWindow) Render() {
 	aw.renderer.Present()
 }
 
+// MARK: SDLリソースの解放メソッド
 func (aw *APUWindow) Close() {
 	if aw.renderer != nil {
 		aw.renderer.Destroy()
@@ -220,6 +225,7 @@ func (aw *APUWindow) Close() {
 	aw.window = nil
 }
 
+// MARK: ウィンドウを閉じるメソッド
 func (aw *APUWindow) requestClose() {
 	if aw.onClose != nil {
 		aw.onClose(aw.ID())
