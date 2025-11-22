@@ -12,7 +12,7 @@ type SquareWaveChannel struct {
 }
 
 // MARK: 矩形波チャンネルの初期化メソッド
-func (swc *SquareWaveChannel) Init() {
+func (swc *SquareWaveChannel) Init(log bool) {
 	swc.register = SquareWaveRegister{}
 	swc.register.Init()
 	swc.envelope = Envelope{}
@@ -21,7 +21,7 @@ func (swc *SquareWaveChannel) Init() {
 	swc.lengthCounter.Init()
 	swc.sweepUnit = SweepUnit{}
 	swc.sweepUnit.Init()
-	swc.buffer.Init()
+	swc.buffer.Init(log)
 }
 
 // MARK: 矩形波チャンネルの出力メソッド
@@ -47,4 +47,9 @@ func (swc *SquareWaveChannel) output(cycles uint) float32 {
 	} else {
 		return 0.0
 	}
+}
+
+// MARK: デバッグ出力切り替え
+func (s *SquareWaveChannel) ToggleLog() {
+	s.buffer.ToggleLog()
 }

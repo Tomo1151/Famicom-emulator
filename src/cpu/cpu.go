@@ -1187,6 +1187,11 @@ func (c *CPU) Trace() string {
 
 // MARK: デバッグ用ログ出力切り替え
 func (c *CPU) ToggleLog() {
+	if c.log {
+		fmt.Println("[CPU] Debug log: OFF")
+	} else {
+		fmt.Println("[CPU] Debug log: ON")
+	}
 	c.log = !c.log
 }
 

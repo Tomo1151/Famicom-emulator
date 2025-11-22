@@ -24,16 +24,19 @@ type BlipBuffer struct {
 	filterTaps  []float64
 	filterState []float32
 	filterIndex int
+
+	log bool // デバッグ出力フラグ
 }
 
 // MARK: BlipBufferの初期化メソッド
-func (b *BlipBuffer) Init() {
+func (b *BlipBuffer) Init(log bool) {
 	b.sampleRate = float64(SAMPLE_RATE)
 	b.tickRate = float64(CPU_CLOCK)
 	b.samples = make([]float32, 0, BUFFER_SIZE)
 	b.filterTaps = designSincLowPass(sincTapCount, sincCutoff)
 	b.filterState = make([]float32, len(b.filterTaps))
 	b.filterIndex = 0
+	b.log = log
 }
 
 // MARK: レベルの差分を追加するメソッド
@@ -71,7 +74,7 @@ func (b *BlipBuffer) Read(out []float32, count int) int {
 	var last float32 = b.lastLevel
 	n := min(len(b.samples), count)
 
-	if len(b.samples) < count {
+	if b.log && len(b.samples) < count {
 		fmt.Printf("[BlipBuffer] Warning: couldn't read enough samples (want: %4d, got: %4d)\n", count, len(b.samples))
 	}
 
@@ -155,6 +158,11 @@ func designSincLowPass(numTaps int, cutoff float64) []float64 {
 	return taps
 }
 
+// MARK: デバッグ出力の切り替え
+func (b *BlipBuffer) ToggleLog() {
+	b.log = !b.log
+}
+
 // MARK: ResamplingBufferの定義
 type ResamplingBuffer struct {
 	sampleRate float64
@@ -164,13 +172,16 @@ type ResamplingBuffer struct {
 	frac       float64
 	samples    []float32
 	mutex      sync.Mutex
+
+	log bool // デバッグ出力フラグ
 }
 
 // MARK: ResamplingBuffer初期化メソッド
-func (b *ResamplingBuffer) Init() {
+func (b *ResamplingBuffer) Init(log bool) {
 	b.sampleRate = float64(SAMPLE_RATE)
 	b.tickRate = float64(CPU_CLOCK)
 	b.samples = make([]float32, 0, BUFFER_SIZE)
+	b.log = log
 }
 
 // MARK: ResamplingBufferの書き込みメソッド
@@ -211,7 +222,7 @@ func (b *ResamplingBuffer) Read(out []float32, count int) int {
 	var last float32 = b.lastLevel
 	n := min(len(b.samples), count)
 
-	if len(b.samples) < count {
+	if b.log && len(b.samples) < count {
 		fmt.Printf("[BlipBuffer] Warning: couldn't read enough samples (want: %4d, got: %4d)\n", count, len(b.samples))
 	}
 

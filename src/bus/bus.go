@@ -3,6 +3,7 @@ package bus
 import (
 	"Famicom-emulator/apu"
 	"Famicom-emulator/cartridge"
+	"Famicom-emulator/config"
 	"Famicom-emulator/joypad"
 	"Famicom-emulator/ppu"
 )
@@ -30,6 +31,7 @@ type Bus struct {
 	cycles    uint                     // CPUサイクル
 	callback  func(*ppu.PPU, *ppu.Canvas, *joypad.JoyPad, *joypad.JoyPad)
 	canvas    *ppu.Canvas
+	config    *config.Config
 }
 
 // MARK: Busの初期化メソッド (カートリッジ無し，デバッグ・テスト用)
@@ -44,7 +46,6 @@ func (b *Bus) Init(callback func(*ppu.PPU, *ppu.Canvas, *joypad.JoyPad, *joypad.
 	for addr := range b.wram {
 		b.wram[addr] = 0x00
 	}
-
 	b.callback = callback
 	b.canvas = &ppu.Canvas{}
 	b.canvas.Init()
@@ -62,7 +63,11 @@ func (b *Bus) ConnectComponents(
 	cartridge *cartridge.Cartridge,
 	joypad1 *joypad.JoyPad,
 	joypad2 *joypad.JoyPad,
+	config *config.Config,
 ) {
+	// 設定を反映
+	b.config = config
+
 	// コンポーネントをBusと接続
 	b.ppu = ppu
 	b.apu = apu
@@ -72,7 +77,7 @@ func (b *Bus) ConnectComponents(
 
 	// 各コンポーネントを初期化
 	b.ppu.Init(b.cartridge.Mapper())
-	b.apu.Init(b.ReadByteFrom)
+	b.apu.Init(b.ReadByteFrom, b.config)
 	b.joypad1.Init()
 	b.joypad2.Init()
 }

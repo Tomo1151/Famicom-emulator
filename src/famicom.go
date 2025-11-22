@@ -51,7 +51,7 @@ type Famicom struct {
 }
 
 // MARK: Famicomの初期化メソッド
-func (f *Famicom) Init(cartridge cartridge.Cartridge, cfg *config.Config) {
+func (f *Famicom) Init(cartridge cartridge.Cartridge, config *config.Config) {
 	// ROMファイルのロード
 	f.cartridge = cartridge
 	err := f.cartridge.Load()
@@ -60,6 +60,7 @@ func (f *Famicom) Init(cartridge cartridge.Cartridge, cfg *config.Config) {
 	}
 
 	// 各コンポーネントの定義 / 接続
+	f.config = config
 	f.cpu = cpu.CPU{}
 	f.ppu = ppu.PPU{}
 	f.apu = apu.APU{}
@@ -72,16 +73,8 @@ func (f *Famicom) Init(cartridge cartridge.Cartridge, cfg *config.Config) {
 		&f.cartridge,
 		&f.joypad1,
 		&f.joypad2,
+		f.config,
 	)
-
-	if cfg != nil {
-		f.config = cfg
-	} else {
-		f.config = &config.Config{
-			SCALE_FACTOR: 3,
-			SOUND_VOLUME: 1.0,
-		}
-	}
 
 	// 入力データの定義
 	f.keyboard1 = InputState{}
@@ -92,6 +85,14 @@ func (f *Famicom) Init(cartridge cartridge.Cartridge, cfg *config.Config) {
 
 // MARK: Famicomの起動
 func (f *Famicom) Start() {
+	// デフォルトの設定
+	if f.config == nil {
+		f.config = &config.Config{
+			SCALE_FACTOR: 3,
+			SOUND_VOLUME: 1.0,
+		}
+	}
+
 	// SDLの初期化
 	if err := sdl.Init(sdl.INIT_VIDEO | sdl.INIT_GAMECONTROLLER); err != nil {
 		panic(err)
@@ -151,8 +152,6 @@ func (f *Famicom) Start() {
 					switch e.Keysym.Sym {
 					case sdl.K_ESCAPE: // ESC: ゲーム終了
 						f.requestShutdown()
-					case sdl.K_F12: // F12: CPUログ ON/OFF
-						f.cpu.ToggleLog()
 					case sdl.K_F1: // F1: オプションウィンドウ ON/OFF
 						if f.windows != nil {
 							if _, err := f.windows.ToggleOptionWindow(f.config); err != nil {
@@ -177,6 +176,10 @@ func (f *Famicom) Start() {
 								log.Printf("failed to toggle audio window: %v", err)
 							}
 						}
+					case sdl.K_F11: // F11: APUログ ON/OFF
+						f.apu.ToggleLog()
+					case sdl.K_F12: // F12: CPUログ ON/OFF
+						f.cpu.ToggleLog()
 					}
 				}
 				f.handleKeyPress(e, &f.keyboard1, &f.keyboard2)
@@ -214,7 +217,7 @@ func (f *Famicom) Start() {
 	f.windows.Add(gameWindow)
 
 	// CPU の作成と起動
-	f.cpu.Init(f.bus, false)
+	f.cpu.Init(f.bus, f.config.CPU_LOG_ENABLED)
 	f.cpu.Run()
 }
 

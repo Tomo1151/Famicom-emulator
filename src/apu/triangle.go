@@ -19,14 +19,14 @@ type TriangleWaveChannel struct {
 }
 
 // MARK: 三角波チャンネルの初期化メソッド
-func (twc *TriangleWaveChannel) Init() {
+func (twc *TriangleWaveChannel) Init(log bool) {
 	twc.register = TriangleWaveRegister{}
 	twc.register.Init()
 	twc.lengthCounter = LengthCounter{}
 	twc.lengthCounter.Init()
 	twc.linearCounter = LinearCounter{}
 	twc.linearCounter.Init()
-	twc.buffer.Init()
+	twc.buffer.Init(log)
 }
 
 // MARK: 三角波チャンネルの出力メソッド
@@ -43,4 +43,9 @@ func (twc *TriangleWaveChannel) output(cycles uint) float32 {
 	step := uint(twc.phase/float32(period)) % 32
 
 	return float32(triangleSequence[step])
+}
+
+// MARK: デバッグ出力切り替え
+func (t *TriangleWaveChannel) ToggleLog() {
+	t.buffer.ToggleLog()
 }

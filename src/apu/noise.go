@@ -14,7 +14,7 @@ type NoiseWaveChannel struct {
 }
 
 // MARK: ノイズチャンネルの初期化メソッド
-func (nwc *NoiseWaveChannel) Init() {
+func (nwc *NoiseWaveChannel) Init(log bool) {
 	nwc.register = NoiseWaveRegister{}
 	nwc.register.Init()
 	nwc.envelope = Envelope{}
@@ -25,7 +25,7 @@ func (nwc *NoiseWaveChannel) Init() {
 	nwc.shiftRegister = NoiseShiftRegister{}
 	nwc.shiftRegister.InitWithShortMode()
 	nwc.buffer = BlipBuffer{}
-	nwc.buffer.Init()
+	nwc.buffer.Init(log)
 }
 
 // MARK: ノイズチャンネルの出力メソッド
@@ -49,4 +49,9 @@ func (nwc *NoiseWaveChannel) output(cycles uint) float32 {
 	} else {
 		return 0.0
 	}
+}
+
+// MARK: デバッグ出力切り替え
+func (n *NoiseWaveChannel) ToggleLog() {
+	n.buffer.ToggleLog()
 }

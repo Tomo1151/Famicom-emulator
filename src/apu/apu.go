@@ -6,6 +6,8 @@ void AudioMixCallback(void* userdata, uint8_t* stream, int length);
 */
 import "C"
 import (
+	"Famicom-emulator/config"
+	"fmt"
 	"unsafe"
 
 	"github.com/veandco/go-sdl2/sdl"
@@ -59,25 +61,28 @@ type APU struct {
 	prevLevel3 float32
 	prevLevel4 float32
 	prevLevel5 float32
+
+	log bool // デバッグ出力フラグ
 }
 
 // MARK: APUの初期化メソッド
-func (a *APU) Init(reader CpuBusReader) {
+func (a *APU) Init(reader CpuBusReader, config *config.Config) {
 	a.volume = 1.0
 	a.cycles = 0
 	a.step = 0
 	a.cpuRead = reader
+	a.log = config.APU_LOG_ENABLED
 
 	a.channel1 = &square1
-	a.channel1.Init()
+	a.channel1.Init(a.log)
 	a.channel2 = &square2
-	a.channel2.Init()
+	a.channel2.Init(a.log)
 	a.channel3 = &triangle
-	a.channel3.Init()
+	a.channel3.Init(a.log)
 	a.channel4 = &noise
-	a.channel4.Init()
+	a.channel4.Init(a.log)
 	a.channel5 = &dmc
-	a.channel5.Init(a.cpuRead)
+	a.channel5.Init(a.cpuRead, a.log)
 
 	a.frameCounter.Init()
 	a.status.Init()
@@ -620,6 +625,21 @@ func (a *APU) clockFrameSequencer() {
 			}
 		}
 	}
+}
+
+// MARK: デバッグ用ログ出力切り替え
+func (a *APU) ToggleLog() {
+	if a.log {
+		fmt.Println("[APU] Debug log: OFF")
+	} else {
+		fmt.Println("[APU] Debug log: ON")
+	}
+	a.log = !a.log
+	a.channel1.ToggleLog()
+	a.channel2.ToggleLog()
+	a.channel3.ToggleLog()
+	a.channel4.ToggleLog()
+	a.channel5.ToggleLog()
 }
 
 // MARK: SDLコールバックのサンプル数を取得するメソッド
