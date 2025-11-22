@@ -128,134 +128,6 @@ func (f *Famicom) Start() {
 	eventPump := sdl.PollEvent
 	lastFrameTime := time.Now()
 
-	var optionWindowID uint32
-	var optionWindowOpen bool
-
-	var vramWindowID uint32
-	var vramWindowOpen bool
-
-	var chrWindowID uint32
-	var chrWindowOpen bool
-
-	var apuWindowID uint32
-	var apuWindowOpen bool
-
-	closeOptionWindow := func() {
-		if !optionWindowOpen {
-			return
-		}
-		if optionWindowID != 0 {
-			f.windows.Remove(optionWindowID)
-		}
-		optionWindowOpen = false
-		optionWindowID = 0
-	}
-
-	openOptionWindow := func() {
-		if optionWindowOpen {
-			return
-		}
-		optWin, err := ui.NewOptionWindow(f.config, func(uint32) {
-			closeOptionWindow()
-		})
-		if err != nil {
-			log.Printf("failed to open option window: %v", err)
-			return
-		}
-		optionWindowOpen = true
-		optionWindowID = optWin.ID()
-		f.windows.Add(optWin)
-	}
-
-	closeVramWindow := func() {
-		if !vramWindowOpen {
-			return
-		}
-		if vramWindowID != 0 {
-			f.windows.Remove(vramWindowID)
-		}
-		vramWindowOpen = false
-		vramWindowID = 0
-	}
-
-	openVramWindow := func(p *ppu.PPU) {
-		if vramWindowOpen {
-			return
-		}
-		vwin, err := ui.NewNameTableWindow(p, f.config.SCALE_FACTOR, func(id uint32) {
-			closeVramWindow()
-		})
-		if err != nil {
-			log.Printf("failed to open Name Table window: %v", err)
-			return
-		}
-		vramWindowOpen = true
-		vramWindowID = vwin.ID()
-		f.windows.Add(vwin)
-	}
-
-	openChrWindow := func(p *ppu.PPU) {
-		cwin, err := ui.NewCharacterWindow(p, f.config.SCALE_FACTOR, func(id uint32) {
-			// onClose
-			if id != 0 {
-				f.windows.Remove(id)
-			}
-			chrWindowOpen = false
-			chrWindowID = 0
-		})
-		if err != nil {
-			log.Printf("failed to open CHR window: %v", err)
-		} else {
-			chrWindowOpen = true
-			chrWindowID = cwin.ID()
-			f.windows.Add(cwin)
-		}
-
-	}
-
-	closeChrWindow := func() {
-		if !chrWindowOpen {
-			return
-		}
-		if chrWindowID != 0 {
-			f.windows.Remove(chrWindowID)
-		}
-		chrWindowOpen = false
-		chrWindowID = 0
-	}
-
-	openAPUWindow := func() {
-		if apuWindowOpen || f.windows == nil {
-			return
-		}
-
-		aw, err := ui.NewAPUWindow(&f.apu, f.config.SCALE_FACTOR, func(id uint32) {
-			if id != 0 {
-				f.windows.Remove(id)
-			}
-			apuWindowOpen = false
-			apuWindowID = 0
-		})
-		if err != nil {
-			log.Printf("failed to open APU window: %v", err)
-			return
-		}
-		apuWindowOpen = true
-		apuWindowID = aw.ID()
-		f.windows.Add(aw)
-	}
-
-	closeAPUWindow := func() {
-		if !apuWindowOpen {
-			return
-		}
-		if apuWindowID != 0 {
-			f.windows.Remove(apuWindowID)
-		}
-		apuWindowOpen = false
-		apuWindowID = 0
-	}
-
 	// Busの初期化とフレーム毎に実行されるコールバックの定義
 	f.bus.Init(func(p *ppu.PPU, c *ppu.Canvas, j1 *joypad.JoyPad, j2 *joypad.JoyPad) {
 		// フレームレート制御
@@ -277,33 +149,33 @@ func (f *Famicom) Start() {
 			case *sdl.KeyboardEvent:
 				if e.State == sdl.PRESSED {
 					switch e.Keysym.Sym {
-					case sdl.K_ESCAPE:
+					case sdl.K_ESCAPE: // ESC: ゲーム終了
 						f.requestShutdown()
-					case sdl.K_F12:
+					case sdl.K_F12: // F12: CPUログ ON/OFF
 						f.cpu.ToggleLog()
-					case sdl.K_F1:
-						if optionWindowOpen {
-							closeOptionWindow()
-						} else {
-							openOptionWindow()
+					case sdl.K_F1: // F1: オプションウィンドウ ON/OFF
+						if f.windows != nil {
+							if _, err := f.windows.ToggleOptionWindow(f.config); err != nil {
+								log.Printf("failed to toggle option window: %v", err)
+							}
 						}
-					case sdl.K_F2:
-						if vramWindowOpen {
-							closeVramWindow()
-						} else {
-							openVramWindow(p)
+					case sdl.K_F2: // F2: ネームテーブルウィンドウ ON/OFF
+						if f.windows != nil {
+							if _, err := f.windows.ToggleNameTableWindow(p, f.config.SCALE_FACTOR); err != nil {
+								log.Printf("failed to toggle name table window: %v", err)
+							}
 						}
-					case sdl.K_F3:
-						if chrWindowOpen {
-							closeChrWindow()
-						} else {
-							openChrWindow(p)
+					case sdl.K_F3: // F3: CHR ROM ウィンドウ ON/OFF
+						if f.windows != nil {
+							if _, err := f.windows.ToggleCharacterWindow(p, f.config.SCALE_FACTOR); err != nil {
+								log.Printf("failed to toggle character window: %v", err)
+							}
 						}
-					case sdl.K_F4:
-						if apuWindowOpen {
-							closeAPUWindow()
-						} else {
-							openAPUWindow()
+					case sdl.K_F4: // F4: オーディオビジュアライザ ON/OFF
+						if f.windows != nil {
+							if _, err := f.windows.ToggleAudioWindow(&f.apu, f.config.SCALE_FACTOR); err != nil {
+								log.Printf("failed to toggle audio window: %v", err)
+							}
 						}
 					}
 				}

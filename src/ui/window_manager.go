@@ -1,6 +1,12 @@
 package ui
 
-import "github.com/veandco/go-sdl2/sdl"
+import (
+	"Famicom-emulator/apu"
+	"Famicom-emulator/config"
+	"Famicom-emulator/ppu"
+
+	"github.com/veandco/go-sdl2/sdl"
+)
 
 // MARK: Window インターフェースの定義
 type Window interface {
@@ -88,4 +94,74 @@ func (wm *WindowManager) dispatch(windowID uint32, event sdl.Event) {
 	if w, ok := wm.windows[windowID]; ok {
 		w.HandleEvent(event)
 	}
+}
+
+// MARK: OptionWindow の表示/非表示切り替えメソッド
+func (wm *WindowManager) ToggleOptionWindow(cfg *config.Config) (uint32, error) {
+	// 既に開かれていれば閉じる
+	for _, w := range wm.windows {
+		if ow, ok := w.(*OptionWindow); ok {
+			id := ow.ID()
+			wm.Remove(id)
+			return 0, nil
+		}
+	}
+
+	ow, err := NewOptionWindow(cfg, func(id uint32) { wm.Remove(id) })
+	if err != nil {
+		return 0, err
+	}
+	wm.Add(ow)
+	return ow.ID(), nil
+}
+
+// MARK: NameTableWindow の表示/非表示切り替えメソッド
+func (wm *WindowManager) ToggleNameTableWindow(p *ppu.PPU, scale int) (uint32, error) {
+	for _, w := range wm.windows {
+		if nw, ok := w.(*NameTableWindow); ok {
+			id := nw.ID()
+			wm.Remove(id)
+			return 0, nil
+		}
+	}
+	nw, err := NewNameTableWindow(p, scale, func(id uint32) { wm.Remove(id) })
+	if err != nil {
+		return 0, err
+	}
+	wm.Add(nw)
+	return nw.ID(), nil
+}
+
+// MARK: OptionWindow の表示/非表示切り替えメソッド
+func (wm *WindowManager) ToggleCharacterWindow(p *ppu.PPU, scale int) (uint32, error) {
+	for _, w := range wm.windows {
+		if cw, ok := w.(*CharacterWindow); ok {
+			id := cw.ID()
+			wm.Remove(id)
+			return 0, nil
+		}
+	}
+	cw, err := NewCharacterWindow(p, scale, func(id uint32) { wm.Remove(id) })
+	if err != nil {
+		return 0, err
+	}
+	wm.Add(cw)
+	return cw.ID(), nil
+}
+
+// MARK: AudioWindow の表示/非表示切り替えメソッド
+func (wm *WindowManager) ToggleAudioWindow(a *apu.APU, scale int) (uint32, error) {
+	for _, w := range wm.windows {
+		if aw, ok := w.(*AudioWindow); ok {
+			id := aw.ID()
+			wm.Remove(id)
+			return 0, nil
+		}
+	}
+	aw, err := NewAudioWindow(a, scale, func(id uint32) { wm.Remove(id) })
+	if err != nil {
+		return 0, err
+	}
+	wm.Add(aw)
+	return aw.ID(), nil
 }

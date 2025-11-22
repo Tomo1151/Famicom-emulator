@@ -8,8 +8,8 @@ import (
 	"github.com/veandco/go-sdl2/sdl"
 )
 
-// MARK: APUウィンドウの定義
-type APUWindow struct {
+// MARK: AudioWindow の定義
+type AudioWindow struct {
 	window   *sdl.Window
 	renderer *sdl.Renderer
 	apu      *apu.APU
@@ -20,13 +20,13 @@ type APUWindow struct {
 }
 
 // MARK: APUウィンドウの作成メソッド
-func NewAPUWindow(a *apu.APU, scale int, onClose func(id uint32)) (*APUWindow, error) {
+func NewAudioWindow(a *apu.APU, scale int, onClose func(id uint32)) (*AudioWindow, error) {
 	baseW := int(ppu.SCREEN_WIDTH * 2)
 	baseH := int(ppu.SCREEN_HEIGHT)
 	width := int32(baseW * scale)
 	height := int32(baseH * scale)
 	w, err := sdl.CreateWindow(
-		"APU Viewer",
+		"Audio Visualizer",
 		sdl.WINDOWPOS_CENTERED,
 		sdl.WINDOWPOS_CENTERED,
 		width,
@@ -43,17 +43,17 @@ func NewAPUWindow(a *apu.APU, scale int, onClose func(id uint32)) (*APUWindow, e
 		return nil, err
 	}
 
-	return &APUWindow{window: w, renderer: r, apu: a, onClose: onClose, baseW: baseW, baseH: baseH, scale: scale}, nil
+	return &AudioWindow{window: w, renderer: r, apu: a, onClose: onClose, baseW: baseW, baseH: baseH, scale: scale}, nil
 }
 
 // MARK: ウィンドウのID取得メソッド
-func (aw *APUWindow) ID() uint32 {
+func (aw *AudioWindow) ID() uint32 {
 	id, _ := aw.window.GetID()
 	return id
 }
 
 // MARK: イベント処理メソッド
-func (aw *APUWindow) HandleEvent(event sdl.Event) {
+func (aw *AudioWindow) HandleEvent(event sdl.Event) {
 	// ウィンドウ固有のイベントを処理する（閉じる・スケール変更）
 	switch e := event.(type) {
 	case *sdl.WindowEvent:
@@ -75,7 +75,7 @@ func (aw *APUWindow) HandleEvent(event sdl.Event) {
 }
 
 // MARK: スケール設定メソッド
-func (aw *APUWindow) setScale(s int) {
+func (aw *AudioWindow) setScale(s int) {
 	if s < 1 {
 		s = 1
 	}
@@ -92,10 +92,10 @@ func (aw *APUWindow) setScale(s int) {
 }
 
 // MARK: 更新メソッド
-func (aw *APUWindow) Update() {}
+func (aw *AudioWindow) Update() {}
 
 // MARK: 描画メソッド
-func (aw *APUWindow) Render() {
+func (aw *AudioWindow) Render() {
 	if aw.renderer == nil {
 		return
 	}
@@ -214,7 +214,7 @@ func (aw *APUWindow) Render() {
 }
 
 // MARK: SDLリソースの解放メソッド
-func (aw *APUWindow) Close() {
+func (aw *AudioWindow) Close() {
 	if aw.renderer != nil {
 		aw.renderer.Destroy()
 	}
@@ -226,7 +226,7 @@ func (aw *APUWindow) Close() {
 }
 
 // MARK: ウィンドウを閉じるメソッド
-func (aw *APUWindow) requestClose() {
+func (aw *AudioWindow) requestClose() {
 	if aw.onClose != nil {
 		aw.onClose(aw.ID())
 	}
