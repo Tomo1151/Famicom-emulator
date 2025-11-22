@@ -134,6 +134,9 @@ func (f *Famicom) Start() {
 	var chrWindowID uint32
 	var chrWindowOpen bool
 
+	var apuWindowID uint32
+	var apuWindowOpen bool
+
 	closeOptionWindow := func() {
 		if !optionWindowOpen {
 			return
@@ -219,6 +222,39 @@ func (f *Famicom) Start() {
 		chrWindowID = 0
 	}
 
+	// APU window closures (managed by WindowManager, keep Famicom struct minimal)
+	openAPUWindow := func() {
+		if apuWindowOpen || f.windows == nil {
+			return
+		}
+
+		aw, err := ui.NewAPUWindow(&f.apu, f.config.ScaleFactor, func(id uint32) {
+			if id != 0 {
+				f.windows.Remove(id)
+			}
+			apuWindowOpen = false
+			apuWindowID = 0
+		})
+		if err != nil {
+			log.Printf("failed to open APU window: %v", err)
+			return
+		}
+		apuWindowOpen = true
+		apuWindowID = aw.ID()
+		f.windows.Add(aw)
+	}
+
+	closeAPUWindow := func() {
+		if !apuWindowOpen {
+			return
+		}
+		if apuWindowID != 0 {
+			f.windows.Remove(apuWindowID)
+		}
+		apuWindowOpen = false
+		apuWindowID = 0
+	}
+
 	f.bus.Init(func(p *ppu.PPU, c *ppu.Canvas, j1 *joypad.JoyPad, j2 *joypad.JoyPad) {
 		frameDuration := time.Second / FRAME_PER_SECOND
 		now := time.Now()
@@ -257,6 +293,12 @@ func (f *Famicom) Start() {
 							closeChrWindow()
 						} else {
 							openChrWindow(p)
+						}
+					case sdl.K_F4:
+						if apuWindowOpen {
+							closeAPUWindow()
+						} else {
+							openAPUWindow()
 						}
 					}
 				}

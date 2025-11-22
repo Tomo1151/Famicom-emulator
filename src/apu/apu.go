@@ -29,6 +29,33 @@ var (
 	ch5Buffer [BUFFER_SIZE]float32
 )
 
+// AudioCallbackSampleCount returns the number of samples per channel
+// passed to the SDL audio callback (matches `spec.Samples`).
+func AudioCallbackSampleCount() int {
+	return BUFFER_SIZE / 2
+}
+
+// GetRecentChannelSamples returns slices referencing the most recent `n` samples
+// for each channel (1..5). The returned slice is ordered [ch1, ch2, ch3, ch4, ch5].
+// It does NOT copy the underlying data — callers may read concurrently with
+// the audio callback. The caller must not assume immutability of the returned
+// slices.
+func GetRecentChannelSamples(n int) [][]float32 {
+	if n <= 0 {
+		return nil
+	}
+	if n > BUFFER_SIZE {
+		n = BUFFER_SIZE
+	}
+	return [][]float32{
+		ch1Buffer[:n],
+		ch2Buffer[:n],
+		ch3Buffer[:n],
+		ch4Buffer[:n],
+		ch5Buffer[:n],
+	}
+}
+
 // CPUバスからデータを読み取るための関数型
 type CpuBusReader func(uint16) uint8
 
