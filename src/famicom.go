@@ -131,6 +131,9 @@ func (f *Famicom) Start() {
 	var vramWindowID uint32
 	var vramWindowOpen bool
 
+	var chrWindowID uint32
+	var chrWindowOpen bool
+
 	closeOptionWindow := func() {
 		if !optionWindowOpen {
 			return
@@ -169,7 +172,52 @@ func (f *Famicom) Start() {
 		vramWindowID = 0
 	}
 
-	// openVramWindow is defined inside the per-frame callback where `p` is available.
+	openVramWindow := func(p *ppu.PPU) {
+		if vramWindowOpen {
+			return
+		}
+		vwin, err := ui.NewNameTableWindow(p, f.config.ScaleFactor, func(id uint32) {
+			closeVramWindow()
+		})
+		if err != nil {
+			log.Printf("failed to open Name Table window: %v", err)
+			return
+		}
+		vramWindowOpen = true
+		vramWindowID = vwin.ID()
+		f.windows.Add(vwin)
+	}
+
+	openChrWindow := func(p *ppu.PPU) {
+		// open CharacterWindow using current PPU
+		cwin, err := ui.NewCharacterWindow(p, f.config.ScaleFactor, func(id uint32) {
+			// onClose
+			if id != 0 {
+				f.windows.Remove(id)
+			}
+			chrWindowOpen = false
+			chrWindowID = 0
+		})
+		if err != nil {
+			log.Printf("failed to open CHR window: %v", err)
+		} else {
+			chrWindowOpen = true
+			chrWindowID = cwin.ID()
+			f.windows.Add(cwin)
+		}
+
+	}
+
+	closeChrWindow := func() {
+		if !chrWindowOpen {
+			return
+		}
+		if chrWindowID != 0 {
+			f.windows.Remove(chrWindowID)
+		}
+		chrWindowOpen = false
+		chrWindowID = 0
+	}
 
 	f.bus.Init(func(p *ppu.PPU, c *ppu.Canvas, j1 *joypad.JoyPad, j2 *joypad.JoyPad) {
 		frameDuration := time.Second / FRAME_PER_SECOND
@@ -180,23 +228,6 @@ func (f *Famicom) Start() {
 		lastFrameTime = time.Now()
 
 		f.windows.RenderAll()
-
-		// openVramWindow uses the per-frame `p` pointer provided by the bus callback.
-		openVramWindow := func() {
-			if vramWindowOpen {
-				return
-			}
-			vwin, err := ui.NewNameTableWindow(p, f.config.ScaleFactor, func(id uint32) {
-				closeVramWindow()
-			})
-			if err != nil {
-				log.Printf("failed to open Name Table window: %v", err)
-				return
-			}
-			vramWindowOpen = true
-			vramWindowID = vwin.ID()
-			f.windows.Add(vwin)
-		}
 
 		for event := eventPump(); event != nil; event = eventPump() {
 			switch e := event.(type) {
@@ -219,7 +250,13 @@ func (f *Famicom) Start() {
 						if vramWindowOpen {
 							closeVramWindow()
 						} else {
-							openVramWindow()
+							openVramWindow(p)
+						}
+					case sdl.K_F3:
+						if chrWindowOpen {
+							closeChrWindow()
+						} else {
+							openChrWindow(p)
 						}
 					}
 				}
