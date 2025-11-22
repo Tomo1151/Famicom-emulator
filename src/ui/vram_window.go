@@ -17,6 +17,9 @@ type NameTableWindow struct {
 	ppu      *ppu.PPU
 	buf      []byte
 	onClose  func(id uint32)
+	baseW    int
+	baseH    int
+	scale    int
 }
 
 // NewNameTableWindow creates a lightweight name-table viewer.
@@ -54,7 +57,7 @@ func NewNameTableWindow(p *ppu.PPU, scale int, onClose func(id uint32)) (*NameTa
 
 	buf := make([]byte, w*h*3)
 
-	return &NameTableWindow{window: win, renderer: r, texture: t, ppu: p, buf: buf, onClose: onClose}, nil
+	return &NameTableWindow{window: win, renderer: r, texture: t, ppu: p, buf: buf, onClose: onClose, baseW: w, baseH: h, scale: scale}, nil
 }
 
 func (n *NameTableWindow) ID() uint32 {
@@ -73,8 +76,29 @@ func (n *NameTableWindow) HandleEvent(event sdl.Event) {
 			switch e.Keysym.Sym {
 			case sdl.K_ESCAPE:
 				n.requestClose()
+			case sdl.K_UP:
+				n.setScale(n.scale + 1)
+			case sdl.K_DOWN:
+				n.setScale(n.scale - 1)
 			}
 		}
+	}
+}
+
+func (n *NameTableWindow) setScale(s int) {
+	if s < 1 {
+		s = 1
+	}
+	if s > 8 {
+		s = 8
+	}
+	if s == n.scale {
+		return
+	}
+	n.scale = s
+	// Resize the window to match the new scale; texture stays the same size
+	if n.window != nil {
+		n.window.SetSize(int32(n.baseW*n.scale), int32(n.baseH*n.scale))
 	}
 }
 
