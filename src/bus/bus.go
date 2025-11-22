@@ -50,6 +50,11 @@ func (b *Bus) Init(callback func(*ppu.PPU, *ppu.Canvas, *joypad.JoyPad, *joypad.
 	b.canvas.Init()
 }
 
+// Canvas exposes the shared drawing surface used by the PPU.
+func (b *Bus) Canvas() *ppu.Canvas {
+	return b.canvas
+}
+
 // MARK: Busに各コンポーネントを接続
 func (b *Bus) ConnectComponents(
 	ppu *ppu.PPU,

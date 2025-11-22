@@ -4,14 +4,15 @@ import (
 	"Famicom-emulator/apu"
 	"Famicom-emulator/bus"
 	"Famicom-emulator/cartridge"
+	"Famicom-emulator/config"
 	"Famicom-emulator/cpu"
 	"Famicom-emulator/joypad"
 	"Famicom-emulator/ppu"
+	"Famicom-emulator/ui"
 	"fmt"
 	"log"
 	"os"
 	"time"
-	"unsafe"
 
 	"github.com/veandco/go-sdl2/sdl"
 )
@@ -19,10 +20,6 @@ import (
 // MARK: 定数定義
 const (
 	FRAME_PER_SECOND = 60
-	SCALE_FACTOR     = 3
-
-	INPUT_MODE_KEYBOARD = 0
-	INPUT_MODE_JOYPAD   = 1
 )
 
 // MARK: InputStateの定義
@@ -48,10 +45,13 @@ type Famicom struct {
 
 	gamepad1 sdl.JoystickID // SDLのコントローラID (1P)
 	gamepad2 sdl.JoystickID // SDLのコントローラID (2P)
+
+	config  *config.Config
+	windows *ui.WindowManager
 }
 
 // MARK: Famicomの初期化メソッド
-func (f *Famicom) Init(cartridge cartridge.Cartridge) {
+func (f *Famicom) Init(cartridge cartridge.Cartridge, cfg *config.Config) {
 	// ROMファイルのロード
 	f.cartridge = cartridge
 	err := f.cartridge.Load()
@@ -74,6 +74,12 @@ func (f *Famicom) Init(cartridge cartridge.Cartridge) {
 		&f.joypad2,
 	)
 
+	if cfg != nil {
+		f.config = cfg
+	} else {
+		f.config = config.New()
+	}
+
 	// 入力データの定義
 	f.keyboard1 = InputState{}
 	f.keyboard2 = InputState{}
@@ -83,21 +89,18 @@ func (f *Famicom) Init(cartridge cartridge.Cartridge) {
 
 // MARK: Famicomの起動
 func (f *Famicom) Start() {
-	// SDLの初期化
+	if f.config == nil {
+		f.config = config.New()
+	}
+
 	if err := sdl.Init(sdl.INIT_VIDEO | sdl.INIT_GAMECONTROLLER); err != nil {
 		panic(err)
 	}
 	defer sdl.Quit()
 
-	// ウィンドウの作成
-	window, err := sdl.CreateWindow("Famicom emu", sdl.WINDOWPOS_UNDEFINED, sdl.WINDOWPOS_UNDEFINED,
-		int32(ppu.SCREEN_WIDTH)*SCALE_FACTOR, int32(ppu.SCREEN_HEIGHT)*SCALE_FACTOR, sdl.WINDOW_SHOWN)
-	if err != nil {
-		panic(err)
-	}
-	defer window.Destroy()
+	f.windows = ui.NewWindowManager()
+	defer f.windows.CloseAll()
 
-	// 接続済みコントローラを検知
 	var gamepad1, gamepad2 *sdl.GameController
 	if sdl.NumJoysticks() == 0 {
 		fmt.Println("No controller detected")
@@ -119,62 +122,67 @@ func (f *Famicom) Start() {
 		}
 	}
 
-	// レンダラーの作成
-	renderer, err := sdl.CreateRenderer(window, -1, sdl.RENDERER_ACCELERATED)
-	if err != nil {
-		panic(err)
-	}
-	defer renderer.Destroy()
-
-	// テクスチャの作成
-	texture, err := renderer.CreateTexture(
-		sdl.PIXELFORMAT_RGB24,
-		sdl.TEXTUREACCESS_STREAMING,
-		int32(ppu.SCREEN_WIDTH), int32(ppu.SCREEN_HEIGHT))
-	if err != nil {
-		panic(err)
-	}
-	defer texture.Destroy()
-
-	// SDL2イベントポンプを取得
 	eventPump := sdl.PollEvent
+	lastFrameTime := time.Now()
 
-	// 1フレーム目の時間を取得
-	var lastFrameTime = time.Now()
+	var optionWindowID uint32
+	var optionWindowOpen bool
 
-	// BusのNMIコールバックで描画とイベント処理
+	closeOptionWindow := func() {
+		if !optionWindowOpen {
+			return
+		}
+		if optionWindowID != 0 {
+			f.windows.Remove(optionWindowID)
+		}
+		optionWindowOpen = false
+		optionWindowID = 0
+	}
+
+	openOptionWindow := func() {
+		if optionWindowOpen {
+			return
+		}
+		optWin, err := ui.NewOptionWindow(f.config, func(uint32) {
+			closeOptionWindow()
+		})
+		if err != nil {
+			log.Printf("failed to open option window: %v", err)
+			return
+		}
+		optionWindowOpen = true
+		optionWindowID = optWin.ID()
+		f.windows.Add(optWin)
+	}
+
 	f.bus.Init(func(p *ppu.PPU, c *ppu.Canvas, j1 *joypad.JoyPad, j2 *joypad.JoyPad) {
-
-		// フレームレート調整 (60FPS)
+		frameDuration := time.Second / FRAME_PER_SECOND
 		now := time.Now()
-		elapsed := now.Sub(lastFrameTime)
-		const frameDuration = time.Second / FRAME_PER_SECOND
-		if elapsed < frameDuration {
+		if elapsed := now.Sub(lastFrameTime); elapsed < frameDuration {
 			time.Sleep(frameDuration - elapsed)
 		}
 		lastFrameTime = time.Now()
 
-		// キャンバスのバッファを元にテクスチャの更新
-		texture.Update(nil, unsafe.Pointer(&c.Buffer[0]), int(c.Width*3))
+		f.windows.RenderAll()
 
-		// 再レンダリング
-		renderer.Clear()
-		renderer.Copy(texture, nil, nil)
-		renderer.Present()
-
-		// SDLイベント処理
 		for event := eventPump(); event != nil; event = eventPump() {
 			switch e := event.(type) {
 			case *sdl.QuitEvent:
-				f.bus.Shutdown()
-				os.Exit(0)
+				f.requestShutdown()
 			case *sdl.KeyboardEvent:
-				if e.Keysym.Sym == sdl.K_ESCAPE && e.State == sdl.PRESSED {
-					f.bus.Shutdown()
-					os.Exit(0)
-				}
-				if e.Keysym.Sym == sdl.K_F12 && e.State == sdl.PRESSED {
-					f.cpu.ToggleLog()
+				if e.State == sdl.PRESSED {
+					switch e.Keysym.Sym {
+					case sdl.K_ESCAPE:
+						f.requestShutdown()
+					case sdl.K_F12:
+						f.cpu.ToggleLog()
+					case sdl.K_F1:
+						if optionWindowOpen {
+							closeOptionWindow()
+						} else {
+							openOptionWindow()
+						}
+					}
 				}
 				f.handleKeyPress(e, &f.keyboard1, &f.keyboard2)
 			case *sdl.ControllerButtonEvent:
@@ -193,17 +201,31 @@ func (f *Famicom) Start() {
 				}
 			}
 
-			// 操作結果を反映
-			f.updateJoyPad(j1, &f.keyboard1, &f.controller1)
-			f.updateJoyPad(j2, &f.keyboard2, &f.controller2)
+			f.windows.HandleEvent(event)
 		}
+
+		f.updateJoyPad(j1, &f.keyboard1, &f.controller1)
+		f.updateJoyPad(j2, &f.keyboard2, &f.controller2)
 	})
 
-	// CPUの初期化
-	f.cpu.Init(f.bus, false)
+	gameWindow, err := ui.NewGameWindow(f.config.ScaleFactor, f.bus.Canvas(), func() {
+		f.requestShutdown()
+	})
+	if err != nil {
+		panic(err)
+	}
+	f.windows.Add(gameWindow)
 
-	// CPUの起動
+	f.cpu.Init(f.bus, false)
 	f.cpu.Run()
+}
+
+func (f *Famicom) requestShutdown() {
+	if f.windows != nil {
+		f.windows.CloseAll()
+	}
+	f.bus.Shutdown()
+	os.Exit(0)
 }
 
 // MARK: キーボードの状態を検知
