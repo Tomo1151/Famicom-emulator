@@ -28,7 +28,7 @@ type Pixel struct {
 func (p *Pixel) Value(ppu *PPU) [3]uint8 {
 	var color [3]uint8
 	if p.isBgTransparent && p.isSpriteTransparent {
-		color = PALETTE[ppu.PaletteTable[0]]
+		color = PALETTE[ppu.paletteTable[0]]
 	} else if p.isBgTransparent && !p.isSpriteTransparent {
 		color = p.spriteValue
 	} else if !p.isBgTransparent && p.isSpriteTransparent {

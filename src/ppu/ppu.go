@@ -32,7 +32,7 @@ const (
 // MARK: PPUの定義
 type PPU struct {
 	Mapper       mappers.Mapper
-	PaletteTable [PALETTE_TABLE_SIZE + 1]uint8
+	paletteTable [PALETTE_TABLE_SIZE + 1]uint8
 	vram         [VRAM_SIZE]uint8
 	oam          [OAM_DATA_SIZE]uint8
 
@@ -60,6 +60,29 @@ type PPU struct {
 	lineBuffer [SCREEN_WIDTH]Pixel // 次のスキャンラインのバッファ
 }
 
+// PaletteTable provides read-only access to the internal palette table
+// for external debug viewers. Internal ppu code should use the
+// lowercase `paletteTable` field to avoid the method call overhead.
+func (p *PPU) PaletteTable() *[PALETTE_TABLE_SIZE + 1]uint8 {
+	return &p.paletteTable
+}
+
+// VRAM returns a read-only pointer to the internal VRAM buffer.
+func (p *PPU) VRAM() *[VRAM_SIZE]uint8 {
+	return &p.vram
+}
+
+// OAM returns a read-only pointer to the internal OAM buffer.
+func (p *PPU) OAM() *[OAM_DATA_SIZE]uint8 {
+	return &p.oam
+}
+
+// BackgroundPatternTableAddress exposes the currently selected background
+// pattern table base address (0x0000 or 0x1000) for external viewers.
+func (p *PPU) BackgroundPatternTableAddress() uint16 {
+	return p.control.BackgroundPatternTableAddress()
+}
+
 // MARK: PPUの初期化メソッド
 func (p *PPU) Init(mapper mappers.Mapper) {
 	p.Mapper = mapper
@@ -71,8 +94,8 @@ func (p *PPU) Init(mapper mappers.Mapper) {
 	for addr := range p.oam {
 		p.oam[addr] = 0x00
 	}
-	for addr := range p.PaletteTable {
-		p.PaletteTable[addr] = 0x00
+	for addr := range p.paletteTable {
+		p.paletteTable[addr] = 0x00
 	}
 
 	// IOレジスタの初期化
@@ -104,8 +127,8 @@ func (p *PPU) Init(mapper mappers.Mapper) {
 	for i := range p.lineBuffer {
 		p.lineBuffer[i] = Pixel{
 			0x00,                       // priority
-			PALETTE[p.PaletteTable[0]], // background value (rgb palette)
-			PALETTE[p.PaletteTable[0]], // sprite value (rgb palette)
+			PALETTE[p.paletteTable[0]], // background value (rgb palette)
+			PALETTE[p.paletteTable[0]], // sprite value (rgb palette)
 			true,                       // background transparent
 			true,                       // sprite transparent
 		}
@@ -206,9 +229,9 @@ func (p *PPU) WriteVRAM(value uint8) {
 			address == 0x3F1C {
 			address -= 0x10
 		}
-		p.PaletteTable[address-0x3F00] = value
+		p.paletteTable[address-0x3F00] = value
 	case 0x3F20 <= address && address <= 0x3FFF: // パレット (ミラーリング)
-		p.PaletteTable[(address-0x3F00)%32] = value
+		p.paletteTable[(address-0x3F00)%32] = value
 	default:
 		panic(fmt.Sprintf("Unexpected write to mirrored space: %04X", address))
 	}
@@ -272,9 +295,9 @@ func (p *PPU) ReadVRAM() uint8 {
 			address == 0x3F1C {
 			address -= 0x10
 		}
-		return p.PaletteTable[address-0x3F00]
+		return p.paletteTable[address-0x3F00]
 	case 0x3F20 <= address && address <= 0x3FFF: // パレット (ミラーリング)
-		return p.PaletteTable[(address-0x3F00)%32]
+		return p.paletteTable[(address-0x3F00)%32]
 	default:
 		panic(fmt.Sprintf("Error: unexpected read to mirrored space: %04X", address))
 	}
@@ -368,10 +391,10 @@ func (p *PPU) bgPalette(attrributeTable *[]uint8, tileColumn uint, tileRow uint)
 
 	var paletteStart uint = 1 + uint(paletteIdx)*4
 	color := [4]uint8{
-		p.PaletteTable[0],
-		p.PaletteTable[paletteStart+0],
-		p.PaletteTable[paletteStart+1],
-		p.PaletteTable[paletteStart+2],
+		p.paletteTable[0],
+		p.paletteTable[paletteStart+0],
+		p.paletteTable[paletteStart+1],
+		p.paletteTable[paletteStart+2],
 	}
 
 	return color
@@ -382,17 +405,17 @@ func (p *PPU) spritePalette(paletteIndex uint8) [4]uint8 {
 	var start uint = 0x11 + uint(paletteIndex*4)
 	return [4]uint8{
 		0,
-		p.PaletteTable[start+0],
-		p.PaletteTable[start+1],
-		p.PaletteTable[start+2],
+		p.paletteTable[start+0],
+		p.paletteTable[start+1],
+		p.paletteTable[start+2],
 	}
 }
 
 // MARK: ラインバッファをクリア
 func (p *PPU) ClearLineBuffer() {
 	for x := range p.lineBuffer {
-		p.lineBuffer[x].backgroundValue = PALETTE[p.PaletteTable[0]]
-		p.lineBuffer[x].spriteValue = PALETTE[p.PaletteTable[0]]
+		p.lineBuffer[x].backgroundValue = PALETTE[p.paletteTable[0]]
+		p.lineBuffer[x].spriteValue = PALETTE[p.paletteTable[0]]
 		p.lineBuffer[x].priority = 0x00
 		p.lineBuffer[x].isSpriteTransparent = true
 	}
@@ -506,7 +529,7 @@ func (p *PPU) CalculateScanlineBackground(canvas *Canvas, scanline uint16) {
 			// ラインバッファに登録
 			p.lineBuffer[x].backgroundValue = color
 			p.lineBuffer[x].priority = 0x00
-			p.lineBuffer[x].isBgTransparent = color == PALETTE[p.PaletteTable[0]]
+			p.lineBuffer[x].isBgTransparent = color == PALETTE[p.paletteTable[0]]
 		}
 
 		// 次のピクセルへ進む（描画しない場合でも必ず進める）

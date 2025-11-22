@@ -128,6 +128,9 @@ func (f *Famicom) Start() {
 	var optionWindowID uint32
 	var optionWindowOpen bool
 
+	var vramWindowID uint32
+	var vramWindowOpen bool
+
 	closeOptionWindow := func() {
 		if !optionWindowOpen {
 			return
@@ -155,6 +158,19 @@ func (f *Famicom) Start() {
 		f.windows.Add(optWin)
 	}
 
+	closeVramWindow := func() {
+		if !vramWindowOpen {
+			return
+		}
+		if vramWindowID != 0 {
+			f.windows.Remove(vramWindowID)
+		}
+		vramWindowOpen = false
+		vramWindowID = 0
+	}
+
+	// openVramWindow is defined inside the per-frame callback where `p` is available.
+
 	f.bus.Init(func(p *ppu.PPU, c *ppu.Canvas, j1 *joypad.JoyPad, j2 *joypad.JoyPad) {
 		frameDuration := time.Second / FRAME_PER_SECOND
 		now := time.Now()
@@ -164,6 +180,23 @@ func (f *Famicom) Start() {
 		lastFrameTime = time.Now()
 
 		f.windows.RenderAll()
+
+		// openVramWindow uses the per-frame `p` pointer provided by the bus callback.
+		openVramWindow := func() {
+			if vramWindowOpen {
+				return
+			}
+			vwin, err := ui.NewNameTableWindow(p, f.config.ScaleFactor, func(id uint32) {
+				closeVramWindow()
+			})
+			if err != nil {
+				log.Printf("failed to open Name Table window: %v", err)
+				return
+			}
+			vramWindowOpen = true
+			vramWindowID = vwin.ID()
+			f.windows.Add(vwin)
+		}
 
 		for event := eventPump(); event != nil; event = eventPump() {
 			switch e := event.(type) {
@@ -181,6 +214,12 @@ func (f *Famicom) Start() {
 							closeOptionWindow()
 						} else {
 							openOptionWindow()
+						}
+					case sdl.K_F2:
+						if vramWindowOpen {
+							closeVramWindow()
+						} else {
+							openVramWindow()
 						}
 					}
 				}
