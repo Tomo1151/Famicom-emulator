@@ -1,6 +1,7 @@
 package ui
 
 import (
+	"Famicom-emulator/cartridge/mappers"
 	"Famicom-emulator/ppu"
 	"unsafe"
 
@@ -25,8 +26,9 @@ func NewNameTableWindow(p *ppu.PPU, scale int, onClose func(id uint32)) (*NameTa
 	const tileSize = 8
 	const cols = 32
 	const rows = 30
-	const w = cols * 2 * tileSize // 512
-	const h = rows * tileSize     // 240
+	// Show 4 nametables arranged as 2x2 (classic layout)
+	const w = cols * 2 * tileSize // 512 (two tables horizontally)
+	const h = rows * 2 * tileSize // 480 (two tables vertically)
 
 	win, err := sdl.CreateWindow(
 		"Name Table Viewer",
@@ -115,9 +117,26 @@ func (n *NameTableWindow) Update() {
 	const tileSize = 8
 	width := cols * 2 * tileSize
 
-	for nt := range 2 {
-		base := nt * ntSize
+	// NT0: 左上, NT1: 右上, NT2: 左下, NT3: 右下
+	for nt := range 4 {
+		// マッパーをもとにVRAMの基準を計算
+		mirr := n.ppu.Mapper.Mirroring()
+		var physicalPage int
+		switch mirr {
+		case mappers.MIRRORING_VERTICAL:
+			// Vertical: NT0==NT2, NT1==NT3 -> pages: 0,1,0,1
+			physicalPage = nt % 2
+		case mappers.MIRRORING_HORIZONTAL:
+			// Horizontal: NT0==NT1, NT2==NT3 -> pages: 0,0,1,1
+			physicalPage = nt / 2
+		default:
+			physicalPage = nt % 2
+		}
+		base := physicalPage * ntSize
 		attrStart := base + 0x3C0
+
+		xOffset := (nt % 2) * cols * tileSize
+		yOffset := (nt / 2) * rows * tileSize
 
 		// 全てのタイルに対して処理
 		for ty := range rows {
@@ -129,13 +148,15 @@ func (n *NameTableWindow) Update() {
 				attrTableIdx := (ty/4)*8 + (tx / 4)
 				attrByte := (*vramPtr)[attrStart+attrTableIdx]
 
-				// パレットインデックスの計算
+				// パレットインデックスの計算 (各2x2ブロックごとに2bit)
+				sx := (tx % 4) / 2
+				sy := (ty % 4) / 2
 				var paletteIdx uint8
-				if tx%4/2 == 0 && ty%4/2 == 0 {
+				if sx == 0 && sy == 0 {
 					paletteIdx = (attrByte) & 0b11
-				} else if tx%4/2 == 1 && ty%4/2 == 0 {
+				} else if sx == 1 && sy == 0 {
 					paletteIdx = (attrByte >> 2) & 0b11
-				} else if tx%4/2 == 0 && ty%4/2 == 1 {
+				} else if sx == 0 && sy == 1 {
 					paletteIdx = (attrByte >> 4) & 0b11
 				} else {
 					paletteIdx = (attrByte >> 6) & 0b11
@@ -162,8 +183,8 @@ func (n *NameTableWindow) Update() {
 						colorIdx := paletteIndices[bit]
 						color := ppu.PALETTE[colorIdx]
 
-						px := nt*cols*tileSize + tx*tileSize + col
-						py := ty*tileSize + row
+						px := xOffset + tx*tileSize + col
+						py := yOffset + ty*tileSize + row
 						pos := (py*width + px) * 3
 						n.buf[pos+0] = color[0]
 						n.buf[pos+1] = color[1]

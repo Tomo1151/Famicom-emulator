@@ -124,7 +124,9 @@ func (wm *WindowManager) ToggleNameTableWindow(p *ppu.PPU, scale int) (uint32, e
 			return 0, nil
 		}
 	}
-	nw, err := NewNameTableWindow(p, scale, func(id uint32) { wm.Remove(id) })
+	// NameTable viewer は4画面あり大きいため SCALE_FACTOR - 1 を使用する
+	desiredScale := max(scale-1, 1)
+	nw, err := NewNameTableWindow(p, desiredScale, func(id uint32) { wm.Remove(id) })
 	if err != nil {
 		return 0, err
 	}
