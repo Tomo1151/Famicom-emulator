@@ -79,5 +79,7 @@ The following mappers have been implemented
 - NROM (mapper 000)
 - MMC1: SxROM (mapper 001)
 - UxROM (mapper 002)
+- CNROM (mapper 003
 - MMC3: TxROM (mapper 004)
 ```
+
