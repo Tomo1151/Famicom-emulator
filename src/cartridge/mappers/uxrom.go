@@ -99,3 +99,9 @@ func (u *UxROM) CharacterRom() []uint8 {
 func (u *UxROM) MapperInfo() string {
 	return "UxROM (Mapper 2)"
 }
+
+// MARK: マッパーのシャローコピーの取得
+func (u *UxROM) Clone() Mapper {
+	copy := *u
+	return &copy
+}

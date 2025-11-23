@@ -174,9 +174,16 @@ func (n *NameTableWindow) Update() {
 				// タイルパターンのフェッチ
 				tileBase := bankBase + uint16(tileIndex)*uint16(tileSize*2)
 
+				// タイルの座標に合わせたマッパーのスナップショットを取得
+				scanlineForTile := (yOffset + ty*tileSize) % int(ppu.SCREEN_HEIGHT)
+				mapperForTile := n.ppu.GetMapperForScanline(uint16(scanlineForTile))
+				if mapperForTile == nil {
+					mapperForTile = n.ppu.Mapper
+				}
+
 				for row := range tileSize {
-					upper := n.ppu.Mapper.ReadCharacterRom(tileBase + uint16(row))
-					lower := n.ppu.Mapper.ReadCharacterRom(tileBase + uint16(row) + uint16(tileSize))
+					upper := mapperForTile.ReadCharacterRom(tileBase + uint16(row))
+					lower := mapperForTile.ReadCharacterRom(tileBase + uint16(row) + uint16(tileSize))
 
 					for col := range tileSize {
 						bit := (((lower >> (7 - uint(col))) & 1) << 1) | ((upper >> (7 - uint(col))) & 1)

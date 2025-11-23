@@ -125,10 +125,17 @@ func (c *CharacterWindow) Update() {
 				basePy := ty * tileSize
 
 				ppuBase := uint16(tileIdx * 16)
+
+				// CHR ROM viewer ではスキャンライン0時点のマッパーを使用
+				mapperFor := c.ppu.GetMapperForScanline(0)
+				if mapperFor == nil {
+					mapperFor = c.ppu.Mapper
+				}
+
 				for row := range tileSize {
-					b0 := c.ppu.Mapper.ReadCharacterRom(ppuBase + uint16(row))
-					b1 := c.ppu.Mapper.ReadCharacterRom(ppuBase + uint16(row) + 8)
-					for col := 0; col < tileSize; col++ {
+					b0 := mapperFor.ReadCharacterRom(ppuBase + uint16(row))
+					b1 := mapperFor.ReadCharacterRom(ppuBase + uint16(row) + 8)
+					for col := range tileSize {
 						bit := (((b1 >> (7 - uint(col))) & 1) << 1) | ((b0 >> (7 - uint(col))) & 1)
 						color := palette[bit]
 

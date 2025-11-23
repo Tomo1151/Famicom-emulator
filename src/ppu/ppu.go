@@ -58,6 +58,10 @@ type PPU struct {
 	nmi bool
 
 	lineBuffer [SCREEN_WIDTH]Pixel // 次のスキャンラインのバッファ
+
+	// デバッグウィンドウ用のスナップショット
+	mapperSnapshots []mappers.Mapper
+	vLineSnapshots  []InternalAddressRegiseter
 }
 
 // MARK: PPUの初期化メソッド
@@ -106,6 +110,9 @@ func (p *PPU) Init(mapper mappers.Mapper) {
 			true,                       // sprite transparent
 		}
 	}
+
+	p.mapperSnapshots = make([]mappers.Mapper, SCREEN_HEIGHT)
+	p.vLineSnapshots = make([]InternalAddressRegiseter, SCREEN_HEIGHT)
 }
 
 // MARK: PPUコントロールレジスタ($2000)への書き込み
@@ -647,6 +654,12 @@ func (p *PPU) Tick(canvas *Canvas, cycles uint) bool {
 		// 描画用スナップショットはtの水平ビットで補正して使用する
 		p.vLineStart = p.v
 		p.t.copyHorizontalBitsTo(&p.vLineStart)
+
+		// vLineStart のデバッグウィンドウ用スナップショットを保存
+		idx := int(p.scanline)
+		if idx >= 0 && idx < len(p.vLineSnapshots) {
+			p.vLineSnapshots[idx] = p.vLineStart
+		}
 	}
 
 	isRenderingEnabled := p.mask.backgroundEnable || p.mask.spriteEnable
@@ -703,6 +716,9 @@ func (p *PPU) Tick(canvas *Canvas, cycles uint) bool {
 		// 可視領域のスキャンラインを描画
 		if SCANLINE_START <= p.scanline && p.scanline < SCANLINE_POSTRENDER {
 			RenderScanlineToCanvas(p, canvas, p.scanline)
+
+			// デバッグウィンドウ用のマッパースナップショットを保存
+			p.takeMapperSnapshot(p.scanline)
 		}
 
 		// スキャンラインを進める
@@ -737,6 +753,37 @@ func (p *PPU) PaletteTable() *[PALETTE_TABLE_SIZE + 1]uint8 {
 // MARK: VRAM の取得メソッド
 func (p *PPU) VRAM() *[VRAM_SIZE]uint8 {
 	return &p.vram
+}
+
+// MARK: 指定したスキャンラインのマッパーのスナップショットを保存
+func (p *PPU) takeMapperSnapshot(scanline uint16) {
+	idx := int(scanline)
+	if idx < 0 || idx >= len(p.mapperSnapshots) {
+		return
+	}
+	if p.Mapper == nil {
+		p.mapperSnapshots[idx] = nil
+		return
+	}
+	p.mapperSnapshots[idx] = p.Mapper.Clone()
+}
+
+// MARK: 指定したスキャンラインのマッパースナップショットを取得
+func (p *PPU) GetMapperForScanline(scanline uint16) mappers.Mapper {
+	idx := int(scanline)
+	if idx >= 0 && idx < len(p.mapperSnapshots) && p.mapperSnapshots[idx] != nil {
+		return p.mapperSnapshots[idx]
+	}
+	return p.Mapper
+}
+
+// MARK: 指定したスキャンラインのvLineStart のスナップショットを取得
+func (p *PPU) GetVLineSnapshot(scanline uint16) InternalAddressRegiseter {
+	idx := int(scanline)
+	if idx >= 0 && idx < len(p.vLineSnapshots) {
+		return p.vLineSnapshots[idx]
+	}
+	return p.vLineStart
 }
 
 // MARK: OAM の取得メソッド

@@ -40,6 +40,8 @@ type Mapper interface {
 	Mirroring() Mirroring
 	ProgramRom() []uint8
 	CharacterRom() []uint8
+
+	Clone() Mapper
 }
 
 // MARK: カートリッジのバイナリからプログラムROMとキャラクタROMを取得
