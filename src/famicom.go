@@ -12,6 +12,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"runtime"
 	"time"
 
 	"github.com/veandco/go-sdl2/sdl"
@@ -94,6 +95,7 @@ func (f *Famicom) Start() {
 	}
 
 	// SDLの初期化
+	runtime.LockOSThread() // SDLはMainスレッド上で動かす必要がある
 	if err := sdl.Init(sdl.INIT_VIDEO | sdl.INIT_GAMECONTROLLER); err != nil {
 		panic(err)
 	}
@@ -127,20 +129,53 @@ func (f *Famicom) Start() {
 
 	// 状態変数の定義
 	eventPump := sdl.PollEvent
-	lastFrameTime := time.Now()
+
+	// フレーム同期用チャネル: PPU がフレーム完了を通知するが、
+	// メインスレッドが CPU を駆動しているので非ブロッキングで通知する。
+	frameCh := make(chan struct{}, 1) // PPU -> main (non-blocking, buffered)
 
 	// Busの初期化とフレーム毎に実行されるコールバックの定義
+	// PPU のフレーム到達を非ブロッキングで通知する（CPU はメインループが駆動する）。
 	f.bus.Init(func(p *ppu.PPU, c *ppu.Canvas, j1 *joypad.JoyPad, j2 *joypad.JoyPad) {
-		// フレームレート制御
-		frameDuration := time.Second / FRAME_PER_SECOND
-		now := time.Now()
-		if elapsed := now.Sub(lastFrameTime); elapsed < frameDuration {
-			time.Sleep(frameDuration - elapsed)
+		select {
+		case frameCh <- struct{}{}:
+		default:
 		}
-		lastFrameTime = time.Now()
+	})
 
-		// 全ウィンドウの描画
-		f.windows.RenderAll()
+	// ゲームウィンドウの作成
+	gameWindow, err := ui.NewGameWindow(f.config.SCALE_FACTOR, f.bus.Canvas(), func() {
+		f.requestShutdown()
+	})
+	if err != nil {
+		panic(err)
+	}
+	f.windows.Add(gameWindow)
+
+	// CPU の作成（フレーム単位でメインが駆動する）
+	f.cpu.Init(f.bus, f.config.CPU_LOG_ENABLED)
+
+	// メインループ: メインが CPU をフレーム単位で駆動し、描画とイベント処理を行う。
+	// フレームあたりの CPU サイクル数を計算して RunCycles に渡す。
+	const ntscCpuClock = 1789773
+	baseCycles := int(ntscCpuClock / FRAME_PER_SECOND)        // 29829
+	remainderPerFrame := int(ntscCpuClock % FRAME_PER_SECOND) // 33
+	remAcc := 0
+
+	lastFrameTime := time.Now()
+
+	for {
+		// フレームのサイクル数を計算
+		remAcc += remainderPerFrame
+		extra := 0
+		if remAcc >= FRAME_PER_SECOND {
+			extra = 1
+			remAcc -= FRAME_PER_SECOND
+		}
+		cyclesThisFrame := uint(baseCycles + extra)
+
+		// CPU をフレーム分だけ実行する（これがエミュレータの実時間を決める）
+		f.cpu.RunCycles(cyclesThisFrame)
 
 		// イベント処理
 		for event := eventPump(); event != nil; event = eventPump() {
@@ -150,35 +185,35 @@ func (f *Famicom) Start() {
 			case *sdl.KeyboardEvent:
 				if e.State == sdl.PRESSED {
 					switch e.Keysym.Sym {
-					case sdl.K_ESCAPE: // ESC: ゲーム終了
+					case sdl.K_ESCAPE:
 						f.requestShutdown()
-					case sdl.K_F1: // F1: オプションウィンドウ ON/OFF
+					case sdl.K_F1:
 						if f.windows != nil {
 							if _, err := f.windows.ToggleOptionWindow(f.config); err != nil {
 								log.Printf("failed to toggle option window: %v", err)
 							}
 						}
-					case sdl.K_F2: // F2: ネームテーブルウィンドウ ON/OFF
+					case sdl.K_F2:
 						if f.windows != nil {
-							if _, err := f.windows.ToggleNameTableWindow(p, f.config.SCALE_FACTOR); err != nil {
+							if _, err := f.windows.ToggleNameTableWindow(&f.ppu, f.config.SCALE_FACTOR); err != nil {
 								log.Printf("failed to toggle name table window: %v", err)
 							}
 						}
-					case sdl.K_F3: // F3: CHR ROM ウィンドウ ON/OFF
+					case sdl.K_F3:
 						if f.windows != nil {
-							if _, err := f.windows.ToggleCharacterWindow(p, f.config.SCALE_FACTOR); err != nil {
+							if _, err := f.windows.ToggleCharacterWindow(&f.ppu, f.config.SCALE_FACTOR); err != nil {
 								log.Printf("failed to toggle character window: %v", err)
 							}
 						}
-					case sdl.K_F4: // F4: オーディオビジュアライザ ON/OFF
+					case sdl.K_F4:
 						if f.windows != nil {
 							if _, err := f.windows.ToggleAudioWindow(&f.apu, f.config.SCALE_FACTOR); err != nil {
 								log.Printf("failed to toggle audio window: %v", err)
 							}
 						}
-					case sdl.K_F11: // F11: APUログ ON/OFF
+					case sdl.K_F11:
 						f.apu.ToggleLog()
-					case sdl.K_F12: // F12: CPUログ ON/OFF
+					case sdl.K_F12:
 						f.cpu.ToggleLog()
 					}
 				}
@@ -202,23 +237,21 @@ func (f *Famicom) Start() {
 			f.windows.HandleEvent(event)
 		}
 
-		// コントローラの状態更新
-		f.updateJoyPad(j1, &f.keyboard1, &f.controller1)
-		f.updateJoyPad(j2, &f.keyboard2, &f.controller2)
-	})
+		// JoyPad状態の更新
+		f.updateJoyPad(&f.joypad1, &f.keyboard1, &f.controller1)
+		f.updateJoyPad(&f.joypad2, &f.keyboard2, &f.controller2)
 
-	// ゲームウィンドウの作成
-	gameWindow, err := ui.NewGameWindow(f.config.SCALE_FACTOR, f.bus.Canvas(), func() {
-		f.requestShutdown()
-	})
-	if err != nil {
-		panic(err)
+		// 描画（PPU フレームに合わせて）
+		f.windows.RenderAll()
+
+		// フレームレート制御: PPU が速すぎて音より先行するのを防ぐ
+		frameDuration := time.Second / FRAME_PER_SECOND
+		now := time.Now()
+		if elapsed := now.Sub(lastFrameTime); elapsed < frameDuration {
+			time.Sleep(frameDuration - elapsed)
+		}
+		lastFrameTime = time.Now()
 	}
-	f.windows.Add(gameWindow)
-
-	// CPU の作成と起動
-	f.cpu.Init(f.bus, f.config.CPU_LOG_ENABLED)
-	f.cpu.Run()
 }
 
 // MARK: ゲームの終了メソッド

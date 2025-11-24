@@ -1211,3 +1211,36 @@ func (c *CPU) REPL(commands []uint8) {
 		c.Step()
 	}
 }
+
+// RunCycles executes CPU instructions until at least targetCycles CPU cycles
+// have been advanced on the bus. This is intended for frame-sliced execution
+// where the caller controls per-frame timing.
+func (c *CPU) RunCycles(targetCycles uint) {
+	var executed uint = 0
+
+	for executed < targetCycles {
+		// Handle interrupts
+		nmi := c.bus.NMI()
+		if nmi {
+			c.interrupt(NMI)
+		}
+
+		apuIrq := c.bus.APUIRQ()
+		mapperIrq := c.bus.MapperIRQ()
+		if !c.registers.P.Interrupt && (apuIrq || mapperIrq) {
+			c.interrupt(IRQ)
+		}
+
+		prev := c.bus.Cycles()
+		c.Step()
+		post := c.bus.Cycles()
+
+		var delta uint
+		if post >= prev {
+			delta = post - prev
+		} else {
+			delta = post
+		}
+		executed += delta
+	}
+}
