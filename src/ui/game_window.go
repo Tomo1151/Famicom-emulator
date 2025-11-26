@@ -30,7 +30,7 @@ func NewGameWindow(scale int, canvas *ppu.Canvas, onClose func()) (*GameWindow, 
 		return nil, err
 	}
 
-	r, err := sdl.CreateRenderer(w, -1, sdl.RENDERER_ACCELERATED)
+	r, err := sdl.CreateRenderer(w, -1, sdl.RENDERER_ACCELERATED|sdl.RENDERER_PRESENTVSYNC)
 	if err != nil {
 		w.Destroy()
 		return nil, err
@@ -69,7 +69,9 @@ func (g *GameWindow) HandleEvent(event sdl.Event) {
 
 // MARK: ウィンドウの更新メソッド
 func (g *GameWindow) Update() {
-	g.texture.Update(nil, unsafe.Pointer(&g.canvas.Buffer[0]), int(g.canvas.Width*3))
+	// 現在描画中のバッファを元に画面を更新
+	buf := g.canvas.FrontBuffer()
+	g.texture.Update(nil, unsafe.Pointer(&(*buf)[0]), int(g.canvas.Width*3))
 }
 
 // MARK: 描画メソッド

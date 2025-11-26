@@ -114,6 +114,9 @@ func (b *Bus) Tick(cycles uint) {
 	for range cycles * 3 {
 		if b.ppu.Tick(b.canvas, 1) {
 			frameEnd = true
+
+			// Canvasをバッファを交換し，すぐにPPUが次のレンダリングを行っても混ざらないように
+			b.canvas.Swap()
 		}
 	}
 
