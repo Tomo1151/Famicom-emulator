@@ -1,5 +1,6 @@
 package apu
 
+// MARK: 変数定義
 var (
 	dmcFrequencyTable = [16]uint16{
 		0x1AC, 0x17C, 0x154, 0x140,
@@ -34,13 +35,13 @@ type DMCWaveChannel struct {
 }
 
 // MARK: DMCの初期化メソッド
-func (dwc *DMCWaveChannel) Init(reader CpuBusReader) {
+func (dwc *DMCWaveChannel) Init(reader CpuBusReader, log bool) {
 	dwc.register = DMCRegister{}
 	dwc.register.Init()
 	dwc.cpuRead = reader
 	dwc.baseAddress = 0xC000
 	dwc.byteCount = 1
-	dwc.buffer.Init()
+	dwc.buffer.Init(log)
 }
 
 // MARK: DMCのタイマーを進めるメソッド
@@ -123,4 +124,9 @@ func (dwc *DMCWaveChannel) setEnabled(enabled bool) {
 			dwc.timerValue = dwc.timerPeriod
 		}
 	}
+}
+
+// MARK: デバッグ出力切り替え
+func (d *DMCWaveChannel) ToggleLog() {
+	d.buffer.ToggleLog()
 }

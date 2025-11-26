@@ -6,6 +6,8 @@ void AudioMixCallback(void* userdata, uint8_t* stream, int length);
 */
 import "C"
 import (
+	"Famicom-emulator/config"
+	"fmt"
 	"unsafe"
 
 	"github.com/veandco/go-sdl2/sdl"
@@ -21,7 +23,9 @@ const (
 	MASTER_VOLUME      = 0.15        // 全体音量
 )
 
+// MARK: 変数定義
 var (
+	// 各チャンネルのバッファの事前確保
 	ch1Buffer [BUFFER_SIZE]float32
 	ch2Buffer [BUFFER_SIZE]float32
 	ch3Buffer [BUFFER_SIZE]float32
@@ -57,30 +61,30 @@ type APU struct {
 	prevLevel3 float32
 	prevLevel4 float32
 	prevLevel5 float32
+
+	log bool // デバッグ出力フラグ
 }
 
 // MARK: APUの初期化メソッド
-func (a *APU) Init(reader CpuBusReader) {
+func (a *APU) Init(reader CpuBusReader, config *config.Config) {
 	a.volume = 1.0
 	a.cycles = 0
 	a.step = 0
 	a.cpuRead = reader
+	a.log = config.APU_LOG_ENABLED
 
 	a.channel1 = &square1
-	a.channel1.Init()
+	a.channel1.Init(a.log)
 	a.channel2 = &square2
-	a.channel2.Init()
+	a.channel2.Init(a.log)
 	a.channel3 = &triangle
-	a.channel3.Init()
+	a.channel3.Init(a.log)
 	a.channel4 = &noise
-	a.channel4.Init()
+	a.channel4.Init(a.log)
 	a.channel5 = &dmc
-	a.channel5.Init(a.cpuRead)
+	a.channel5.Init(a.cpuRead, a.log)
 
-	a.frameCounter = FrameCounter{}
 	a.frameCounter.Init()
-
-	a.status = StatusRegister{}
 	a.status.Init()
 
 	a.prevLevel1 = 0.0
@@ -131,15 +135,7 @@ func AudioMixCallback(userdata unsafe.Pointer, stream *C.uint8_t, length C.int) 
 	dmc.buffer.Read(ch5, n)
 
 	for i := range n {
-		// @FIXME mixのバランス
-		// mixed := (ch1[i] + ch2[i] + ch3[i] + ch4[i] + ch5[i]) / 25
-		// mixed := (ch1[i] + ch2[i]) / 25
-		// stage1Input := ch5[i]
-		// dmcFilterStage1 += (ch5[i] - dmcFilterStage1) * dmcFilterAlpha1
-		// dmcFilterStage2 += (dmcFilterStage1 - dmcFilterStage2) * dmcFilterAlpha2
-		// dmcFilterStage3 += (dmcFilterStage2 - dmcFilterStage3) * dmcFilterAlpha3
-		// filteredDmc := dmcFilterStage3
-
+		// 全チャンネルをミックス
 		mixed := mixSamples(ch1[i], ch2[i], ch3[i], ch4[i], ch5[i])
 
 		if mixed > MAX_VOLUME {
@@ -147,6 +143,8 @@ func AudioMixCallback(userdata unsafe.Pointer, stream *C.uint8_t, length C.int) 
 		} else if mixed < -MAX_VOLUME {
 			mixed = -MAX_VOLUME
 		}
+
+		// SDLへサンプルとして渡す
 		buffer[i] = mixed * MASTER_VOLUME
 	}
 }
@@ -224,7 +222,8 @@ func (a *APU) WriteStatus(data uint8) {
 
 	// @TODO: ミュートと長さカウンタのリセットも行う
 	/*
-		有効ビットがクリアされると（ $4015経由）、長さカウンタは強制的に0に設定され、有効ビットが再度セットされるまで変更できなくなります（長さカウンタの以前の値は失われます）。有効ビットをセットしても、すぐには効果はありません。
+		有効ビットがクリアされると（ $4015経由）、長さカウンタは強制的に0に設定され、有効ビットが再度セットされるまで変更できなくなる（長さカウンタの以前の値は失われます）。
+		有効ビットをセットしても、すぐには効果はない。
 	*/
 	if (prev&(1<<STATUS_REG_ENABLE_1CH_POS)) != 0 && !a.status.is1chEnabled() {
 		a.channel1.lengthCounter.counter = 0
@@ -539,14 +538,6 @@ func (a *APU) EndFrame() {
 	a.channel3.buffer.endFrame(a.sampleClock)
 	a.channel4.buffer.endFrame(a.sampleClock)
 	a.channel5.buffer.endFrame(a.sampleClock)
-
-	// // クロックとバッファの lastTime をリセット
-	// a.sampleClock = 0
-	// a.channel1.buffer.resetTime()
-	// a.channel2.buffer.resetTime()
-	// a.channel3.buffer.resetTime()
-	// a.channel4.buffer.resetTime()
-	// a.channel5.buffer.resetTime()
 }
 
 // MARK: エンベロープのクロック (1ch/2ch/4ch)
@@ -636,7 +627,44 @@ func (a *APU) clockFrameSequencer() {
 	}
 }
 
-// MARK: 各チャンネルのサンプルをMixする関数
+// MARK: デバッグ用ログ出力切り替え
+func (a *APU) ToggleLog() {
+	if a.log {
+		fmt.Println("[APU] Debug log: OFF")
+	} else {
+		fmt.Println("[APU] Debug log: ON")
+	}
+	a.log = !a.log
+	a.channel1.ToggleLog()
+	a.channel2.ToggleLog()
+	a.channel3.ToggleLog()
+	a.channel4.ToggleLog()
+	a.channel5.ToggleLog()
+}
+
+// MARK: SDLコールバックのサンプル数を取得するメソッド
+func AudioCallbackSampleCount() int {
+	return BUFFER_SIZE / 2
+}
+
+// MARK: 最新の全チャンネルのサンプルを取得するメソッド
+func GetRecentChannelSamples(n int) [][]float32 {
+	if n <= 0 {
+		return nil
+	}
+	if n > BUFFER_SIZE {
+		n = BUFFER_SIZE
+	}
+	return [][]float32{
+		ch1Buffer[:n],
+		ch2Buffer[:n],
+		ch3Buffer[:n],
+		ch4Buffer[:n],
+		ch5Buffer[:n],
+	}
+}
+
+// MARK: 各チャンネルのサンプルを適切なバランスでミックスする関数
 func mixSamples(pulse1 float32, pulse2 float32, triangle float32, noise float32, dmc float32) float32 {
 	/*
 		output = pulse_out + tnd_out

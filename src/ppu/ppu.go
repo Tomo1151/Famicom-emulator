@@ -32,7 +32,7 @@ const (
 // MARK: PPUの定義
 type PPU struct {
 	Mapper       mappers.Mapper
-	PaletteTable [PALETTE_TABLE_SIZE + 1]uint8
+	paletteTable [PALETTE_TABLE_SIZE + 1]uint8
 	vram         [VRAM_SIZE]uint8
 	oam          [OAM_DATA_SIZE]uint8
 
@@ -58,6 +58,10 @@ type PPU struct {
 	nmi bool
 
 	lineBuffer [SCREEN_WIDTH]Pixel // 次のスキャンラインのバッファ
+
+	// デバッグウィンドウ用のスナップショット
+	mapperSnapshots []mappers.Mapper
+	vLineSnapshots  []InternalAddressRegiseter
 }
 
 // MARK: PPUの初期化メソッド
@@ -71,8 +75,8 @@ func (p *PPU) Init(mapper mappers.Mapper) {
 	for addr := range p.oam {
 		p.oam[addr] = 0x00
 	}
-	for addr := range p.PaletteTable {
-		p.PaletteTable[addr] = 0x00
+	for addr := range p.paletteTable {
+		p.paletteTable[addr] = 0x00
 	}
 
 	// IOレジスタの初期化
@@ -81,16 +85,12 @@ func (p *PPU) Init(mapper mappers.Mapper) {
 	p.status.Init()
 
 	// 内部レジスタの初期化
-	p.t = InternalAddressRegiseter{}
 	p.t.Init()
-	p.v = InternalAddressRegiseter{}
 	p.v.Init()
-	p.x = InternalXRegister{}
 	p.x.Init()
-	p.w = InternalWRegister{}
 	p.w.Init()
+
 	// vLineStartも初期化
-	p.vLineStart = InternalAddressRegiseter{}
 	p.vLineStart.Init()
 
 	p.oamAddress = 0
@@ -104,12 +104,15 @@ func (p *PPU) Init(mapper mappers.Mapper) {
 	for i := range p.lineBuffer {
 		p.lineBuffer[i] = Pixel{
 			0x00,                       // priority
-			PALETTE[p.PaletteTable[0]], // background value (rgb palette)
-			PALETTE[p.PaletteTable[0]], // sprite value (rgb palette)
+			PALETTE[p.paletteTable[0]], // background value (rgb palette)
+			PALETTE[p.paletteTable[0]], // sprite value (rgb palette)
 			true,                       // background transparent
 			true,                       // sprite transparent
 		}
 	}
+
+	p.mapperSnapshots = make([]mappers.Mapper, SCREEN_HEIGHT)
+	p.vLineSnapshots = make([]InternalAddressRegiseter, SCREEN_HEIGHT)
 }
 
 // MARK: PPUコントロールレジスタ($2000)への書き込み
@@ -206,9 +209,9 @@ func (p *PPU) WriteVRAM(value uint8) {
 			address == 0x3F1C {
 			address -= 0x10
 		}
-		p.PaletteTable[address-0x3F00] = value
+		p.paletteTable[address-0x3F00] = value
 	case 0x3F20 <= address && address <= 0x3FFF: // パレット (ミラーリング)
-		p.PaletteTable[(address-0x3F00)%32] = value
+		p.paletteTable[(address-0x3F00)%32] = value
 	default:
 		panic(fmt.Sprintf("Unexpected write to mirrored space: %04X", address))
 	}
@@ -272,9 +275,9 @@ func (p *PPU) ReadVRAM() uint8 {
 			address == 0x3F1C {
 			address -= 0x10
 		}
-		return p.PaletteTable[address-0x3F00]
+		return p.paletteTable[address-0x3F00]
 	case 0x3F20 <= address && address <= 0x3FFF: // パレット (ミラーリング)
-		return p.PaletteTable[(address-0x3F00)%32]
+		return p.paletteTable[(address-0x3F00)%32]
 	default:
 		panic(fmt.Sprintf("Error: unexpected read to mirrored space: %04X", address))
 	}
@@ -368,10 +371,10 @@ func (p *PPU) bgPalette(attrributeTable *[]uint8, tileColumn uint, tileRow uint)
 
 	var paletteStart uint = 1 + uint(paletteIdx)*4
 	color := [4]uint8{
-		p.PaletteTable[0],
-		p.PaletteTable[paletteStart+0],
-		p.PaletteTable[paletteStart+1],
-		p.PaletteTable[paletteStart+2],
+		p.paletteTable[0],
+		p.paletteTable[paletteStart+0],
+		p.paletteTable[paletteStart+1],
+		p.paletteTable[paletteStart+2],
 	}
 
 	return color
@@ -382,17 +385,17 @@ func (p *PPU) spritePalette(paletteIndex uint8) [4]uint8 {
 	var start uint = 0x11 + uint(paletteIndex*4)
 	return [4]uint8{
 		0,
-		p.PaletteTable[start+0],
-		p.PaletteTable[start+1],
-		p.PaletteTable[start+2],
+		p.paletteTable[start+0],
+		p.paletteTable[start+1],
+		p.paletteTable[start+2],
 	}
 }
 
 // MARK: ラインバッファをクリア
 func (p *PPU) ClearLineBuffer() {
 	for x := range p.lineBuffer {
-		p.lineBuffer[x].backgroundValue = PALETTE[p.PaletteTable[0]]
-		p.lineBuffer[x].spriteValue = PALETTE[p.PaletteTable[0]]
+		p.lineBuffer[x].backgroundValue = PALETTE[p.paletteTable[0]]
+		p.lineBuffer[x].spriteValue = PALETTE[p.paletteTable[0]]
 		p.lineBuffer[x].priority = 0x00
 		p.lineBuffer[x].isSpriteTransparent = true
 	}
@@ -506,7 +509,7 @@ func (p *PPU) CalculateScanlineBackground(canvas *Canvas, scanline uint16) {
 			// ラインバッファに登録
 			p.lineBuffer[x].backgroundValue = color
 			p.lineBuffer[x].priority = 0x00
-			p.lineBuffer[x].isBgTransparent = color == PALETTE[p.PaletteTable[0]]
+			p.lineBuffer[x].isBgTransparent = color == PALETTE[p.paletteTable[0]]
 		}
 
 		// 次のピクセルへ進む（描画しない場合でも必ず進める）
@@ -651,6 +654,12 @@ func (p *PPU) Tick(canvas *Canvas, cycles uint) bool {
 		// 描画用スナップショットはtの水平ビットで補正して使用する
 		p.vLineStart = p.v
 		p.t.copyHorizontalBitsTo(&p.vLineStart)
+
+		// vLineStart のデバッグウィンドウ用スナップショットを保存
+		idx := int(p.scanline)
+		if idx >= 0 && idx < len(p.vLineSnapshots) {
+			p.vLineSnapshots[idx] = p.vLineStart
+		}
 	}
 
 	isRenderingEnabled := p.mask.backgroundEnable || p.mask.spriteEnable
@@ -707,6 +716,9 @@ func (p *PPU) Tick(canvas *Canvas, cycles uint) bool {
 		// 可視領域のスキャンラインを描画
 		if SCANLINE_START <= p.scanline && p.scanline < SCANLINE_POSTRENDER {
 			RenderScanlineToCanvas(p, canvas, p.scanline)
+
+			// デバッグウィンドウ用のマッパースナップショットを保存
+			p.takeMapperSnapshot(p.scanline)
 		}
 
 		// スキャンラインを進める
@@ -731,4 +743,55 @@ func (p *PPU) Tick(canvas *Canvas, cycles uint) bool {
 		}
 	}
 	return false
+}
+
+// MARK: PaletteTable の取得メソッド
+func (p *PPU) PaletteTable() *[PALETTE_TABLE_SIZE + 1]uint8 {
+	return &p.paletteTable
+}
+
+// MARK: VRAM の取得メソッド
+func (p *PPU) VRAM() *[VRAM_SIZE]uint8 {
+	return &p.vram
+}
+
+// MARK: 指定したスキャンラインのマッパーのスナップショットを保存
+func (p *PPU) takeMapperSnapshot(scanline uint16) {
+	idx := int(scanline)
+	if idx < 0 || idx >= len(p.mapperSnapshots) {
+		return
+	}
+	if p.Mapper == nil {
+		p.mapperSnapshots[idx] = nil
+		return
+	}
+	p.mapperSnapshots[idx] = p.Mapper.Clone()
+}
+
+// MARK: 指定したスキャンラインのマッパースナップショットを取得
+func (p *PPU) GetMapperForScanline(scanline uint16) mappers.Mapper {
+	idx := int(scanline)
+	if idx >= 0 && idx < len(p.mapperSnapshots) && p.mapperSnapshots[idx] != nil {
+		return p.mapperSnapshots[idx]
+	}
+	return p.Mapper
+}
+
+// MARK: 指定したスキャンラインのvLineStart のスナップショットを取得
+func (p *PPU) GetVLineSnapshot(scanline uint16) InternalAddressRegiseter {
+	idx := int(scanline)
+	if idx >= 0 && idx < len(p.vLineSnapshots) {
+		return p.vLineSnapshots[idx]
+	}
+	return p.vLineStart
+}
+
+// MARK: OAM の取得メソッド
+func (p *PPU) OAM() *[OAM_DATA_SIZE]uint8 {
+	return &p.oam
+}
+
+// MARK: BG pattern table address の取得メソッド
+func (p *PPU) BackgroundPatternTableAddress() uint16 {
+	return p.control.BackgroundPatternTableAddress()
 }

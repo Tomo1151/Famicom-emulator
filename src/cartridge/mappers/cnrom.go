@@ -85,3 +85,9 @@ func (c *CNROM) CharacterRom() []uint8 {
 func (c *CNROM) MapperInfo() string {
 	return "CNROM (Mapper 3)"
 }
+
+// MARK: マッパーのシャローコピーの取得
+func (c *CNROM) Clone() Mapper {
+	copy := *c
+	return &copy
+}

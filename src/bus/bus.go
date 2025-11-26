@@ -3,6 +3,7 @@ package bus
 import (
 	"Famicom-emulator/apu"
 	"Famicom-emulator/cartridge"
+	"Famicom-emulator/config"
 	"Famicom-emulator/joypad"
 	"Famicom-emulator/ppu"
 )
@@ -30,6 +31,7 @@ type Bus struct {
 	cycles    uint                     // CPUサイクル
 	callback  func(*ppu.PPU, *ppu.Canvas, *joypad.JoyPad, *joypad.JoyPad)
 	canvas    *ppu.Canvas
+	config    *config.Config
 }
 
 // MARK: Busの初期化メソッド (カートリッジ無し，デバッグ・テスト用)
@@ -44,10 +46,14 @@ func (b *Bus) Init(callback func(*ppu.PPU, *ppu.Canvas, *joypad.JoyPad, *joypad.
 	for addr := range b.wram {
 		b.wram[addr] = 0x00
 	}
-
 	b.callback = callback
 	b.canvas = &ppu.Canvas{}
 	b.canvas.Init()
+}
+
+// MARK: Canvasを取得
+func (b *Bus) Canvas() *ppu.Canvas {
+	return b.canvas
 }
 
 // MARK: Busに各コンポーネントを接続
@@ -57,7 +63,11 @@ func (b *Bus) ConnectComponents(
 	cartridge *cartridge.Cartridge,
 	joypad1 *joypad.JoyPad,
 	joypad2 *joypad.JoyPad,
+	config *config.Config,
 ) {
+	// 設定を反映
+	b.config = config
+
 	// コンポーネントをBusと接続
 	b.ppu = ppu
 	b.apu = apu
@@ -67,7 +77,7 @@ func (b *Bus) ConnectComponents(
 
 	// 各コンポーネントを初期化
 	b.ppu.Init(b.cartridge.Mapper())
-	b.apu.Init(b.ReadByteFrom)
+	b.apu.Init(b.ReadByteFrom, b.config)
 	b.joypad1.Init()
 	b.joypad2.Init()
 }
@@ -98,9 +108,16 @@ func (b *Bus) Tick(cycles uint) {
 
 	nmiBefore := b.ppu.CheckNMI()
 
+	frameEnd := false
+
 	// PPUはCPUの3倍のクロック周波数
 	for range cycles * 3 {
-		b.ppu.Tick(b.canvas, 1)
+		if b.ppu.Tick(b.canvas, 1) {
+			frameEnd = true
+
+			// Canvasをバッファを交換し，すぐにPPUが次のレンダリングを行っても混ざらないように
+			b.canvas.Swap()
+		}
 	}
 
 	// APUと同期
@@ -109,7 +126,7 @@ func (b *Bus) Tick(cycles uint) {
 	}
 
 	nmiAfter := b.ppu.CheckNMI()
-	if !nmiBefore && nmiAfter {
+	if frameEnd || (!nmiBefore && nmiAfter) {
 		b.apu.EndFrame()
 		b.callback(b.ppu, b.canvas, b.joypad1, b.joypad2)
 	}
@@ -292,4 +309,9 @@ func (b *Bus) WriteWordAt(address uint16, data uint16) {
 	lower := uint8(data & 0xFF)
 	b.WriteByteAt(address, lower)
 	b.WriteByteAt(address+1, upper)
+}
+
+// MARK: 現在のサイクル数の取得
+func (b *Bus) Cycles() uint {
+	return b.cycles
 }

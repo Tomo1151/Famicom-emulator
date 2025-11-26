@@ -321,3 +321,9 @@ func (t *TxROM) CharacterRom() []uint8 {
 func (t *TxROM) MapperInfo() string {
 	return "TxROM (Mapper 4)"
 }
+
+// MARK: マッパーのシャローコピーの取得
+func (t *TxROM) Clone() Mapper {
+	copy := *t
+	return &copy
+}

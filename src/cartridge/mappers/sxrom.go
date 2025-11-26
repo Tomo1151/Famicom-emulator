@@ -248,3 +248,9 @@ func (s *SxROM) CharacterRom() []uint8 {
 func (s *SxROM) MapperInfo() string {
 	return "MMC1 SxROM (Mapper 1)"
 }
+
+// MARK: マッパーのシャローコピーの取得
+func (s *SxROM) Clone() Mapper {
+	copy := *s
+	return &copy
+}

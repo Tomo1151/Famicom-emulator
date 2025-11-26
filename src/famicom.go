@@ -4,14 +4,16 @@ import (
 	"Famicom-emulator/apu"
 	"Famicom-emulator/bus"
 	"Famicom-emulator/cartridge"
+	"Famicom-emulator/config"
 	"Famicom-emulator/cpu"
 	"Famicom-emulator/joypad"
 	"Famicom-emulator/ppu"
+	"Famicom-emulator/ui"
 	"fmt"
 	"log"
 	"os"
+	"runtime"
 	"time"
-	"unsafe"
 
 	"github.com/veandco/go-sdl2/sdl"
 )
@@ -19,10 +21,6 @@ import (
 // MARK: 定数定義
 const (
 	FRAME_PER_SECOND = 60
-	SCALE_FACTOR     = 3
-
-	INPUT_MODE_KEYBOARD = 0
-	INPUT_MODE_JOYPAD   = 1
 )
 
 // MARK: InputStateの定義
@@ -48,10 +46,13 @@ type Famicom struct {
 
 	gamepad1 sdl.JoystickID // SDLのコントローラID (1P)
 	gamepad2 sdl.JoystickID // SDLのコントローラID (2P)
+
+	config  *config.Config
+	windows *ui.WindowManager
 }
 
 // MARK: Famicomの初期化メソッド
-func (f *Famicom) Init(cartridge cartridge.Cartridge) {
+func (f *Famicom) Init(cartridge cartridge.Cartridge, config *config.Config) {
 	// ROMファイルのロード
 	f.cartridge = cartridge
 	err := f.cartridge.Load()
@@ -60,6 +61,7 @@ func (f *Famicom) Init(cartridge cartridge.Cartridge) {
 	}
 
 	// 各コンポーネントの定義 / 接続
+	f.config = config
 	f.cpu = cpu.CPU{}
 	f.ppu = ppu.PPU{}
 	f.apu = apu.APU{}
@@ -72,6 +74,7 @@ func (f *Famicom) Init(cartridge cartridge.Cartridge) {
 		&f.cartridge,
 		&f.joypad1,
 		&f.joypad2,
+		f.config,
 	)
 
 	// 入力データの定義
@@ -83,21 +86,26 @@ func (f *Famicom) Init(cartridge cartridge.Cartridge) {
 
 // MARK: Famicomの起動
 func (f *Famicom) Start() {
+	// デフォルトの設定
+	if f.config == nil {
+		f.config = &config.Config{
+			SCALE_FACTOR: 3,
+			SOUND_VOLUME: 1.0,
+		}
+	}
+
 	// SDLの初期化
+	runtime.LockOSThread() // SDLはMainスレッド上で動かす必要がある
 	if err := sdl.Init(sdl.INIT_VIDEO | sdl.INIT_GAMECONTROLLER); err != nil {
 		panic(err)
 	}
 	defer sdl.Quit()
 
-	// ウィンドウの作成
-	window, err := sdl.CreateWindow("Famicom emu", sdl.WINDOWPOS_UNDEFINED, sdl.WINDOWPOS_UNDEFINED,
-		int32(ppu.SCREEN_WIDTH)*SCALE_FACTOR, int32(ppu.SCREEN_HEIGHT)*SCALE_FACTOR, sdl.WINDOW_SHOWN)
-	if err != nil {
-		panic(err)
-	}
-	defer window.Destroy()
+	// ウィンドウマネージャの作成
+	f.windows = ui.NewWindowManager()
+	defer f.windows.CloseAll()
 
-	// 接続済みコントローラを検知
+	// ゲームコントローラの接続
 	var gamepad1, gamepad2 *sdl.GameController
 	if sdl.NumJoysticks() == 0 {
 		fmt.Println("No controller detected")
@@ -119,62 +127,95 @@ func (f *Famicom) Start() {
 		}
 	}
 
-	// レンダラーの作成
-	renderer, err := sdl.CreateRenderer(window, -1, sdl.RENDERER_ACCELERATED)
-	if err != nil {
-		panic(err)
-	}
-	defer renderer.Destroy()
-
-	// テクスチャの作成
-	texture, err := renderer.CreateTexture(
-		sdl.PIXELFORMAT_RGB24,
-		sdl.TEXTUREACCESS_STREAMING,
-		int32(ppu.SCREEN_WIDTH), int32(ppu.SCREEN_HEIGHT))
-	if err != nil {
-		panic(err)
-	}
-	defer texture.Destroy()
-
-	// SDL2イベントポンプを取得
+	// 状態変数の定義
 	eventPump := sdl.PollEvent
 
-	// 1フレーム目の時間を取得
-	var lastFrameTime = time.Now()
+	// フレーム同期用チャネル: PPU がフレーム完了を通知するが、
+	// メインスレッドが CPU を駆動しているので非ブロッキングで通知する。
+	frameCh := make(chan struct{}, 1) // PPU -> main (non-blocking, buffered)
 
-	// BusのNMIコールバックで描画とイベント処理
+	// Busの初期化とフレーム毎に実行されるコールバックの定義
+	// PPU のフレーム到達を非ブロッキングで通知する（CPU はメインループが駆動する）。
 	f.bus.Init(func(p *ppu.PPU, c *ppu.Canvas, j1 *joypad.JoyPad, j2 *joypad.JoyPad) {
-
-		// フレームレート調整 (60FPS)
-		now := time.Now()
-		elapsed := now.Sub(lastFrameTime)
-		const frameDuration = time.Second / FRAME_PER_SECOND
-		if elapsed < frameDuration {
-			time.Sleep(frameDuration - elapsed)
+		select {
+		case frameCh <- struct{}{}:
+		default:
 		}
-		lastFrameTime = time.Now()
+	})
 
-		// キャンバスのバッファを元にテクスチャの更新
-		texture.Update(nil, unsafe.Pointer(&c.Buffer[0]), int(c.Width*3))
+	// ゲームウィンドウの作成
+	gameWindow, err := ui.NewGameWindow(f.config.SCALE_FACTOR, f.bus.Canvas(), func() {
+		f.requestShutdown()
+	})
+	if err != nil {
+		panic(err)
+	}
+	f.windows.Add(gameWindow)
 
-		// 再レンダリング
-		renderer.Clear()
-		renderer.Copy(texture, nil, nil)
-		renderer.Present()
+	// CPU の作成（フレーム単位でメインが駆動する）
+	f.cpu.Init(f.bus, f.config.CPU_LOG_ENABLED)
 
-		// SDLイベント処理
+	// メインループ: メインが CPU をフレーム単位で駆動し、描画とイベント処理を行う。
+	// フレームあたりの CPU サイクル数を計算して RunCycles に渡す。
+	const ntscCpuClock = 1789773
+	baseCycles := int(ntscCpuClock / FRAME_PER_SECOND)        // 29829
+	remainderPerFrame := int(ntscCpuClock % FRAME_PER_SECOND) // 33
+	remAcc := 0
+
+	lastFrameTime := time.Now()
+
+	for {
+		// フレームのサイクル数を計算
+		remAcc += remainderPerFrame
+		extra := 0
+		if remAcc >= FRAME_PER_SECOND {
+			extra = 1
+			remAcc -= FRAME_PER_SECOND
+		}
+		cyclesThisFrame := uint(baseCycles + extra)
+
+		// CPU をフレーム分だけ実行する（これがエミュレータの実時間を決める）
+		f.cpu.RunCycles(cyclesThisFrame)
+
+		// イベント処理
 		for event := eventPump(); event != nil; event = eventPump() {
 			switch e := event.(type) {
 			case *sdl.QuitEvent:
-				f.bus.Shutdown()
-				os.Exit(0)
+				f.requestShutdown()
 			case *sdl.KeyboardEvent:
-				if e.Keysym.Sym == sdl.K_ESCAPE && e.State == sdl.PRESSED {
-					f.bus.Shutdown()
-					os.Exit(0)
-				}
-				if e.Keysym.Sym == sdl.K_F12 && e.State == sdl.PRESSED {
-					f.cpu.ToggleLog()
+				if e.State == sdl.PRESSED {
+					switch e.Keysym.Sym {
+					case sdl.K_ESCAPE:
+						f.requestShutdown()
+					case sdl.K_F1:
+						if f.windows != nil {
+							if _, err := f.windows.ToggleOptionWindow(f.config); err != nil {
+								log.Printf("failed to toggle option window: %v", err)
+							}
+						}
+					case sdl.K_F2:
+						if f.windows != nil {
+							if _, err := f.windows.ToggleNameTableWindow(&f.ppu, f.config.SCALE_FACTOR); err != nil {
+								log.Printf("failed to toggle name table window: %v", err)
+							}
+						}
+					case sdl.K_F3:
+						if f.windows != nil {
+							if _, err := f.windows.ToggleCharacterWindow(&f.ppu, f.config.SCALE_FACTOR); err != nil {
+								log.Printf("failed to toggle character window: %v", err)
+							}
+						}
+					case sdl.K_F4:
+						if f.windows != nil {
+							if _, err := f.windows.ToggleAudioWindow(&f.apu, f.config.SCALE_FACTOR); err != nil {
+								log.Printf("failed to toggle audio window: %v", err)
+							}
+						}
+					case sdl.K_F11:
+						f.apu.ToggleLog()
+					case sdl.K_F12:
+						f.cpu.ToggleLog()
+					}
 				}
 				f.handleKeyPress(e, &f.keyboard1, &f.keyboard2)
 			case *sdl.ControllerButtonEvent:
@@ -193,20 +234,36 @@ func (f *Famicom) Start() {
 				}
 			}
 
-			// 操作結果を反映
-			f.updateJoyPad(j1, &f.keyboard1, &f.controller1)
-			f.updateJoyPad(j2, &f.keyboard2, &f.controller2)
+			f.windows.HandleEvent(event)
 		}
-	})
 
-	// CPUの初期化
-	f.cpu.Init(f.bus, false)
+		// JoyPad状態の更新
+		f.updateJoyPad(&f.joypad1, &f.keyboard1, &f.controller1)
+		f.updateJoyPad(&f.joypad2, &f.keyboard2, &f.controller2)
 
-	// CPUの起動
-	f.cpu.Run()
+		// 描画（PPU フレームに合わせて）
+		f.windows.RenderAll()
+
+		// フレームレート制御: PPU が速すぎて音より先行するのを防ぐ
+		frameDuration := time.Second / FRAME_PER_SECOND
+		now := time.Now()
+		if elapsed := now.Sub(lastFrameTime); elapsed < frameDuration {
+			time.Sleep(frameDuration - elapsed)
+		}
+		lastFrameTime = time.Now()
+	}
 }
 
-// MARK: キーボードの状態を検知
+// MARK: ゲームの終了メソッド
+func (f *Famicom) requestShutdown() {
+	if f.windows != nil {
+		f.windows.CloseAll()
+	}
+	f.bus.Shutdown()
+	os.Exit(0)
+}
+
+// MARK: キーボードの状態を検知するメソッド
 func (f *Famicom) handleKeyPress(e *sdl.KeyboardEvent, c1 *InputState, c2 *InputState) {
 	pressed := e.State == sdl.PRESSED
 	switch e.Keysym.Sym {
@@ -248,7 +305,7 @@ func (f *Famicom) handleKeyPress(e *sdl.KeyboardEvent, c1 *InputState, c2 *Input
 	}
 }
 
-// MARK: コントローラーのボタン状態を検知
+// MARK: コントローラーのボタン状態を検知するメソッド
 func (f *Famicom) handleButtonPress(e *sdl.ControllerButtonEvent, c *InputState) {
 	pressed := e.State == sdl.PRESSED
 	switch e.Button {
@@ -263,7 +320,7 @@ func (f *Famicom) handleButtonPress(e *sdl.ControllerButtonEvent, c *InputState)
 	}
 }
 
-// MARK: コントローラーのスティック状態を検知
+// MARK: コントローラーのスティック状態を検知するメソッド
 func (f *Famicom) handleAxisMotion(e *sdl.ControllerAxisEvent, c *InputState) {
 	const threshold = 8000 // デッドゾーン
 	switch e.Axis {
@@ -292,7 +349,7 @@ func (f *Famicom) handleAxisMotion(e *sdl.ControllerAxisEvent, c *InputState) {
 	}
 }
 
-// MARK: JoyPadの状態を更新
+// MARK: JoyPadの状態を更新するメソッド
 func (f *Famicom) updateJoyPad(j *joypad.JoyPad, k *InputState, c *InputState) {
 	// キーボードとコントローラの入力を統合
 	buttonA := k.A || c.A
