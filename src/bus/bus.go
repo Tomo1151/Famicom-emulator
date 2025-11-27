@@ -100,6 +100,7 @@ func (b *Bus) MapperIRQ() bool {
 // MARK: 終了処理
 func (b *Bus) Shutdown() {
 	b.cartridge.Mapper().Save()
+	b.apu.Shutdown()
 }
 
 // MARK: サイクルを進める

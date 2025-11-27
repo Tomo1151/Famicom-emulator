@@ -1,16 +1,10 @@
 package apu
 
-/*
-#include <stdint.h>
-void AudioMixCallback(void* userdata, uint8_t* stream, int length);
-*/
-import "C"
 import (
 	"Famicom-emulator/config"
 	"fmt"
-	"unsafe"
 
-	"github.com/veandco/go-sdl2/sdl"
+	"github.com/gordonklaus/portaudio"
 )
 
 // MARK: 定数定義
@@ -62,6 +56,8 @@ type APU struct {
 	prevLevel4 float32
 	prevLevel5 float32
 
+	stream *portaudio.Stream
+
 	log bool // デバッグ出力フラグ
 }
 
@@ -99,54 +95,56 @@ func (a *APU) Init(reader CpuBusReader, config *config.Config) {
 
 // MARK: オーディオデバイスの初期化メソッド
 func (a *APU) initAudioDevice() {
-	spec := &sdl.AudioSpec{
-		Freq:     SAMPLE_RATE,
-		Format:   sdl.AUDIO_F32,
-		Channels: 1,
-		Samples:  BUFFER_SIZE / 2,
-		Callback: sdl.AudioCallback(C.AudioMixCallback),
-	}
-
-	if err := sdl.OpenAudio(spec, nil); err != nil {
+	// PortAudio 初期化
+	if err := portaudio.Initialize(); err != nil {
 		panic(err)
 	}
 
-	// オーディオ再生開始
-	sdl.PauseAudio(false)
-}
+	framesPerBuffer := BUFFER_SIZE / 2
 
-// MARK: SDLのオーディオコールバック
-//
-//export AudioMixCallback
-func AudioMixCallback(userdata unsafe.Pointer, stream *C.uint8_t, length C.int) {
-	n := int(length) / 4
-	buffer := unsafe.Slice((*float32)(unsafe.Pointer(stream)), n)
+	stream, err := portaudio.OpenDefaultStream(
+		0,
+		1,
+		SAMPLE_RATE,
+		framesPerBuffer,
+		func(out []float32) {
+			n := len(out)
+			ch1 := ch1Buffer[:n]
+			ch2 := ch2Buffer[:n]
+			ch3 := ch3Buffer[:n]
+			ch4 := ch4Buffer[:n]
+			ch5 := ch5Buffer[:n]
 
-	ch1 := ch1Buffer[:n]
-	ch2 := ch2Buffer[:n]
-	ch3 := ch3Buffer[:n]
-	ch4 := ch4Buffer[:n]
-	ch5 := ch5Buffer[:n]
+			// チャンネルのバッファから読み込み
+			square1.buffer.Read(ch1, n)
+			square2.buffer.Read(ch2, n)
+			triangle.buffer.Read(ch3, n)
+			noise.buffer.Read(ch4, n)
+			dmc.buffer.Read(ch5, n)
 
-	square1.buffer.Read(ch1, n)
-	square2.buffer.Read(ch2, n)
-	triangle.buffer.Read(ch3, n)
-	noise.buffer.Read(ch4, n)
-	dmc.buffer.Read(ch5, n)
+			for i := range n {
+				mixed := mixSamples(ch1[i], ch2[i], ch3[i], ch4[i], ch5[i])
 
-	for i := range n {
-		// 全チャンネルをミックス
-		mixed := mixSamples(ch1[i], ch2[i], ch3[i], ch4[i], ch5[i])
+				if mixed > MAX_VOLUME {
+					mixed = MAX_VOLUME
+				} else if mixed < -MAX_VOLUME {
+					mixed = -MAX_VOLUME
+				}
 
-		if mixed > MAX_VOLUME {
-			mixed = MAX_VOLUME
-		} else if mixed < -MAX_VOLUME {
-			mixed = -MAX_VOLUME
-		}
+				out[i] = mixed * MASTER_VOLUME
+			}
+		},
+	)
 
-		// SDLへサンプルとして渡す
-		buffer[i] = mixed * MASTER_VOLUME
+	if err != nil {
+		panic(err)
 	}
+
+	if err := stream.Start(); err != nil {
+		panic(err)
+	}
+
+	a.stream = stream
 }
 
 // MARK: APUのサイクルを進める
@@ -640,6 +638,17 @@ func (a *APU) ToggleLog() {
 	a.channel3.ToggleLog()
 	a.channel4.ToggleLog()
 	a.channel5.ToggleLog()
+}
+
+// MARK: 終了処理
+func (a *APU) Shutdown() {
+	if a.stream != nil {
+		_ = a.stream.Stop()
+		_ = a.stream.Close()
+		a.stream = nil
+	}
+
+	_ = portaudio.Terminate()
 }
 
 // MARK: SDLコールバックのサンプル数を取得するメソッド
