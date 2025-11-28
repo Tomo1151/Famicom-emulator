@@ -73,7 +73,7 @@ func (c *Canvas) setPixelAt(x uint, y uint, palette [3]uint8) {
 
 	basePtr := int((y*c.Width + x) * 3)
 
-	if c.config.DOUBLE_BUFFERING_ENABLED {
+	if c.config.Render.DOUBLE_BUFFERING_ENABLED {
 		// ダブルバッファリングが有効の場合，現在描画していない側のバッファに描画を行う
 		back := 1 - c.index
 		c.Buffers[back][basePtr+0] = palette[0] // R
@@ -89,14 +89,14 @@ func (c *Canvas) setPixelAt(x uint, y uint, palette [3]uint8) {
 
 // 現在描画しているバッファと入れ替える
 func (c *Canvas) Swap() {
-	if c.config.DOUBLE_BUFFERING_ENABLED {
+	if c.config.Render.DOUBLE_BUFFERING_ENABLED {
 		c.index = 1 - c.index
 	}
 }
 
 // 現在描画しているバッファの先頭のポインタを返す
 func (c *Canvas) FrontBuffer() *[uint(SCREEN_WIDTH) * uint(SCREEN_HEIGHT) * 3]byte {
-	if c.config.DOUBLE_BUFFERING_ENABLED {
+	if c.config.Render.DOUBLE_BUFFERING_ENABLED {
 		return &c.Buffers[c.index]
 	} else {
 		return &c.Buffers[0]

@@ -71,7 +71,7 @@ func (a *APU) Init(reader CpuBusReader, config *config.Config) {
 	a.cycles = 0
 	a.step = 0
 	a.cpuRead = reader
-	a.log = config.APU_LOG_ENABLED
+	a.log = config.APU.LOG_ENABLED
 
 	a.channel1 = &square1
 	a.channel1.Init(a.log)
