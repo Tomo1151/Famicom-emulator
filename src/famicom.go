@@ -88,10 +88,7 @@ func (f *Famicom) Init(cartridge cartridge.Cartridge, config *config.Config) {
 func (f *Famicom) Start() {
 	// デフォルトの設定
 	if f.config == nil {
-		f.config = &config.Config{
-			SCALE_FACTOR: 3,
-			SOUND_VOLUME: 1.0,
-		}
+		f.config = config.DefaultConfig
 	}
 
 	// SDLの初期化
@@ -144,7 +141,7 @@ func (f *Famicom) Start() {
 	})
 
 	// ゲームウィンドウの作成
-	gameWindow, err := ui.NewGameWindow(f.config.SCALE_FACTOR, f.bus.Canvas(), func() {
+	gameWindow, err := ui.NewGameWindow(f.config.Render.SCALE_FACTOR, f.bus.Canvas(), func() {
 		f.requestShutdown()
 	})
 	if err != nil {
@@ -153,7 +150,7 @@ func (f *Famicom) Start() {
 	f.windows.Add(gameWindow)
 
 	// CPU の作成（フレーム単位でメインが駆動する）
-	f.cpu.Init(f.bus, f.config.CPU_LOG_ENABLED)
+	f.cpu.Init(f.bus, f.config.CPU.LOG_ENABLED)
 
 	// メインループ: メインが CPU をフレーム単位で駆動し、描画とイベント処理を行う。
 	// フレームあたりの CPU サイクル数を計算して RunCycles に渡す。
@@ -195,19 +192,19 @@ func (f *Famicom) Start() {
 						}
 					case sdl.K_F2:
 						if f.windows != nil {
-							if _, err := f.windows.ToggleNameTableWindow(&f.ppu, f.config.SCALE_FACTOR); err != nil {
+							if _, err := f.windows.ToggleNameTableWindow(&f.ppu, f.config.Render.SCALE_FACTOR); err != nil {
 								log.Printf("failed to toggle name table window: %v", err)
 							}
 						}
 					case sdl.K_F3:
 						if f.windows != nil {
-							if _, err := f.windows.ToggleCharacterWindow(&f.ppu, f.config.SCALE_FACTOR); err != nil {
+							if _, err := f.windows.ToggleCharacterWindow(&f.ppu, f.config.Render.SCALE_FACTOR); err != nil {
 								log.Printf("failed to toggle character window: %v", err)
 							}
 						}
 					case sdl.K_F4:
 						if f.windows != nil {
-							if _, err := f.windows.ToggleAudioWindow(&f.apu, f.config.SCALE_FACTOR); err != nil {
+							if _, err := f.windows.ToggleAudioWindow(&f.apu, f.config.Render.SCALE_FACTOR); err != nil {
 								log.Printf("failed to toggle audio window: %v", err)
 							}
 						}
@@ -215,6 +212,16 @@ func (f *Famicom) Start() {
 						f.apu.ToggleLog()
 					case sdl.K_F12:
 						f.cpu.ToggleLog()
+					case sdl.K_1:
+						f.apu.ToggleMute1ch()
+					case sdl.K_2:
+						f.apu.ToggleMute2ch()
+					case sdl.K_3:
+						f.apu.ToggleMute3ch()
+					case sdl.K_4:
+						f.apu.ToggleMute4ch()
+					case sdl.K_5:
+						f.apu.ToggleMute5ch()
 					}
 				}
 				f.handleKeyPress(e, &f.keyboard1, &f.keyboard2)
@@ -268,40 +275,40 @@ func (f *Famicom) handleKeyPress(e *sdl.KeyboardEvent, c1 *InputState, c2 *Input
 	pressed := e.State == sdl.PRESSED
 	switch e.Keysym.Sym {
 	// 1P
-	case sdl.K_k:
+	case f.config.Control.KEY_1P.BUTTON_A:
 		c1.A = pressed
-	case sdl.K_j:
+	case f.config.Control.KEY_1P.BUTTON_B:
 		c1.B = pressed
-	case sdl.K_w:
+	case f.config.Control.KEY_1P.BUTTON_UP:
 		c1.Up = pressed
-	case sdl.K_s:
+	case f.config.Control.KEY_1P.BUTTON_DOWN:
 		c1.Down = pressed
-	case sdl.K_a:
-		c1.Left = pressed
-	case sdl.K_d:
+	case f.config.Control.KEY_1P.BUTTON_RIGHT:
 		c1.Right = pressed
-	case sdl.K_RETURN, sdl.K_KP_ENTER:
+	case f.config.Control.KEY_1P.BUTTON_LEFT:
+		c1.Left = pressed
+	case f.config.Control.KEY_1P.BUTTON_START:
 		c1.Start = pressed
-	case sdl.K_BACKSPACE:
+	case f.config.Control.KEY_1P.BUTTON_SELECT:
 		c1.Select = pressed
 
 	// 2P
-	case sdl.K_COLON:
+	case f.config.Control.KEY_2P.BUTTON_A:
 		c2.A = pressed
-	case sdl.K_SEMICOLON:
+	case f.config.Control.KEY_2P.BUTTON_B:
 		c2.B = pressed
-	case sdl.K_t:
+	case f.config.Control.KEY_2P.BUTTON_UP:
 		c2.Up = pressed
-	case sdl.K_g:
+	case f.config.Control.KEY_2P.BUTTON_DOWN:
 		c2.Down = pressed
-	case sdl.K_f:
-		c2.Left = pressed
-	case sdl.K_h:
+	case f.config.Control.KEY_2P.BUTTON_RIGHT:
 		c2.Right = pressed
-	case sdl.K_GREATER:
-		c2.Select = pressed
-	case sdl.K_TAB:
+	case f.config.Control.KEY_2P.BUTTON_LEFT:
+		c2.Left = pressed
+	case f.config.Control.KEY_2P.BUTTON_START:
 		c2.Start = pressed
+	case f.config.Control.KEY_2P.BUTTON_SELECT:
+		c2.Select = pressed
 	}
 }
 
@@ -322,13 +329,12 @@ func (f *Famicom) handleButtonPress(e *sdl.ControllerButtonEvent, c *InputState)
 
 // MARK: コントローラーのスティック状態を検知するメソッド
 func (f *Famicom) handleAxisMotion(e *sdl.ControllerAxisEvent, c *InputState) {
-	const threshold = 8000 // デッドゾーン
 	switch e.Axis {
 	case 0: // X軸 (左スティック左右)
-		if e.Value < -threshold {
+		if e.Value < -f.config.Control.GamepadAxisThreshold {
 			c.Left = true
 			c.Right = false
-		} else if e.Value > threshold {
+		} else if e.Value > f.config.Control.GamepadAxisThreshold {
 			c.Left = false
 			c.Right = true
 		} else {
@@ -336,10 +342,10 @@ func (f *Famicom) handleAxisMotion(e *sdl.ControllerAxisEvent, c *InputState) {
 			c.Right = false
 		}
 	case 1: // Y軸 (左スティック上下)
-		if e.Value < -threshold {
+		if e.Value < -f.config.Control.GamepadAxisThreshold {
 			c.Up = true
 			c.Down = false
-		} else if e.Value > threshold {
+		} else if e.Value > f.config.Control.GamepadAxisThreshold {
 			c.Up = false
 			c.Down = true
 		} else {

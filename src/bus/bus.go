@@ -41,14 +41,14 @@ func (b *Bus) InitForTest() {
 	}
 }
 
-// MARK: Busの初期化メソッド (カートリッジ有り)
+// MARK: Busの初期化メソッド (ConnectComponents後に呼ばれる)
 func (b *Bus) Init(callback func(*ppu.PPU, *ppu.Canvas, *joypad.JoyPad, *joypad.JoyPad)) {
 	for addr := range b.wram {
 		b.wram[addr] = 0x00
 	}
 	b.callback = callback
 	b.canvas = &ppu.Canvas{}
-	b.canvas.Init()
+	b.canvas.Init(*b.config)
 }
 
 // MARK: Canvasを取得
@@ -77,7 +77,7 @@ func (b *Bus) ConnectComponents(
 
 	// 各コンポーネントを初期化
 	b.ppu.Init(b.cartridge.Mapper())
-	b.apu.Init(b.ReadByteFrom, b.config)
+	b.apu.Init(b.ReadByteFrom, *b.config)
 	b.joypad1.Init()
 	b.joypad2.Init()
 }

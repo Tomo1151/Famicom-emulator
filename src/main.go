@@ -14,12 +14,7 @@ func main() {
 			// ROM: "../rom/SuperMarioBros.nes",
 			ROM: "../rom/SuperMarioBros3.nes",
 		},
-		&config.Config{
-			SCALE_FACTOR:    3,
-			SOUND_VOLUME:    1.0,
-			CPU_LOG_ENABLED: false,
-			APU_LOG_ENABLED: false,
-		},
+		config.DefaultConfig,
 	)
 	famicom.Start()
 }
