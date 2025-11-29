@@ -2,12 +2,14 @@ package apu
 
 /*
 #include <stdint.h>
+#include <stdlib.h>
 void AudioMixCallback(void* userdata, uint8_t* stream, int length);
 */
 import "C"
 import (
 	"Famicom-emulator/config"
 	"fmt"
+	"runtime/cgo"
 	"unsafe"
 
 	"github.com/veandco/go-sdl2/sdl"
@@ -43,11 +45,11 @@ type APU struct {
 	step   uint8
 
 	// チャンネル
-	channel1 *SquareWaveChannel
-	channel2 *SquareWaveChannel
-	channel3 *TriangleWaveChannel
-	channel4 *NoiseWaveChannel
-	channel5 *DMCWaveChannel
+	channel1 SquareWaveChannel
+	channel2 SquareWaveChannel
+	channel3 TriangleWaveChannel
+	channel4 NoiseWaveChannel
+	channel5 DMCWaveChannel
 
 	frameCounter FrameCounter
 	status       StatusRegister
@@ -62,27 +64,23 @@ type APU struct {
 	prevLevel4 float32
 	prevLevel5 float32
 
-	log bool // デバッグ出力フラグ
+	config config.Config
 }
 
 // MARK: APUの初期化メソッド
-func (a *APU) Init(reader CpuBusReader, config *config.Config) {
+func (a *APU) Init(reader CpuBusReader, config config.Config) {
 	a.volume = 1.0
 	a.cycles = 0
 	a.step = 0
 	a.cpuRead = reader
-	a.log = config.APU_LOG_ENABLED
+	a.config = config
 
-	a.channel1 = &square1
-	a.channel1.Init(a.log)
-	a.channel2 = &square2
-	a.channel2.Init(a.log)
-	a.channel3 = &triangle
-	a.channel3.Init(a.log)
-	a.channel4 = &noise
-	a.channel4.Init(a.log)
-	a.channel5 = &dmc
-	a.channel5.Init(a.cpuRead, a.log)
+	// 各チャンネルの初期化
+	a.channel1.Init(a.config.APU.LOG_ENABLED)
+	a.channel2.Init(a.config.APU.LOG_ENABLED)
+	a.channel3.Init(a.config.APU.LOG_ENABLED)
+	a.channel4.Init(a.config.APU.LOG_ENABLED)
+	a.channel5.Init(a.cpuRead, a.config.APU.LOG_ENABLED)
 
 	a.frameCounter.Init()
 	a.status.Init()
@@ -99,12 +97,16 @@ func (a *APU) Init(reader CpuBusReader, config *config.Config) {
 
 // MARK: オーディオデバイスの初期化メソッド
 func (a *APU) initAudioDevice() {
+	handle := cgo.NewHandle(a)
+	hptr := C.malloc(C.size_t(unsafe.Sizeof(uintptr(0))))
+	*(*C.uintptr_t)(hptr) = C.uintptr_t(handle)
 	spec := &sdl.AudioSpec{
 		Freq:     SAMPLE_RATE,
 		Format:   sdl.AUDIO_F32,
 		Channels: 1,
 		Samples:  BUFFER_SIZE / 2,
 		Callback: sdl.AudioCallback(C.AudioMixCallback),
+		UserData: hptr,
 	}
 
 	if err := sdl.OpenAudio(spec, nil); err != nil {
@@ -119,6 +121,23 @@ func (a *APU) initAudioDevice() {
 //
 //export AudioMixCallback
 func AudioMixCallback(userdata unsafe.Pointer, stream *C.uint8_t, length C.int) {
+	// APUの参照を取得
+	if userdata == nil {
+		return
+	}
+
+	// userdata に格納した uintptr を読み出す
+	apuPointer := uintptr(*(*C.uintptr_t)(userdata))
+	if apuPointer == 0 {
+		return
+	}
+
+	h := cgo.Handle(apuPointer)
+	apu, ok := h.Value().(*APU)
+	if !ok || apu == nil {
+		return
+	}
+
 	n := int(length) / 4
 	buffer := unsafe.Slice((*float32)(unsafe.Pointer(stream)), n)
 
@@ -128,11 +147,31 @@ func AudioMixCallback(userdata unsafe.Pointer, stream *C.uint8_t, length C.int) 
 	ch4 := ch4Buffer[:n]
 	ch5 := ch5Buffer[:n]
 
-	square1.buffer.Read(ch1, n)
-	square2.buffer.Read(ch2, n)
-	triangle.buffer.Read(ch3, n)
-	noise.buffer.Read(ch4, n)
-	dmc.buffer.Read(ch5, n)
+	if !apu.config.APU.MUTE_1CH {
+		apu.channel1.buffer.Read(ch1, n)
+	} else {
+		apu.channel1.buffer.Fill(ch1, n, 0.0, apu.sampleClock)
+	}
+	if !apu.config.APU.MUTE_2CH {
+		apu.channel2.buffer.Read(ch2, n)
+	} else {
+		apu.channel2.buffer.Fill(ch2, n, 0.0, apu.sampleClock)
+	}
+	if !apu.config.APU.MUTE_3CH {
+		apu.channel3.buffer.Read(ch3, n)
+	} else {
+		apu.channel3.buffer.Fill(ch3, n, 0.0, apu.sampleClock)
+	}
+	if !apu.config.APU.MUTE_4CH {
+		apu.channel4.buffer.Read(ch4, n)
+	} else {
+		apu.channel4.buffer.Fill(ch4, n, 0.0, apu.sampleClock)
+	}
+	if !apu.config.APU.MUTE_5CH {
+		apu.channel5.buffer.Read(ch5, n)
+	} else {
+		apu.channel5.buffer.Fill(ch5, n, 0.0, apu.sampleClock)
+	}
 
 	for i := range n {
 		// 全チャンネルをミックス
@@ -629,17 +668,115 @@ func (a *APU) clockFrameSequencer() {
 
 // MARK: デバッグ用ログ出力切り替え
 func (a *APU) ToggleLog() {
-	if a.log {
+	if a.config.APU.LOG_ENABLED {
 		fmt.Println("[APU] Debug log: OFF")
 	} else {
 		fmt.Println("[APU] Debug log: ON")
 	}
-	a.log = !a.log
+	a.config.APU.LOG_ENABLED = !a.config.APU.LOG_ENABLED
 	a.channel1.ToggleLog()
 	a.channel2.ToggleLog()
 	a.channel3.ToggleLog()
 	a.channel4.ToggleLog()
 	a.channel5.ToggleLog()
+}
+
+// MARK: 1chミュート切り替え
+func (a *APU) ToggleMute1ch() {
+	if a.config.APU.MUTE_1CH {
+		fmt.Println("[APU] 1ch (square): Unmuted")
+	} else {
+		fmt.Println("[APU] 1ch (square): Muted")
+	}
+	a.config.APU.MUTE_1CH = !a.config.APU.MUTE_1CH
+
+	if a.config.APU.MUTE_1CH {
+		// ミュートした瞬間はバッファを0に同期して過去サンプルを破棄
+		a.channel1.buffer.Sync(0.0, a.sampleClock)
+		// APU 側の prevLevel も 0 にして差分発生を防ぐ
+		a.prevLevel1 = 0.0
+	} else {
+		// ミュート解除：現在の出力レベルに同期して過渡を抑える
+		current := a.channel1.output(0)
+		a.prevLevel1 = current
+		a.channel1.buffer.Sync(current, a.sampleClock)
+	}
+}
+
+// MARK: 2chミュート切り替え
+func (a *APU) ToggleMute2ch() {
+	if a.config.APU.MUTE_2CH {
+		fmt.Println("[APU] 2ch (square): Unmuted")
+	} else {
+		fmt.Println("[APU] 2ch (square): Muted")
+	}
+	a.config.APU.MUTE_2CH = !a.config.APU.MUTE_2CH
+
+	if a.config.APU.MUTE_2CH {
+		a.channel2.buffer.Sync(0.0, a.sampleClock)
+		a.prevLevel2 = 0.0
+	} else {
+		current := a.channel2.output(0)
+		a.prevLevel2 = current
+		a.channel2.buffer.Sync(current, a.sampleClock)
+	}
+}
+
+// MARK: 3chミュート切り替え
+func (a *APU) ToggleMute3ch() {
+	if a.config.APU.MUTE_3CH {
+		fmt.Println("[APU] 3ch (triangle): Unmuted")
+	} else {
+		fmt.Println("[APU] 3ch (triangle): Muted")
+	}
+	a.config.APU.MUTE_3CH = !a.config.APU.MUTE_3CH
+
+	if a.config.APU.MUTE_3CH {
+		a.channel3.buffer.Sync(0.0, a.sampleClock)
+		a.prevLevel2 = 0.0
+	} else {
+		current := a.channel3.output(0)
+		a.prevLevel3 = current
+		a.channel3.buffer.Sync(current, a.sampleClock)
+	}
+}
+
+// MARK: 4chミュート切り替え
+func (a *APU) ToggleMute4ch() {
+	if a.config.APU.MUTE_4CH {
+		fmt.Println("[APU] 4ch (noise): Unmuted")
+	} else {
+		fmt.Println("[APU] 4ch (noise): Muted")
+	}
+	a.config.APU.MUTE_4CH = !a.config.APU.MUTE_4CH
+
+	if a.config.APU.MUTE_4CH {
+		a.channel4.buffer.Sync(0.0, a.sampleClock)
+		a.prevLevel4 = 0.0
+	} else {
+		current := a.channel4.output(0)
+		a.prevLevel4 = current
+		a.channel4.buffer.Sync(current, a.sampleClock)
+	}
+}
+
+// MARK: 5chミュート切り替え
+func (a *APU) ToggleMute5ch() {
+	if a.config.APU.MUTE_5CH {
+		fmt.Println("[APU] 5ch (DPCM): Unmuted")
+	} else {
+		fmt.Println("[APU] 5ch (DPCM): Muted")
+	}
+	a.config.APU.MUTE_5CH = !a.config.APU.MUTE_5CH
+
+	if a.config.APU.MUTE_5CH {
+		a.channel5.buffer.Sync(0.0, a.sampleClock)
+		a.prevLevel5 = 0.0
+	} else {
+		current := a.channel5.output()
+		a.prevLevel5 = current
+		a.channel5.buffer.Sync(current, a.sampleClock)
+	}
 }
 
 // MARK: SDLコールバックのサンプル数を取得するメソッド

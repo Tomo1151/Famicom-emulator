@@ -73,12 +73,12 @@ func (o *OptionWindow) Render() {
 	o.renderer.Clear()
 
 	o.renderer.SetDrawColor(80, 160, 255, opacity)
-	scaleWidth := int32(float32(300) * float32(o.config.SCALE_FACTOR) / 6.0)
+	scaleWidth := int32(float32(300) * float32(o.config.Render.SCALE_FACTOR) / 6.0)
 	optionRect := sdl.Rect{X: 30, Y: 40, W: scaleWidth, H: 20}
 	o.renderer.FillRect(&optionRect)
 
 	o.renderer.SetDrawColor(255, 200, 80, opacity)
-	volumeWidth := int32(float32(300) * o.config.SOUND_VOLUME)
+	volumeWidth := int32(float32(300) * o.config.APU.SOUND_VOLUME)
 	volumeRect := sdl.Rect{X: 30, Y: 100, W: volumeWidth, H: 20}
 	o.renderer.FillRect(&volumeRect)
 
