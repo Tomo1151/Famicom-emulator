@@ -31,8 +31,8 @@ var DefaultConfig = &Config{
 			BUTTON_SELECT: sdl.K_BACKSPACE,
 		},
 		KEY_2P: KeyConfig{
-			BUTTON_A:      sdl.K_UNDERSCORE,
-			BUTTON_B:      sdl.K_SLASH,
+			BUTTON_A:      sdl.K_SLASH,
+			BUTTON_B:      sdl.K_PERIOD,
 			BUTTON_UP:     sdl.K_g,
 			BUTTON_DOWN:   sdl.K_b,
 			BUTTON_RIGHT:  sdl.K_n,
