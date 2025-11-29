@@ -98,14 +98,7 @@ func (b *BlipBuffer) endFrame(time uint64) {
 	b.addDelta(time, 0)
 }
 
-// MARK: 時間のリセットをするメソッド
-func (b *BlipBuffer) resetTime() {
-	b.mutex.Lock()
-	defer b.mutex.Unlock()
-	b.lastTime = 0
-	b.frac = 0
-}
-
+// MARK: サンプルのフィルタリング
 func (b *BlipBuffer) filterSample(sample float32) float32 {
 	if len(b.filterTaps) == 0 {
 		return sample
@@ -130,6 +123,7 @@ func (b *BlipBuffer) filterSample(sample float32) float32 {
 	return float32(sum)
 }
 
+// MARK: ローパスフィルタ(窓付きsinc)の係数を計算・正規化
 func designSincLowPass(numTaps int, cutoff float64) []float64 {
 	if numTaps%2 == 0 {
 		numTaps++
@@ -156,6 +150,51 @@ func designSincLowPass(numTaps int, cutoff float64) []float64 {
 		taps[n] /= sum
 	}
 	return taps
+}
+
+// MARK: バッファを埋める
+func (b *BlipBuffer) Fill(out []float32, n int, element float32, time uint64) {
+	b.mutex.Lock()
+	defer b.mutex.Unlock()
+
+	consume := min(len(b.samples), n)
+	if consume > 0 {
+		b.samples = b.samples[consume:]
+	}
+
+	b.lastLevel = element
+	b.lastTime = time
+	b.frac = 0
+
+	if b.filterState != nil {
+		for i := range b.filterState {
+			b.filterState[i] = element
+		}
+	}
+	b.filterIndex = 0
+
+	for i := range min(len(out), n) {
+		out[i] = element
+	}
+}
+
+// MARK: 渡された時間に同期する
+func (b *BlipBuffer) Sync(level float32, time uint64) {
+	b.mutex.Lock()
+	defer b.mutex.Unlock()
+
+	// 内部サンプルを破棄して状態を与えられたレベルに揃える
+	b.samples = b.samples[:0]
+	b.lastLevel = level
+	b.lastTime = time
+	b.frac = 0
+
+	if b.filterState != nil {
+		for i := range b.filterState {
+			b.filterState[i] = level
+		}
+	}
+	b.filterIndex = 0
 }
 
 // MARK: デバッグ出力の切り替え
@@ -236,17 +275,4 @@ func (b *ResamplingBuffer) Read(out []float32, count int) int {
 		out[i] = last
 	}
 	return n
-}
-
-// MARK: バッファのフラッシュをするメソッド
-func (b *ResamplingBuffer) endFrame(time uint64) {
-	b.Write(time, b.lastLevel)
-}
-
-// MARK: 時間のリセットをするメソッド
-func (b *ResamplingBuffer) resetTime() {
-	b.mutex.Lock()
-	defer b.mutex.Unlock()
-	b.lastTime = 0
-	b.frac = 0
 }

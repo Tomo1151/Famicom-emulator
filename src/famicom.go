@@ -212,6 +212,16 @@ func (f *Famicom) Start() {
 						f.apu.ToggleLog()
 					case sdl.K_F12:
 						f.cpu.ToggleLog()
+					case sdl.K_1:
+						f.apu.ToggleMute1ch()
+					case sdl.K_2:
+						f.apu.ToggleMute2ch()
+					case sdl.K_3:
+						f.apu.ToggleMute3ch()
+					case sdl.K_4:
+						f.apu.ToggleMute4ch()
+					case sdl.K_5:
+						f.apu.ToggleMute5ch()
 					}
 				}
 				f.handleKeyPress(e, &f.keyboard1, &f.keyboard2)
