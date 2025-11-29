@@ -37,8 +37,7 @@ func (c *Cartridge) Load() error {
 	// ゲームROMの読み込み
 	gamefile, err := os.ReadFile(c.ROM)
 	if err != nil {
-		log.Fatalf("Error occured in 'os.ReadFile()'")
-		return fmt.Errorf("Couldn't read file: %s", c.ROM)
+		return fmt.Errorf("couldn't read file %s", c.ROM)
 	}
 
 	// savesディレクトリがなければ作成
@@ -48,10 +47,7 @@ func (c *Cartridge) Load() error {
 
 	// セーブデータの読み込み
 	savefile, err := os.ReadFile(SAVE_DATA_DIR + name + ".save")
-	if err == nil {
-		fmt.Println("Save data loaded")
-	} else {
-		fmt.Println("No save data found")
+	if err != nil {
 		savefile = []byte{}
 	}
 
@@ -73,7 +69,7 @@ func (c *Cartridge) Load() error {
 	rom := c.selectMapper(mapperNo)
 	rom.Init(name, gamefile, savefile)
 	c.mapper = rom
-	c.DumpInfo()
+	c.DumpInfo(savefile)
 
 	return nil
 }
@@ -102,7 +98,7 @@ func (c *Cartridge) Mapper() mappers.Mapper {
 }
 
 // MARK: カートリッジの情報を出力
-func (c *Cartridge) DumpInfo() {
+func (c *Cartridge) DumpInfo(savefile []uint8) {
 	fmt.Printf("Cartridge loaded:\n")
 	fmt.Printf("  Mapper: %s\n", c.mapper.MapperInfo())
 	fmt.Printf("  PRG ROM Size: %d bytes\n", len(c.mapper.ProgramRom()))
@@ -120,4 +116,10 @@ func (c *Cartridge) DumpInfo() {
 		mirroringStr = "Unknown"
 	}
 	fmt.Printf("  Mirroring: %s\n", mirroringStr)
+
+	if len(savefile) != 0 {
+		fmt.Println("Save data loaded")
+	} else {
+		fmt.Println("No save data found")
+	}
 }
