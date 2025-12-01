@@ -16,12 +16,13 @@ func ParseArguments() (cartridge.Cartridge, *Config) {
 	)
 
 	flag.Parse()
-
 	fmt.Println("Load ROM file:", *rom)
+
+	config := LoadFromFile()
 
 	return cartridge.Cartridge{
 		ROM: filepath.Join("..", "rom", *rom),
-	}, DefaultConfig
+	}, config
 }
 
 // MARK: デフォルトのROMファイル名を取得

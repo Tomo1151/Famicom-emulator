@@ -1,0 +1,21 @@
+{
+  "render": {
+    "scale": 3,
+    "doubleBuffering": true
+  },
+  "apu": {
+    "volume": 1.0,
+    "log": false,
+    "mute1ch": false,
+    "mute2ch": false,
+    "mute3ch": false,
+    "mute4ch": false,
+    "mute5ch": false
+  },
+  "cpu": {
+    "log": false
+  },
+  "control": {
+    "gamepadAxisThreshold": 8000
+  }
+}
