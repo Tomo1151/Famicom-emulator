@@ -1212,10 +1212,12 @@ func (c *CPU) REPL(commands []uint8) {
 	}
 }
 
-// RunCycles executes CPU instructions until at least targetCycles CPU cycles
-// have been advanced on the bus. This is intended for frame-sliced execution
-// where the caller controls per-frame timing.
+// MARK: サイクル数を指定してCPUを実行
 func (c *CPU) RunCycles(targetCycles uint) {
+	if c.log {
+		fmt.Println(c.Trace())
+	}
+
 	var executed uint = 0
 
 	for executed < targetCycles {
