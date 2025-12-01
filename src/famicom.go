@@ -86,11 +86,6 @@ func (f *Famicom) Init(cartridge cartridge.Cartridge, config *config.Config) {
 
 // MARK: Famicomの起動
 func (f *Famicom) Start() {
-	// デフォルトの設定
-	if f.config == nil {
-		f.config = config.DefaultConfig
-	}
-
 	// SDLの初期化
 	runtime.LockOSThread() // SDLはMainスレッド上で動かす必要がある
 	if err := sdl.Init(sdl.INIT_VIDEO | sdl.INIT_GAMECONTROLLER); err != nil {
