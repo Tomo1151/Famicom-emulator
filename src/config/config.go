@@ -91,7 +91,6 @@ type KeyConfig struct {
 func LoadFromFile() *Config {
 	// コンフィグファイルの読み込み
 	configfile, err := os.ReadFile(CONFIG_FILE_PATH)
-	fmt.Println(configfile)
 	if len(configfile) != 0 && err == nil {
 		fmt.Println("Config file loaded.")
 	} else {
@@ -102,6 +101,14 @@ func LoadFromFile() *Config {
 	config, err := ParseFromJson(configfile)
 	if err != nil {
 		fmt.Println("Config file contains invalid field.")
+
+		// パースに失敗した場合は最低限の設定で起動
+		config = &Config{
+			Render: RenderConfig{
+				SCALE_FACTOR: 3,
+			},
+			Control: DefaultControl,
+		}
 	}
 
 	return config

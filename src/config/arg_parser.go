@@ -11,14 +11,14 @@ import (
 
 // MARK: コマンドライン引数をパースしてROMとコンフィグを生成
 func ParseArguments() (cartridge.Cartridge, *Config) {
+	config := LoadFromFile()
+
 	var (
 		rom = flag.String("rom", defaultRomName(), "Rom file name in /rom.")
 	)
 
 	flag.Parse()
 	fmt.Println("Load ROM file:", *rom)
-
-	config := LoadFromFile()
 
 	return cartridge.Cartridge{
 		ROM: filepath.Join("..", "rom", *rom),
