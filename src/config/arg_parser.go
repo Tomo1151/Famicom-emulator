@@ -13,21 +13,22 @@ import (
 func ParseArguments() (cartridge.Cartridge, *Config) {
 	config := LoadFromFile()
 
-	var (
-		rom = flag.String("rom", defaultRomName(), "Rom file name in /rom.")
-	)
-
 	flag.Parse()
-	fmt.Println("Load ROM file:", *rom)
+	rom := flag.Arg(0)
+	if len(rom) == 0 {
+		rom = defaultRomPath()
+	}
+
+	fmt.Println("Load ROM file:", rom)
 
 	return cartridge.Cartridge{
-		ROM: filepath.Join("..", "rom", *rom),
+		ROM: filepath.Join("..", "rom", rom),
 	}, config
 }
 
 // MARK: デフォルトのROMファイル名を取得
-func defaultRomName() string {
-	// rom/*.nes にマッチする一番最後のROMを返す
+func defaultRomPath() string {
+	// rom/*.nes にマッチするROMのパスを取得
 	pattern := filepath.Join("..", "rom", "*.nes")
 	matches, err := filepath.Glob(pattern)
 
@@ -35,11 +36,13 @@ func defaultRomName() string {
 		return ""
 	}
 
+	// 大文字小文字を揃えて辞書順に並べる
 	sort.Slice(matches, func(i, j int) bool {
 		a := strings.ToLower(filepath.Base(matches[i]))
 		b := strings.ToLower(filepath.Base(matches[j]))
 		return a < b
 	})
 
+	// 取得されたROMの中で一番最後のものを返す
 	return filepath.Base(matches[len(matches)-1])
 }
