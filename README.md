@@ -18,10 +18,14 @@ Rom file load from default rom directory automatically.
 > [!Note]
 > By default, the last .nes file in the rom directory is loaded.
 
-If you use specific Rom file, you can pass Rom path (from default rom directory) with `-rom [rom path]` option
+If you use specific Rom file, you can pass Rom path (from default rom directory) first argument.
 
 ```shell
-cd src && go run . -rom example_rom.nes
+cd src && go run . example_rom.nes
+```
+
+```shell
+cd src && go run . tests/example_rom.nes
 ```
 
 ## Controls
@@ -41,7 +45,7 @@ cd src && go run . -rom example_rom.nes
 
 > [!Important]
 > Currently there is no convenient way to change key bindings.
-> If you want to change them, please rewrite `DefaultConfig *config.Config` in the `config/config.go`.
+> If you want to change them, please rewrite var `DefaultControl` in `config/config.go`.
 
 ### Debug window
 
