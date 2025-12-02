@@ -1,4 +1,4 @@
-# テスト実施状況
+# Test status
 
 - S : success
 - F : fail
@@ -575,3 +575,4 @@
     only blue colors are displayed
   - full_palette: F
     only blue colors are displayed
+
