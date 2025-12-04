@@ -9,11 +9,12 @@ import (
 
 // MARK: GameWindow の定義
 type GameWindow struct {
-	window   *sdl.Window
-	renderer *sdl.Renderer
-	texture  *sdl.Texture
-	canvas   *ppu.Canvas
-	onClose  func()
+	window       *sdl.Window
+	renderer     *sdl.Renderer
+	texture      *sdl.Texture
+	canvas       *ppu.Canvas
+	isFullscreen bool
+	onClose      func()
 }
 
 // MARK: GameWindow の作成メソッド
@@ -63,6 +64,18 @@ func (g *GameWindow) HandleEvent(event sdl.Event) {
 	case *sdl.WindowEvent:
 		if e.Event == sdl.WINDOWEVENT_CLOSE && g.onClose != nil {
 			g.onClose()
+		}
+	case *sdl.KeyboardEvent:
+		if e.State == sdl.PRESSED {
+			switch e.Keysym.Sym {
+			case sdl.K_BACKSLASH:
+				if g.isFullscreen {
+					g.window.SetFullscreen(sdl.WINDOW_RESIZABLE)
+				} else {
+					g.window.SetFullscreen(sdl.WINDOW_FULLSCREEN)
+				}
+				g.isFullscreen = !g.isFullscreen
+			}
 		}
 	}
 }

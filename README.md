@@ -52,6 +52,7 @@ cd src && go run . tests/example_rom.nes
 |                                                      | Key |
 | :--------------------------------------------------- | :-: |
 | Exit                                                 | ESC |
+| Toggle Fullscreen                                    | \   |
 | Show / Hide nametable viewer                         | F2  |
 | Show / Hide CHR ROM viewer                           | F3  |
 | Show / Hide audio visualizer                         | F4  |
