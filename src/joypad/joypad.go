@@ -12,32 +12,24 @@ const (
 	JOYPAD_BUTTON_RIGHT_POSITION
 )
 
-// Joy-Con (R) 向けボタンマッピング
-const (
-	JOYCON_R_BUTTON_X    uint8 = 0
-	JOYCON_R_BUTTON_A    uint8 = 1
-	JOYCON_R_BUTTON_Y    uint8 = 2
-	JOYCON_R_BUTTON_B    uint8 = 3
-	JOYCON_R_BUTTON_HOME uint8 = 5
-	JOYCON_R_BUTTON_PLUS uint8 = 6
-	JOYCON_R_BUTTON_R    uint8 = 16
-	JOYCON_R_BUTTON_ZR   uint8 = 16
-)
-
+// MARK: JoyPadButtonの定義
 type JoyPadButton uint8
 
+// MARK: JoyPadの定義
 type JoyPad struct {
 	strobe      bool
 	ButtonIndex uint8
 	State       uint8
 }
 
+// MARK: JoyPadの初期化メソッド
 func (j *JoyPad) Init() {
 	j.strobe = false
 	j.ButtonIndex = 0
 	j.State = 0
 }
 
+// MARK: JoyPadへの書き込み
 func (j *JoyPad) Write(data uint8) {
 	j.strobe = data&1 == 1
 	if j.strobe {
@@ -45,6 +37,7 @@ func (j *JoyPad) Write(data uint8) {
 	}
 }
 
+// MARK: JoyPadの読み取り
 func (j *JoyPad) Read() uint8 {
 	if j.ButtonIndex > 7 {
 		return 0x01
@@ -58,6 +51,7 @@ func (j *JoyPad) Read() uint8 {
 	return response
 }
 
+// MARK: ボタン押下状態のセット
 func (j *JoyPad) SetButtonPressed(buttonIndex JoyPadButton, pressed bool) {
 	if pressed {
 		j.State |= (1 << buttonIndex)
