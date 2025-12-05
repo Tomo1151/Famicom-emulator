@@ -89,11 +89,10 @@ func (c *CharacterWindow) HandleEvent(event sdl.Event) {
 
 // MARK: スケール設定メソッド
 func (c *CharacterWindow) setScale(s int) {
-	if s < 1 {
-		s = 1
-	}
-	if s > 8 {
-		s = 8
+	// 1 ~ 8 の間に設定
+	s = min(max(s, 1), 8)
+	if s == c.scale {
+		return
 	}
 	if s == c.scale {
 		return

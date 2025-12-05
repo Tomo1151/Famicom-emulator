@@ -76,11 +76,10 @@ func (aw *AudioWindow) HandleEvent(event sdl.Event) {
 
 // MARK: スケール設定メソッド
 func (aw *AudioWindow) setScale(s int) {
-	if s < 1 {
-		s = 1
-	}
-	if s > 8 {
-		s = 8
+	// 1 ~ 8 の間に設定
+	s = min(max(s, 1), 8)
+	if s == aw.scale {
+		return
 	}
 	if s == aw.scale {
 		return
@@ -157,10 +156,7 @@ func (aw *AudioWindow) Render() {
 			if width > 1 {
 				idxF = float64(x) * float64(sampleCount-1) / float64(width-1)
 			}
-			idx0 := int(math.Floor(idxF))
-			if idx0 < 0 {
-				idx0 = 0
-			}
+			idx0 := max(int(math.Floor(idxF)), 0)
 			if idx0 >= sampleCount {
 				idx0 = sampleCount - 1
 			}
