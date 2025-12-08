@@ -477,7 +477,6 @@ func (a *APU) Write3ch(address uint16, data uint8) {
 		)
 		a.channel3.lengthCounter.reload()
 		a.channel3.linearCounter.setReload()
-		a.channel3.phase = 0
 	}
 }
 
