@@ -38,6 +38,13 @@ func NewGameWindow(scale int, canvas *ppu.Canvas, onClose func()) (*GameWindow, 
 		return nil, err
 	}
 
+	// フルスクリーン時にアスペクト比を保つため，論理サイズを指定
+	if err := r.SetLogicalSize(int32(ppu.SCREEN_WIDTH), int32(ppu.SCREEN_HEIGHT)); err != nil {
+		r.Destroy()
+		w.Destroy()
+		return nil, err
+	}
+
 	t, err := r.CreateTexture(
 		sdl.PIXELFORMAT_RGB24,
 		sdl.TEXTUREACCESS_STREAMING,
@@ -75,7 +82,7 @@ func (g *GameWindow) HandleEvent(event sdl.Event) {
 					g.setScale(g.scale)
 				} else {
 					g.setScale(1)
-					g.window.SetFullscreen(sdl.WINDOW_FULLSCREEN)
+					g.window.SetFullscreen(sdl.WINDOW_FULLSCREEN_DESKTOP)
 				}
 				g.isFullscreen = !g.isFullscreen
 			}
