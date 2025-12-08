@@ -52,13 +52,14 @@ cd src && go run . tests/example_rom.nes
 |                                                      | Key |
 | :--------------------------------------------------- | :-: |
 | Exit                                                 | ESC |
+| Toggle Fullscreen                                    | F12 |
 | Show / Hide nametable viewer                         | F2  |
 | Show / Hide CHR ROM viewer                           | F3  |
 | Show / Hide audio visualizer                         | F4  |
 | Expand debug window                                  |  ↑  |
 | Shrink debug window                                  |  ↓  |
-| Enable / Disable APU log                             | F11 |
-| Enable / Disable CPU log (very processing intensive) | F12 |
+| Enable / Disable APU log                             | F10 |
+| Enable / Disable CPU log (very processing intensive) | F11 |
 | Mute / Unmute APU 1ch                                |  1  |
 | Mute / Unmute APU 2ch                                |  2  |
 | Mute / Unmute APU 3ch                                |  3  |

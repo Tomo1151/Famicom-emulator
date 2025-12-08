@@ -89,17 +89,12 @@ func (n *NameTableWindow) HandleEvent(event sdl.Event) {
 
 // MARK: スケール設定メソッド
 func (n *NameTableWindow) setScale(s int) {
-	if s < 1 {
-		s = 1
-	}
-	if s > 8 {
-		s = 8
-	}
+	// 1 ~ 8 の間に設定
+	s = min(max(s, 1), 8)
 	if s == n.scale {
 		return
 	}
 	n.scale = s
-	// Resize the window to match the new scale; texture stays the same size
 	if n.window != nil {
 		n.window.SetSize(int32(n.baseW*n.scale), int32(n.baseH*n.scale))
 	}

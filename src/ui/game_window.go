@@ -9,11 +9,13 @@ import (
 
 // MARK: GameWindow の定義
 type GameWindow struct {
-	window   *sdl.Window
-	renderer *sdl.Renderer
-	texture  *sdl.Texture
-	canvas   *ppu.Canvas
-	onClose  func()
+	window       *sdl.Window
+	renderer     *sdl.Renderer
+	texture      *sdl.Texture
+	canvas       *ppu.Canvas
+	isFullscreen bool
+	scale        int
+	onClose      func()
 }
 
 // MARK: GameWindow の作成メソッド
@@ -48,7 +50,7 @@ func NewGameWindow(scale int, canvas *ppu.Canvas, onClose func()) (*GameWindow, 
 		return nil, err
 	}
 
-	return &GameWindow{window: w, renderer: r, texture: t, canvas: canvas, onClose: onClose}, nil
+	return &GameWindow{window: w, renderer: r, texture: t, canvas: canvas, isFullscreen: false, scale: scale, onClose: onClose}, nil
 }
 
 // MARK: ウィンドウのID取得メソッド
@@ -64,6 +66,31 @@ func (g *GameWindow) HandleEvent(event sdl.Event) {
 		if e.Event == sdl.WINDOWEVENT_CLOSE && g.onClose != nil {
 			g.onClose()
 		}
+	case *sdl.KeyboardEvent:
+		if e.State == sdl.PRESSED {
+			switch e.Keysym.Sym {
+			case sdl.K_F12:
+				if g.isFullscreen {
+					g.window.SetFullscreen(0)
+					g.setScale(g.scale)
+				} else {
+					g.setScale(1)
+					g.window.SetFullscreen(sdl.WINDOW_FULLSCREEN)
+				}
+				g.isFullscreen = !g.isFullscreen
+			}
+		}
+	}
+}
+
+// MARK: スケール設定メソッド
+func (g *GameWindow) setScale(s int) {
+	// 1 ~ 8 の間に設定
+	s = min(max(s, 1), 8)
+
+	if g.window != nil {
+		g.window.SetSize(int32(ppu.SCREEN_WIDTH)*int32(s),
+			int32(ppu.SCREEN_HEIGHT)*int32(s))
 	}
 }
 

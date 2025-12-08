@@ -44,8 +44,10 @@ type Famicom struct {
 	controller1 InputState // 1Pの入力状態 (コントローラ)
 	controller2 InputState // 2Pの入力状態 (コントローラ)
 
-	gamepad1 sdl.JoystickID // SDLのコントローラID (1P)
-	gamepad2 sdl.JoystickID // SDLのコントローラID (2P)
+	gamepad1 sdl.JoystickID       // SDLのコントローラID (1P)
+	gamepad2 sdl.JoystickID       // SDLのコントローラID (2P)
+	adapter1 joypad.JoyPadAdapter // 1Pコントローラのアダプタ
+	adapter2 joypad.JoyPadAdapter // 2Pコントローラのアダプタ
 
 	config  *config.Config
 	windows *ui.WindowManager
@@ -60,14 +62,8 @@ func (f *Famicom) Init(cartridge cartridge.Cartridge, config *config.Config) {
 		log.Fatalf("Cartridge loading error: %v", err)
 	}
 
-	// 各コンポーネントの定義 / 接続
+	// 各コンポーネントの接続
 	f.config = config
-	f.cpu = cpu.CPU{}
-	f.ppu = ppu.PPU{}
-	f.apu = apu.APU{}
-	f.joypad1 = joypad.JoyPad{}
-	f.joypad2 = joypad.JoyPad{}
-	f.bus = bus.Bus{}
 	f.bus.ConnectComponents(
 		&f.ppu,
 		&f.apu,
@@ -76,12 +72,6 @@ func (f *Famicom) Init(cartridge cartridge.Cartridge, config *config.Config) {
 		&f.joypad2,
 		f.config,
 	)
-
-	// 入力データの定義
-	f.keyboard1 = InputState{}
-	f.keyboard2 = InputState{}
-	f.controller1 = InputState{}
-	f.controller2 = InputState{}
 }
 
 // MARK: Famicomの起動
@@ -107,6 +97,7 @@ func (f *Famicom) Start() {
 		if gamepad1 != nil {
 			f.gamepad1 = gamepad1.Joystick().InstanceID()
 			fmt.Println("Controller opened for 1P:", gamepad1.Name())
+			f.adapter1.Init(gamepad1.Name())
 			defer gamepad1.Close()
 		}
 	}
@@ -114,6 +105,7 @@ func (f *Famicom) Start() {
 		gamepad2 = sdl.GameControllerOpen(1)
 		if gamepad2 != nil {
 			f.gamepad2 = gamepad2.Joystick().InstanceID()
+			f.adapter2.Init(gamepad2.Name())
 			fmt.Println("Controller opened for 2P:", gamepad2.Name())
 			defer gamepad2.Close()
 		}
@@ -203,9 +195,9 @@ func (f *Famicom) Start() {
 								log.Printf("failed to toggle audio window: %v", err)
 							}
 						}
-					case sdl.K_F11:
+					case sdl.K_F10:
 						f.apu.ToggleLog()
-					case sdl.K_F12:
+					case sdl.K_F11:
 						f.cpu.ToggleLog()
 					case sdl.K_1:
 						f.apu.ToggleMute1ch()
@@ -236,12 +228,12 @@ func (f *Famicom) Start() {
 				}
 			}
 
+			// JoyPad状態の更新
+			f.updateJoyPad(&f.joypad1, &f.keyboard1, &f.controller1)
+			f.updateJoyPad(&f.joypad2, &f.keyboard2, &f.controller2)
+
 			f.windows.HandleEvent(event)
 		}
-
-		// JoyPad状態の更新
-		f.updateJoyPad(&f.joypad1, &f.keyboard1, &f.controller1)
-		f.updateJoyPad(&f.joypad2, &f.keyboard2, &f.controller2)
 
 		// 描画（PPU フレームに合わせて）
 		f.windows.RenderAll()
@@ -309,15 +301,33 @@ func (f *Famicom) handleKeyPress(e *sdl.KeyboardEvent, c1 *InputState, c2 *Input
 
 // MARK: コントローラーのボタン状態を検知するメソッド
 func (f *Famicom) handleButtonPress(e *sdl.ControllerButtonEvent, c *InputState) {
+	var adapter joypad.JoyPadAdapter
+	switch e.Which {
+	case f.gamepad1:
+		adapter = f.adapter1
+	case f.gamepad2:
+		adapter = f.adapter2
+	default:
+		return
+	}
+
 	pressed := e.State == sdl.PRESSED
 	switch e.Button {
-	case joypad.JOYCON_R_BUTTON_A, joypad.JOYCON_R_BUTTON_X:
+	case adapter.ButtonA():
 		c.A = pressed
-	case joypad.JOYCON_R_BUTTON_B, joypad.JOYCON_R_BUTTON_Y:
+	case adapter.ButtonB():
 		c.B = pressed
-	case joypad.JOYCON_R_BUTTON_PLUS:
+	case adapter.ButtonUp():
+		c.Up = pressed
+	case adapter.ButtonDown():
+		c.Down = pressed
+	case adapter.ButtonRight():
+		c.Right = pressed
+	case adapter.ButtonLeft():
+		c.Left = pressed
+	case adapter.ButtonStart():
 		c.Start = pressed
-	case joypad.JOYCON_R_BUTTON_HOME:
+	case adapter.ButtonSelect():
 		c.Select = pressed
 	}
 }
