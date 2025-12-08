@@ -107,20 +107,21 @@ func (swr *SquareWaveRegister) write(address uint16, data uint8) {
 }
 
 // MARK: レジスタからデューティ比を取得するメソッド
-func (swr *SquareWaveRegister) Duty() float32 {
+func (swr *SquareWaveRegister) Duty() uint8 {
 	// 00: 12.5%, 01: 25.0%, 10: 50.0%, 11: 75.0%
-	switch swr.duty {
-	case 0b00:
-		return 0.125
-	case 0b01:
-		return 0.25
-	case 0b10:
-		return 0.50
-	case 0b11:
-		return 0.75
-	default:
-		return 0.0
-	}
+	return swr.duty
+	// switch swr.duty {
+	// case 0b00:
+	// 	return 0.125
+	// case 0b01:
+	// 	return 0.25
+	// case 0b10:
+	// 	return 0.50
+	// case 0b11:
+	// 	return 0.75
+	// default:
+	// 	return 0.0
+	// }
 }
 
 // MARK: レジスタからボリュームを取得するメソッド
