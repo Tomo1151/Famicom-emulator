@@ -211,9 +211,9 @@ func (a *APU) Tick(cycles uint) {
 	if a.status.is4chEnabled() {
 		currentLevel4 = a.channel4.output(cycles)
 	}
-	if a.status.is5chEnabled() {
-		currentLevel5 = a.channel5.output()
-	}
+
+	// 5chは書き込み以外でレベルが変化しないため，ミュートに関係なく出力値を拾う
+	currentLevel5 = a.channel5.output()
 
 	// 前回レベルとの差分を計算
 	delta1 := currentLevel1 - a.prevLevel1
