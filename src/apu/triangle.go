@@ -14,7 +14,8 @@ type TriangleWaveChannel struct {
 	lengthCounter LengthCounter
 	linearCounter LinearCounter
 	frequency     uint16
-	phase         float32
+	timer         float32
+	sequenceIndex int
 	buffer        BlipBuffer
 }
 
@@ -27,22 +28,26 @@ func (twc *TriangleWaveChannel) Init(log bool) {
 	twc.linearCounter = LinearCounter{}
 	twc.linearCounter.Init()
 	twc.buffer.Init(log)
+	twc.timer = 0
+	twc.sequenceIndex = 0
 }
 
 // MARK: 三角波チャンネルの出力メソッド
 func (twc *TriangleWaveChannel) output(cycles uint) float32 {
+	// ミュート状態でも現在の値を出力し続ける（位相は進めない）
 	if twc.lengthCounter.isMuted() || twc.linearCounter.isMuted() || twc.frequency < 2 {
-		return 0.0
+		return float32(triangleSequence[twc.sequenceIndex])
 	}
 
-	// タイマー値から現在のシーケンス位置を計算
-	period := (twc.frequency + 1)
-	twc.phase += float32(cycles)
+	// タイマーを進める
+	period := float32(twc.frequency + 1)
+	twc.timer -= float32(cycles)
+	for twc.timer <= 0 {
+		twc.timer += period
+		twc.sequenceIndex = (twc.sequenceIndex + 1) % 32
+	}
 
-	// 32ステップのシーケンサ
-	step := uint(twc.phase/float32(period)) % 32
-
-	return float32(triangleSequence[step])
+	return float32(triangleSequence[twc.sequenceIndex])
 }
 
 // MARK: デバッグ出力切り替え

@@ -12,33 +12,35 @@ var (
 
 // MARK: エンベロープの定義
 type Envelope struct {
-	data EnvelopeData
-
 	counter uint8
 	divider uint8
+	rate    uint8
+	enabled bool
+	loop    bool
 }
 
 // MARK: エンベロープの初期化メソッド
 func (e *Envelope) Init() {
-	e.data = EnvelopeData{}
-	e.data.Init(0, false, false)
 	e.counter = 0x0F
-	e.divider = e.data.rate + 1
+	e.rate = 0
+	e.divider = e.rate + 1
+	e.loop = false
+	e.enabled = false
 }
 
 // MARK: エンベロープからボリュームを取得するメソッド
 func (e *Envelope) Volume() float32 {
-	if e.data.enabled {
+	if e.enabled {
 		return float32(e.counter)
 	} else {
-		return float32(e.data.rate)
+		return float32(e.rate)
 	}
 }
 
 // MARK: エンベロープをリセットするメソッド
 func (e *Envelope) reset() {
 	e.counter = 0x0F
-	e.divider = e.data.rate + 1
+	e.divider = e.rate + 1
 }
 
 // MARK: エンベロープのサイクルを進めるメソッド
@@ -53,51 +55,42 @@ func (e *Envelope) tick() {
 	if e.counter != 0 {
 		e.counter--
 	} else {
-		if e.data.loop {
+		if e.loop {
 			e.reset()
 		}
 	}
-	e.divider = e.data.rate + 1
+	e.divider = e.rate + 1
 }
 
 // MARK: エンベロープの更新メソッド
 func (e *Envelope) update(rate uint8, loop bool, enabled bool) {
-	e.data.rate = rate
-	e.data.loop = loop
-	e.data.enabled = enabled
-}
-
-// MARK: エンベロープの可変部分
-type EnvelopeData struct {
-	rate    uint8
-	enabled bool
-	loop    bool
-}
-
-// MARK: エンベロープの可変部分の初期化メソッド
-func (ed *EnvelopeData) Init(rate uint8, enabled bool, loop bool) {
-	ed.rate = rate
-	ed.enabled = enabled
-	ed.loop = loop
+	e.rate = rate
+	e.loop = loop
+	e.enabled = enabled
 }
 
 // MARK: スイープの定義
 type SweepUnit struct {
-	data      SweepUnitData
-	frequency uint16
-	counter   uint8
-	mute      bool
-	reload    bool
+	frequency  uint16
+	counter    uint8
+	mute       bool
+	reload     bool
+	shift      uint8
+	direction  uint8
+	timerCount uint8
+	enabled    bool
 }
 
 // MARK: スイープの初期化メソッド
 func (su *SweepUnit) Init() {
-	su.data = SweepUnitData{}
-	su.data.Init(0, 0, 0, false)
 	su.frequency = 0
 	su.counter = 0
 	su.mute = true
 	su.reload = false
+	su.shift = 0
+	su.direction = 0
+	su.timerCount = 0
+	su.enabled = false
 }
 
 // MARK: スイープのリセット
@@ -114,10 +107,10 @@ func (su *SweepUnit) isMuted() bool {
 
 // MARK: スイープユニットの更新メソッド
 func (su *SweepUnit) update(shift uint8, direction uint8, period uint8, enabled bool) {
-	su.data.shift = shift
-	su.data.direction = direction
-	su.data.timerCount = period
-	su.data.enabled = enabled
+	su.shift = shift
+	su.direction = direction
+	su.timerCount = period
+	su.enabled = enabled
 	su.reload = true
 }
 
@@ -128,7 +121,7 @@ func (su *SweepUnit) tick(lengthCounter *LengthCounter, isNot bool) {
 	}
 
 	if su.reload || su.counter == 0 {
-		su.counter = su.data.timerCount + 1
+		su.counter = su.timerCount + 1
 		if su.reload {
 			su.reload = false
 		}
@@ -136,14 +129,14 @@ func (su *SweepUnit) tick(lengthCounter *LengthCounter, isNot bool) {
 		return
 	}
 
-	if !su.data.enabled || su.data.shift == 0 || lengthCounter.isMuted() || su.frequency < 8 {
+	if !su.enabled || su.shift == 0 || lengthCounter.isMuted() || su.frequency < 8 {
 		return
 	}
 
 	var target uint16
-	diff := su.frequency >> uint16(su.data.shift)
+	diff := su.frequency >> uint16(su.shift)
 
-	if su.data.direction == 0 {
+	if su.direction == 0 {
 		target = su.frequency + diff
 	} else {
 		if isNot {
@@ -162,46 +155,31 @@ func (su *SweepUnit) tick(lengthCounter *LengthCounter, isNot bool) {
 	su.mute = false
 }
 
-// MARK: スイープの可変部分
-type SweepUnitData struct {
-	shift      uint8
-	direction  uint8
-	timerCount uint8
-	enabled    bool
-}
-
-// MARK: スイープの可変部分の初期化メソッド
-func (sud *SweepUnitData) Init(shift uint8, direction uint8, timerCount uint8, enabled bool) {
-	sud.shift = shift
-	sud.direction = direction
-	sud.timerCount = timerCount
-	sud.enabled = enabled
-}
-
 // MARK: 線形カウンタの定義
 type LinearCounter struct {
-	data    LinearCounterData
 	counter uint8
 	reload  bool
+	count   uint8
+	enabled bool
 }
 
 // MARK: 線形カウンタの初期化メソッド
 func (lc *LinearCounter) Init() {
-	lc.data = LinearCounterData{}
-	lc.data.Init(0, false)
 	lc.counter = 0
 	lc.reload = false
+	lc.count = 0
+	lc.enabled = false
 }
 
 // MARK: 線形カウンタのサイクルを進めるメソッド
 func (lc *LinearCounter) tick() {
 	if lc.reload {
-		lc.counter = lc.data.count
+		lc.counter = lc.count
 	} else if lc.counter > 0 {
 		lc.counter--
 	}
 
-	if !lc.data.enabled {
+	if !lc.enabled {
 		lc.reload = false
 	}
 }
@@ -218,33 +196,22 @@ func (lc *LinearCounter) setReload() {
 
 // MARK: 線型カウンタの更新メソッド
 func (lc *LinearCounter) update(count uint8, enabled bool) {
-	lc.data.count = count
-	lc.data.enabled = enabled
-}
-
-// MARK: 線形カウンタの可変部分
-type LinearCounterData struct {
-	count   uint8
-	enabled bool
-}
-
-// MARK: 線形カウンタの可変部分の初期化メソッド
-func (lcd *LinearCounterData) Init(count uint8, enabled bool) {
-	lcd.count = count
-	lcd.enabled = enabled
+	lc.count = count
+	lc.enabled = enabled
 }
 
 // MARK: 長さカウンタの定義
 type LengthCounter struct {
-	data    LengthCounterData
 	counter uint8
+	count   uint8
+	enabled bool
 }
 
 // MARK: 長さカウンタの初期化メソッド
 func (lc *LengthCounter) Init() {
-	lc.data = LengthCounterData{}
-	lc.data.Init(0, false)
 	lc.counter = 0
+	lc.count = 0
+	lc.enabled = false
 }
 
 // MARK: 長さカウンタが終了したかを取得するメソッド
@@ -254,34 +221,22 @@ func (lc *LengthCounter) isMuted() bool {
 
 // MARK: 長さカウンタをリセットするメソッド
 func (lc *LengthCounter) reload() {
-	lc.counter = lc.data.count
+	lc.counter = lc.count
 }
 
 // MARK: 長さカウンタの更新メソッド
 func (lc *LengthCounter) update(count uint8, enabled bool) {
-	lc.data.count = LENGTH_COUNTER_TABLE[count]
-	lc.data.enabled = enabled
+	lc.count = LENGTH_COUNTER_TABLE[count]
+	lc.enabled = enabled
 }
 
 // MARK: 長さカウンタのサイクルを進めるメソッド
 func (lc *LengthCounter) tick() {
-	if lc.data.enabled {
+	if lc.enabled {
 		return
 	}
 
 	if lc.counter > 0 {
 		lc.counter--
 	}
-}
-
-// MARK: 長さカウンタの可変部分
-type LengthCounterData struct {
-	count   uint8
-	enabled bool
-}
-
-// MARK: 長さカウンタの可変部分の初期化メソッド
-func (lcd *LengthCounterData) Init(count uint8, enabled bool) {
-	lcd.count = LENGTH_COUNTER_TABLE[count]
-	lcd.enabled = enabled
 }
