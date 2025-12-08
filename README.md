@@ -49,22 +49,22 @@ cd src && go run . tests/example_rom.nes
 
 ### Debug window
 
-|                                                      | Key |
-| :--------------------------------------------------- | :-: |
-| Exit                                                 | ESC |
-| Toggle Fullscreen                                    | F12 |
-| Show / Hide nametable viewer                         | F2  |
-| Show / Hide CHR ROM viewer                           | F3  |
-| Show / Hide audio visualizer                         | F4  |
-| Expand debug window                                  |  ↑  |
-| Shrink debug window                                  |  ↓  |
-| Enable / Disable APU log                             | F10 |
-| Enable / Disable CPU log (very processing intensive) | F11 |
-| Mute / Unmute APU 1ch                                |  1  |
-| Mute / Unmute APU 2ch                                |  2  |
-| Mute / Unmute APU 3ch                                |  3  |
-| Mute / Unmute APU 4ch                                |  4  |
-| Mute / Unmute APU 5ch                                |  5  |
+|                              | Key |
+| :--------------------------- | :-: |
+| Exit                         | ESC |
+| Toggle Fullscreen            | F12 |
+| Show / Hide nametable viewer | F2  |
+| Show / Hide CHR ROM viewer   | F3  |
+| Show / Hide audio visualizer | F4  |
+| Expand debug window          |  ↑  |
+| Shrink debug window          |  ↓  |
+| Enable / Disable APU log     | F10 |
+| Enable / Disable CPU log     | F11 |
+| Mute / Unmute APU 1ch        |  1  |
+| Mute / Unmute APU 2ch        |  2  |
+| Mute / Unmute APU 3ch        |  3  |
+| Mute / Unmute APU 4ch        |  4  |
+| Mute / Unmute APU 5ch        |  5  |
 
 ## Dependencies
 
@@ -120,12 +120,12 @@ This program implements the following components (some of which may not be compl
   - [x] noise wave Channel (4ch)
   - [x] DMC (5ch)
   - [ ] expansion audio
-  - [ ] efficient tick cycle
-    - the current implementation has moderately frequent buffer underruns
 - [x] Bus
 - [x] JoyPad
   - [x] GameController support via SDL2 Gamepad
   - [x] 2P joypad emulation
+  - [x] Joy-Con (R) support
+  - [x] Nintendo HVC Controller (1/2) support
 
 ## Mappers
 
