@@ -1,13 +1,25 @@
 package apu
 
+// MARK: 変数定義
+var (
+	SQUARE_DUTY_TABLE = [4][8]uint8{
+		{0, 1, 0, 0, 0, 0, 0, 0}, // 12.5%
+		{0, 1, 1, 0, 0, 0, 0, 0}, // 25.0%
+		{0, 1, 1, 1, 1, 0, 0, 0}, // 50.0%
+		{1, 0, 0, 1, 1, 1, 1, 1}, // 75.0%
+	}
+)
+
 // MARK: 矩形波チャンネルの定義
 type SquareWaveChannel struct {
 	register      SquareWaveRegister // @FIXME レジスタはAPUに持たせ、ここは参照にする
 	envelope      Envelope
 	lengthCounter LengthCounter
 	sweepUnit     SweepUnit
-	duty          float32
-	phase         float32
+	duty          uint8
+	timerReload   uint16
+	timer         uint16
+	sequencer     uint8
 	buffer        BlipBuffer
 }
 
@@ -28,21 +40,32 @@ func (swc *SquareWaveChannel) Init(log bool) {
 func (swc *SquareWaveChannel) output(cycles uint) float32 {
 	frequency := swc.sweepUnit.frequency
 	if frequency < 8 || frequency > 0x7FF || swc.lengthCounter.isMuted() || swc.sweepUnit.isMuted() {
+		return 0.0
+	}
+
+	swc.timerReload = (uint16(frequency) + 1) * 2
+	if swc.timer == 0 {
+		swc.timer = swc.timerReload
+	}
+
+	cyclesLeft := uint(cycles)
+	for cyclesLeft > 0 {
+		if swc.timer > uint16(cyclesLeft) {
+			swc.timer -= uint16(cyclesLeft)
+			break
+		}
+		cyclesLeft -= uint(swc.timer)
+		swc.timer = swc.timerReload
+		swc.sequencer = (swc.sequencer + 1) & 7
+	}
+
+	if frequency < 8 || frequency > 0x7FF || swc.lengthCounter.isMuted() || swc.sweepUnit.isMuted() {
 		// ミュートの時は0.0を返す
 		return 0.0
 	}
 
-	// 進める位相 (進んだクロック数 / 1周期に必要なクロック数)
-	period := float32(16.0 * (frequency + 1))
-	swc.phase += float32(cycles) / period
-
-	if swc.phase >= 1.0 {
-		// 0.0 ~ 1.0 の範囲に制限
-		swc.phase -= 1.0
-	}
-
-	// パルスがHIGHの時だけエンベロープの音量を返す
-	if swc.phase <= swc.duty {
+	// デューティテーブルを参照
+	if SQUARE_DUTY_TABLE[swc.duty][swc.sequencer] == 1 {
 		return swc.envelope.Volume()
 	} else {
 		return 0.0

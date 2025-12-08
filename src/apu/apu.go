@@ -199,12 +199,12 @@ func (a *APU) Tick(cycles uint) {
 
 	// 現在のレベルを計算
 	var currentLevel1, currentLevel2, currentLevel3, currentLevel4, currentLevel5 float32
-	if a.status.is1chEnabled() {
-		currentLevel1 = a.channel1.output(cycles)
-	}
-	if a.status.is2chEnabled() {
-		currentLevel2 = a.channel2.output(cycles)
-	}
+	// if a.status.is1chEnabled() {
+	currentLevel1 = a.channel1.output(cycles)
+	// }
+	// if a.status.is2chEnabled() {
+	currentLevel2 = a.channel2.output(cycles)
+	// }
 	if a.status.is3chEnabled() {
 		currentLevel3 = a.channel3.output(cycles)
 	}
@@ -369,7 +369,9 @@ func (a *APU) Write1ch(address uint16, data uint8) {
 			a.channel1.lengthCounter.reload()
 			a.channel1.envelope.reset()
 			a.channel1.sweepUnit.reset()
-			a.channel1.phase = 0
+			a.channel1.sequencer = 0
+			a.channel1.timerReload = (uint16(a.channel1.register.frequency) + 1) * 2
+			a.channel1.timer = a.channel1.timerReload
 		}
 	}
 }
@@ -434,7 +436,9 @@ func (a *APU) Write2ch(address uint16, data uint8) {
 			a.channel2.lengthCounter.reload()
 			a.channel2.envelope.reset()
 			a.channel2.sweepUnit.reset()
-			a.channel2.phase = 0
+			a.channel2.sequencer = 0
+			a.channel2.timerReload = (uint16(a.channel2.register.frequency) + 1) * 2
+			a.channel2.timer = a.channel2.timerReload
 		}
 	}
 }
@@ -543,8 +547,8 @@ func (a *APU) Write5ch(address uint16, data uint8) {
 				6   l    ループフラグ
 				3-0 f    周期インデックス
 		*/
-		a.channel5.timerPeriod = dmcFrequencyTable[a.channel5.register.frequencyIndex]
-		a.channel5.timerValue = a.channel5.timerPeriod
+		a.channel5.timerReload = dmcFrequencyTable[a.channel5.register.frequencyIndex]
+		a.channel5.timer = a.channel5.timerReload
 	case 0x4011:
 		/*
 			$4011    -ddd dddd
