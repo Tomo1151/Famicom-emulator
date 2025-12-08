@@ -21,8 +21,8 @@ type DMCWaveChannel struct {
 	deltaCounter uint8 // 7bit DAC (0-127)
 
 	// タイマー
-	timerPeriod uint16
-	timerValue  uint16
+	timerReload uint16
+	timer       uint16
 
 	// サンプル処理
 	byteCount   uint16
@@ -46,19 +46,19 @@ func (dwc *DMCWaveChannel) Init(reader CpuBusReader, log bool) {
 
 // MARK: DMCのタイマーを進めるメソッド
 func (dwc *DMCWaveChannel) tick(cycles uint) {
-	if dwc.timerValue == 0 || !dwc.enabled {
+	if dwc.timer == 0 || !dwc.enabled {
 		return
 	}
 
 	// タイマーが0になるまで待機
-	if dwc.timerValue <= uint16(cycles) {
-		dwc.timerValue = 0
+	if dwc.timer <= uint16(cycles) {
+		dwc.timer = 0
 	} else {
-		dwc.timerValue -= uint16(cycles)
+		dwc.timer -= uint16(cycles)
 		return
 	}
 
-	dwc.timerValue = dwc.timerPeriod
+	dwc.timer = dwc.timerReload
 	if dwc.bitsLeft == 0 {
 		// 次のサンプルをフェッチ
 		if dwc.bytesLeft > 0 {
@@ -121,7 +121,7 @@ func (dwc *DMCWaveChannel) setEnabled(enabled bool) {
 		// 有効化されたときに再生が終わっていれば再開
 		if dwc.bytesLeft == 0 {
 			dwc.restart()
-			dwc.timerValue = dwc.timerPeriod
+			dwc.timer = dwc.timerReload
 		}
 	}
 }
