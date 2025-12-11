@@ -144,6 +144,7 @@ func (c *CPU) interrupt(interrupt Interrupt) {
 // MARK: リセット
 func (c *CPU) Reset() {
 	// @TODO 要仕様調査
+	fmt.Println("[System] Reset requested")
 	c.Init(c.bus, c.log)
 	c.bus.Reset()
 }
