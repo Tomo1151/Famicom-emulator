@@ -97,6 +97,17 @@ func (b *Bus) MapperIRQ() bool {
 	return b.cartridge.Mapper().IRQ()
 }
 
+// MARK: リセット
+func (b *Bus) Reset() {
+	b.Shutdown()
+	b.apu.Reset()
+
+	// RAMの初期化
+	for i := range b.wram {
+		b.wram[i] = 0x00
+	}
+}
+
 // MARK: 終了処理
 func (b *Bus) Shutdown() {
 	b.cartridge.Mapper().Save()

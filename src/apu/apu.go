@@ -669,6 +669,35 @@ func (a *APU) clockFrameSequencer() {
 	}
 }
 
+// MARK: リセット
+func (a *APU) Reset() {
+	a.WriteStatus(0x00)
+	a.frameCounter.Init()
+	a.frameCounter.DisableIRQ()
+	a.status.Init()
+
+	a.channel1.Init(a.config.APU.LOG_ENABLED)
+	a.channel2.Init(a.config.APU.LOG_ENABLED)
+	a.channel3.Init(a.config.APU.LOG_ENABLED)
+	a.channel4.Init(a.config.APU.LOG_ENABLED)
+	a.channel5.Init(a.cpuRead, a.config.APU.LOG_ENABLED)
+
+	a.channel1.buffer.Sync(0.0, a.sampleClock)
+	a.channel2.buffer.Sync(0.0, a.sampleClock)
+	a.channel3.buffer.Sync(0.0, a.sampleClock)
+	a.channel4.buffer.Sync(0.0, a.sampleClock)
+	a.channel5.buffer.Sync(0.0, a.sampleClock)
+
+	a.prevLevel1 = 0.0
+	a.prevLevel2 = 0.0
+	a.prevLevel3 = 0.0
+	a.prevLevel4 = 0.0
+	a.prevLevel5 = 0.0
+
+	a.cycles = 0
+	a.step = 0
+}
+
 // MARK: デバッグ用ログ出力切り替え
 func (a *APU) ToggleLog() {
 	if a.config.APU.LOG_ENABLED {
