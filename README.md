@@ -60,6 +60,7 @@ cd src && go run . tests/example_rom.nes
 | Shrink debug window                                  |  ↓  |
 | Enable / Disable APU log                             | F10 |
 | Enable / Disable CPU log (very processing intensive) | F11 |
+| Reset                                                |  Y  |
 | Mute / Unmute APU 1ch                                |  1  |
 | Mute / Unmute APU 2ch                                |  2  |
 | Mute / Unmute APU 3ch                                |  3  |

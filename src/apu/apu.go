@@ -669,6 +669,11 @@ func (a *APU) clockFrameSequencer() {
 	}
 }
 
+// MARK: リセット
+func (a *APU) Reset() {
+	a.frameCounter.DisableIRQ()
+}
+
 // MARK: デバッグ用ログ出力切り替え
 func (a *APU) ToggleLog() {
 	if a.config.APU.LOG_ENABLED {

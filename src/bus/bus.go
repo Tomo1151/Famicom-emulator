@@ -97,6 +97,12 @@ func (b *Bus) MapperIRQ() bool {
 	return b.cartridge.Mapper().IRQ()
 }
 
+// MARK: リセット
+func (b *Bus) Reset() {
+	b.Shutdown()
+	b.apu.Reset()
+}
+
 // MARK: 終了処理
 func (b *Bus) Shutdown() {
 	b.cartridge.Mapper().Save()

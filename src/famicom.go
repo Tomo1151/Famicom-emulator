@@ -199,6 +199,8 @@ func (f *Famicom) Start() {
 						f.apu.ToggleLog()
 					case sdl.K_F11:
 						f.cpu.ToggleLog()
+					case sdl.K_y:
+						f.cpu.Reset()
 					case sdl.K_1:
 						f.apu.ToggleMute1ch()
 					case sdl.K_2:

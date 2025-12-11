@@ -141,6 +141,13 @@ func (c *CPU) interrupt(interrupt Interrupt) {
 	c.registers.PC = c.ReadWordFrom(interrupt.VectorAddress) // 割り込みベクタ
 }
 
+// MARK: リセット
+func (c *CPU) Reset() {
+	// @TODO 要仕様調査
+	c.Init(c.bus, c.log)
+	c.bus.Reset()
+}
+
 // MARK: ワーキングメモリの参照 (1byte)
 func (c *CPU) ReadByteFrom(address uint16) uint8 {
 	return c.bus.ReadByteFrom(address)
