@@ -132,9 +132,7 @@ func (b *Bus) Tick(cycles uint) {
 	}
 
 	// APUと同期
-	for range cycles {
-		b.apu.Tick(1)
-	}
+	b.apu.Tick(cycles)
 
 	nmiAfter := b.ppu.CheckNMI()
 	if frameEnd || (!nmiBefore && nmiAfter) {
