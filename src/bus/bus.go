@@ -168,19 +168,19 @@ func (b *Bus) ReadByteFrom(address uint16) uint8 {
 		ptr := address & 0b00000111_11111111 // 11bitにマスク
 		return b.wram[ptr]
 	case address == 0x2000: // PPU_CTRL
-		return b.ppu.ReadPPUControl()
+		return b.ppu.ReadOpenBus()
 	case address == 0x2001: // PPU_MASK
-		return b.ppu.ReadPPUMask()
+		return b.ppu.ReadOpenBus()
 	case address == 0x2002: // PPU_STATUS
 		return b.ppu.ReadPPUStatus()
 	case address == 0x2003: // OAM_ADDR
-		panic("Error: attempt to read from OAM Address register")
+		return b.ppu.ReadOpenBus()
 	case address == 0x2004: // OAM_DATA
 		return b.ppu.ReadOAMData() // OAMはDMA転送を使用するため，ほとんど使わないはず?
 	case address == 0x2005: // PPU_SCROLL
-		panic("Error: attempt to read from PPU Scroll register")
+		return b.ppu.ReadOpenBus()
 	case address == 0x2006: // PPU_ADDR
-		panic("Error: attempt to read from PPU Address register")
+		return b.ppu.ReadOpenBus()
 	case address == 0x2007: // PPU_DATA
 		return b.ppu.ReadVRAM()
 	case 0x2008 <= address && address <= PPU_REG_END: // PPUレジスタのミラーリング
@@ -188,7 +188,8 @@ func (b *Bus) ReadByteFrom(address uint16) uint8 {
 		ptr := 0x2000 | (address & 0x07)
 		return b.ReadByteFrom(ptr)
 	case address == 0x4014: // OAM_DATA (DMA)
-		panic("Error: attempt to read from OAM Data register")
+		// @NOTE 本来はCPU側のOpenBusを返すべき
+		return 0x00
 	case address == 0x4015: // APU
 		return b.apu.ReadStatus()
 	case address == 0x4016: // JOYPAD (1P)
@@ -251,7 +252,7 @@ func (b *Bus) WriteByteAt(address uint16, data uint8) {
 	case address == 0x2001: // PPU_MASK
 		b.ppu.WriteToPPUMaskRegister(data)
 	case address == 0x2002: // PPU_STATUS
-		panic("Error: attempt to write to PPU Status register")
+		b.ppu.WriteToPPUStatusRegister(data)
 	case address == 0x2003: // OAM_ADDR
 		b.ppu.WriteToOAMAddressRegister(data)
 	case address == 0x2004: // OAM_DATA

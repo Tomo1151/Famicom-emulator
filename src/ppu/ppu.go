@@ -7,9 +7,10 @@ import (
 
 // MARK: 定数定義
 const (
-	VRAM_SIZE          uint16 = 2 * 1024 // 2kB
-	PALETTE_TABLE_SIZE uint8  = 32
-	OAM_DATA_SIZE      uint16 = 64 * 4
+	VRAM_SIZE             uint16 = 2 * 1024 // 2kB
+	PALETTE_TABLE_SIZE    uint8  = 32
+	OAM_DATA_SIZE         uint16 = 64 * 4
+	OPEN_BUS_DECAY_CYCLES        = 3_000_000
 )
 
 const (
@@ -57,7 +58,9 @@ type PPU struct {
 
 	nmi bool
 
-	lineBuffer [SCREEN_WIDTH]Pixel // 次のスキャンラインのバッファ
+	lineBuffer        [SCREEN_WIDTH]Pixel // 次のスキャンラインのバッファ
+	openBus           uint8
+	openBusDecayTimer int // OpenBus減衰のタイマー
 
 	// デバッグウィンドウ用のスナップショット
 	mapperSnapshots []mappers.Mapper
@@ -97,6 +100,7 @@ func (p *PPU) Init(mapper mappers.Mapper) {
 	p.scanline = 0
 	p.cycles = 0
 	p.internalDataBuffer = 0x00
+	p.openBus = 0x00
 
 	p.nmi = false
 
@@ -123,6 +127,9 @@ func (p *PPU) WriteToPPUControlRegister(value uint8) {
 	// tレジスタのネームテーブルビットを更新
 	p.t.updateNameTable(value)
 
+	// オープンバスに影響を与える
+	p.refreshOpenBus(value)
+
 	// VBlank中にGenerateNMIが立つタイミングでNMIを発生させる
 	if !prev && p.control.GenerateNMI() && p.status.VBlank() {
 		p.nmi = true
@@ -132,11 +139,18 @@ func (p *PPU) WriteToPPUControlRegister(value uint8) {
 // MARK: PPUマスクレジスタ($2001)への書き込み
 func (p *PPU) WriteToPPUMaskRegister(value uint8) {
 	p.mask.update(value)
+	p.refreshOpenBus(value)
+}
+
+// MARK: PPUステータスレジスタ($2002)への書き込み
+func (p *PPU) WriteToPPUStatusRegister(value uint8) {
+	p.refreshOpenBus(value)
 }
 
 // MARK: OAM ADDR($2003) への書き込み
 func (p *PPU) WriteToOAMAddressRegister(addr uint8) {
 	p.oamAddress = addr
+	p.refreshOpenBus(addr)
 }
 
 // MARK: PPU内部レジスタへ(T/V/X/W)の書き込み
@@ -155,12 +169,14 @@ func (p *PPU) WriteToPPUInternalRegister(address uint16, data uint8) {
 			p.t.copyAllBitsTo(&p.v)
 		}
 	}
+	p.refreshOpenBus(data)
 }
 
 // MARK: OAM DATA($4014) への書き込み
 func (p *PPU) WriteToOAMDataRegister(data uint8) {
 	p.oam[p.oamAddress] = data
 	p.oamAddress++
+	p.refreshOpenBus(data)
 }
 
 // MARK: DMA転送を行う ([256]u8 の配列のアドレスを受け取る)
@@ -191,6 +207,7 @@ func (p *PPU) WriteVRAM(value uint8) {
 
 	address := p.v.ToByte()
 	p.incrementVRAMAddress()
+	p.refreshOpenBus(value)
 
 	// $0000-$3FFF のミラーリング
 	if address > 0x3FFF {
@@ -237,13 +254,34 @@ func (p *PPU) ReadPPUStatus() uint8 {
 	status := p.status.ToByte()
 	p.status.ClearVBlankStatus()
 	p.w.reset()
-	// @FIXME READ PPU STATUSした次のフレームはNMIを発生させない
-	return status
+	value := status | (p.openBus)&0x1F
+	p.openBus = value
+	// @FIXME PPU STATUS を読み込んだ次のフレームはNMIを発生させない
+	return value
 }
 
 // MARK: OAM DATAの読み取り
 func (p *PPU) ReadOAMData() uint8 {
-	return p.oam[p.oamAddress]
+	value := p.oam[p.oamAddress]
+
+	// 属性バイト (Byte 2) の bit 2-4 は未実装のため 0 として読み出される
+	if p.oamAddress%4 == 2 {
+		value &= 0xE3
+	}
+
+	p.refreshOpenBus(value)
+	return value
+}
+
+// MARK: Open Busの読み取り
+func (p *PPU) ReadOpenBus() uint8 {
+	return p.openBus
+}
+
+// MARK: Open Busのリフレッシュ
+func (p *PPU) refreshOpenBus(value uint8) {
+	p.openBus = value
+	p.openBusDecayTimer = OPEN_BUS_DECAY_CYCLES
 }
 
 // MARK: VRAMの読み取り
@@ -269,11 +307,13 @@ func (p *PPU) ReadVRAM() uint8 {
 	case address <= 0x1FFF: // キャラクタROM
 		value := p.internalDataBuffer
 		p.internalDataBuffer = p.Mapper.ReadCharacterRom(address)
+		p.refreshOpenBus(value)
 		return value
 	case 0x2000 <= address && address <= 0x2FFF: // VRAM
 		// 一回遅れで値は反映されるため，内部バッファを更新し，元のバッファ値を返す
 		value := p.internalDataBuffer
 		p.internalDataBuffer = p.vram[p.mirrorVRAMAddress(address)]
+		p.refreshOpenBus(value)
 		return value
 	case 0x3000 <= address && address <= 0x3EFF: // ネームテーブル
 		panic(fmt.Sprintf("Error: address space 0x3000..0x3eff is not expected to read, requested: %04X", address))
@@ -285,9 +325,21 @@ func (p *PPU) ReadVRAM() uint8 {
 			address == 0x3F1C {
 			address -= 0x10
 		}
-		return p.paletteTable[address-0x3F00]
+		// パレット読み込み時は内部バッファを更新する (ミラーリングされたVRAMの値)
+		// $3F00-$3FFF は $2F00-$2FFF (VRAM) にミラーリングされる
+		p.internalDataBuffer = p.vram[p.mirrorVRAMAddress(address)]
+
+		// パレットデータの下位6bitとOpenBusの上位2bitを結合して返す
+		value := (p.openBus & 0xC0) | (p.paletteTable[address-0x3F00] & 0x3F)
+		p.refreshOpenBus(value)
+		return value
 	case 0x3F20 <= address && address <= 0x3FFF: // パレット (ミラーリング)
-		return p.paletteTable[(address-0x3F00)%32]
+		// パレット読み込み時は内部バッファを更新する
+		p.internalDataBuffer = p.vram[p.mirrorVRAMAddress(address)]
+
+		value := (p.openBus & 0xC0) | (p.paletteTable[(address-0x3F00)%32] & 0x3F)
+		p.refreshOpenBus(value)
+		return value
 	default:
 		panic(fmt.Sprintf("Error: unexpected read to vram space: %04X", address))
 	}
@@ -679,6 +731,13 @@ func (p *PPU) Tick(canvas *Canvas, cycles uint) bool {
 	// スプライト0ヒットの判定（適切なタイミングで）
 	if isRenderLine && p.isSpriteZeroHit(p.cycles) {
 		p.status.SetSpriteZeroHit(true)
+	}
+
+	// Open Busの減衰
+	if p.openBusDecayTimer > 0 {
+		p.openBusDecayTimer--
+	} else {
+		p.openBus = 0x00
 	}
 
 	if isRenderingEnabled {
