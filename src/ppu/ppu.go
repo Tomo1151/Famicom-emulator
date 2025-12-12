@@ -193,7 +193,7 @@ func (p *PPU) WriteVRAM(value uint8) {
 	p.incrementVRAMAddress()
 
 	// $0000-$3FFF のミラーリング
-	if address < 0x3FFF {
+	if address > 0x3FFF {
 		address -= 0x4000
 	}
 
@@ -261,7 +261,7 @@ func (p *PPU) ReadVRAM() uint8 {
 	p.incrementVRAMAddress()
 
 	// $0000-$3FFF のミラーリング
-	if address < 0x3FFF {
+	if address > 0x3FFF {
 		address -= 0x4000
 	}
 
