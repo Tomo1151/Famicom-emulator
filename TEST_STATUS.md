@@ -17,7 +17,7 @@
   - triangle: P
     > don't become silent
 - apu_reset
-  - 4015_cleared: NI
+  - 4015_cleared: F
   - 4017_timing: F
     > Delay after effective \$4017  
     > write: 0  
@@ -26,9 +26,11 @@
   - 4017_written: F
     > At power, \$4017 should be written with \$00  
     > Failed #2
-  - irq_flag_cleared: NI
-  - len_ctrs_enabled: NI
-  - works_immediately: NI
+  - irq_flag_cleared: F
+  - len_ctrs_enabled: F
+  - works_immediately: F
+    > At power, writes should work immediately  
+    > Failed #2
 - apu_test
   - rom_singles
     - 1-len_ctr: F
@@ -126,9 +128,9 @@
 - cpu_exec_space
   - test_cpu_exec_space_apu: F
     > panic: attempt to read from OAM Data register (specification investigation required)
-  - test_cpu_exec_space_ppuio: U
-    > PPU open bus implementation is missing or incomplete: A write to \$2003, followed by a read from \$2001 should return the same value as was written.  
-    > Failed #3
+  - test_cpu_exec_space_ppuio: F
+    > An RTS opcode should still do a dummy fetch of the next opcode. (The same goes for all one-byte opcodes, really).  
+    > Failed #5
 - cpu_interrupts_v2
 
   - rom_singles
@@ -216,8 +218,8 @@
       > Failed
 
 - cpu_reset
-  - ram_after_reset: NI
-  - registers: NI
+  - ram_after_reset: F
+  - registers: F
 - cpu_timing_test6
   - cpu_timing_test: S
 - instr_misc
@@ -390,8 +392,7 @@
     > 59916E5B  
     > Failed
 - ppu_open_bus
-  - ppu_open_bus: F
-    > panic: attempt to write to PPU Status register
+  - ppu_open_bus: S
 - ppu_vbl_nmi
 
   - rom_singles
