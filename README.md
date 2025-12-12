@@ -73,9 +73,8 @@ cd src && go run . tests/example_rom.nes
 | Button Start  |         Start         |   Enter   |   Enter    |
 | Button Select |        Select         | BackSpace | BackSpace  |
 
-> [!Important]
-> Currently there is no convenient way to change key bindings.
-> If you want to change them, please rewrite var `DefaultControl` in `config/config.go`.
+> [!Note]
+> To change key bindings, edit "key1p/2p" field in `config.json`
 
 ### Debug window
 
