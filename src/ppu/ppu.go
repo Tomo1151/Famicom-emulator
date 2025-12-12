@@ -192,6 +192,11 @@ func (p *PPU) WriteVRAM(value uint8) {
 	address := p.v.ToByte()
 	p.incrementVRAMAddress()
 
+	// $0000-$3FFF のミラーリング
+	if address < 0x3FFF {
+		address -= 0x4000
+	}
+
 	switch {
 	case address <= 0x1FFF: // キャラクタROM
 		if p.Mapper.IsCharacterRam() {
@@ -213,7 +218,7 @@ func (p *PPU) WriteVRAM(value uint8) {
 	case 0x3F20 <= address && address <= 0x3FFF: // パレット (ミラーリング)
 		p.paletteTable[(address-0x3F00)%32] = value
 	default:
-		panic(fmt.Sprintf("Unexpected write to mirrored space: %04X", address))
+		panic(fmt.Sprintf("Unexpected write to vram space: %04X", address))
 	}
 }
 
@@ -255,6 +260,11 @@ func (p *PPU) ReadVRAM() uint8 {
 	address := p.v.ToByte()
 	p.incrementVRAMAddress()
 
+	// $0000-$3FFF のミラーリング
+	if address < 0x3FFF {
+		address -= 0x4000
+	}
+
 	switch {
 	case address <= 0x1FFF: // キャラクタROM
 		value := p.internalDataBuffer
@@ -279,7 +289,7 @@ func (p *PPU) ReadVRAM() uint8 {
 	case 0x3F20 <= address && address <= 0x3FFF: // パレット (ミラーリング)
 		return p.paletteTable[(address-0x3F00)%32]
 	default:
-		panic(fmt.Sprintf("Error: unexpected read to mirrored space: %04X", address))
+		panic(fmt.Sprintf("Error: unexpected read to vram space: %04X", address))
 	}
 }
 
