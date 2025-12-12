@@ -16,6 +16,26 @@
     "log": false
   },
   "control": {
-    "gamepadAxisThreshold": 8000
+    "gamepadAxisThreshold": 8000,
+    "key1p": {
+      "buttonA": "K",
+      "buttonB": "J",
+      "buttonUp": "W",
+      "buttonDown": "S",
+      "buttonRight": "D",
+      "buttonLeft": "A",
+      "buttonStart": "RETURN",
+      "buttonSelect": "BACKSPACE"
+    },
+    "key2p": {
+      "buttonA": "SLASH",
+      "buttonB": "PERIOD",
+      "buttonUp": "G",
+      "buttonDown": "B",
+      "buttonRight": "N",
+      "buttonLeft": "V",
+      "buttonStart": "RETURN",
+      "buttonSelect": "BACKSPACE"
+    }
   }
 }
