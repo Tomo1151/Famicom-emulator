@@ -17,7 +17,7 @@
   - triangle: P
     > don't become silent
 - apu_reset
-  - 4015_cleared: F
+  - 4015_cleared: S
   - 4017_timing: F
     > Delay after effective \$4017  
     > write: 0  
@@ -218,8 +218,8 @@
       > Failed
 
 - cpu_reset
-  - ram_after_reset: F
-  - registers: F
+  - ram_after_reset: S
+  - registers: S
 - cpu_timing_test6
   - cpu_timing_test: S
 - instr_misc
