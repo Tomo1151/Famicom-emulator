@@ -22,7 +22,6 @@ const (
 	APU_CYCLE_INTERVAL = 7457        // 分周器の間隔
 	BUFFER_SIZE        = 1024 * 4    // サンプルバッファサイズ
 	MAX_VOLUME         = 1.0         // 最大音量
-	MASTER_VOLUME      = 0.15        // 全体音量
 )
 
 // MARK: 変数定義
@@ -40,7 +39,6 @@ type CpuBusReader func(uint16) uint8
 
 // MARK: APUの定義
 type APU struct {
-	volume float32
 	cycles uint
 	step   uint8
 
@@ -69,7 +67,6 @@ type APU struct {
 
 // MARK: APUの初期化メソッド
 func (a *APU) Init(reader CpuBusReader, config config.Config) {
-	a.volume = 1.0
 	a.cycles = 0
 	a.step = 0
 	a.cpuRead = reader
@@ -186,7 +183,7 @@ func AudioMixCallback(userdata unsafe.Pointer, stream *C.uint8_t, length C.int) 
 		}
 
 		// SDLへサンプルとして渡す
-		buffer[i] = mixed * MASTER_VOLUME
+		buffer[i] = mixed * apu.config.APU.SOUND_VOLUME
 	}
 }
 
