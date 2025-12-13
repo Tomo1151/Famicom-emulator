@@ -417,6 +417,11 @@ func (sr *StatusRegister) ClearFrameIRQ() {
 	sr.enableFrameIRQ = false
 }
 
+// MARK: DMC IRQフラグの取得
+func (sr *StatusRegister) EnableDMCIRQ() bool {
+	return sr.enableDMCIRQ
+}
+
 // MARK: 1chの有効/無効を取得
 func (sr *StatusRegister) is1chEnabled() bool {
 	return sr.enable1ch
@@ -490,8 +495,8 @@ type FrameCounter struct {
 }
 
 func (fc *FrameCounter) Init() {
-	fc.disableIRQ = true
-	fc.sequencerMode = true
+	fc.disableIRQ = false
+	fc.sequencerMode = false
 }
 
 func (fc *FrameCounter) Mode() uint8 {

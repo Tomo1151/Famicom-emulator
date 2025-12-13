@@ -91,6 +91,8 @@ func (a *APU) Init(reader CpuBusReader, config config.Config) {
 	a.prevLevel4 = 0.0
 	a.prevLevel5 = 0.0
 
+	a.WriteFrameSequencer(0x00)
+
 	// オーディオデバイスの初期化
 	a.initAudioDevice()
 }
@@ -247,9 +249,35 @@ func (a *APU) Tick(cycles uint) {
 
 // MARK: ステータスレジスタの読み込みメソッド
 func (a *APU) ReadStatus() uint8 {
-	status := a.status.ToByte()
-	status &= 0xF0
-	// @TODO: 各チャンネルの長さカウントを反映させる
+	var status uint8 = 0
+
+	// 1~4ch: length counter > 0 を見る
+	if a.channel1.lengthCounter.counter > 0 {
+		status |= 1 << STATUS_REG_ENABLE_1CH_POS
+	}
+	if a.channel2.lengthCounter.counter > 0 {
+		status |= 1 << STATUS_REG_ENABLE_2CH_POS
+	}
+	if a.channel3.lengthCounter.counter > 0 {
+		status |= 1 << STATUS_REG_ENABLE_3CH_POS
+	}
+	if a.channel4.lengthCounter.counter > 0 {
+		status |= 1 << STATUS_REG_ENABLE_4CH_POS
+	}
+
+	// @FIXME DMCの再生状態を正しく反映する
+	// 5ch: DMCが再生中かどうか
+	status |= 1 << STATUS_REG_ENABLE_5CH_POS // TODO: DMC 実装に合わせて
+
+	// FrameIRQ / DMCIRQ フラグの反映
+	if a.status.FrameIRQ() {
+		status |= 1 << STATUS_REG_ENABLE_FRAME_IRQ_POS
+	}
+	if a.status.EnableDMCIRQ() {
+		status |= 1 << STATUS_REG_ENABLE_DMC_IRQ_POS
+	}
+
+	// $4015の読み込みはFrameIRQフラグをクリアする
 	a.status.ClearFrameIRQ()
 	return status
 }
@@ -261,7 +289,7 @@ func (a *APU) WriteStatus(data uint8) {
 
 	// @TODO: ミュートと長さカウンタのリセットも行う
 	/*
-		有効ビットがクリアされると（ $4015経由）、長さカウンタは強制的に0に設定され、有効ビットが再度セットされるまで変更できなくなる（長さカウンタの以前の値は失われます）。
+		有効ビットがクリアされると（$4015経由）、長さカウンタは強制的に0に設定され、有効ビットが再度セットされるまで変更できなくなる（長さカウンタの以前の値は破棄）。
 		有効ビットをセットしても、すぐには効果はない。
 	*/
 	if (prev&(1<<STATUS_REG_ENABLE_1CH_POS)) != 0 && !a.status.is1chEnabled() {
@@ -281,6 +309,9 @@ func (a *APU) WriteStatus(data uint8) {
 	} else if (prev&(1<<STATUS_REG_ENABLE_5CH_POS)) == 0 && a.status.is5chEnabled() {
 		a.channel5.setEnabled(true)
 	}
+
+	// $4015への書き込みはFrameIRQフラグをクリアする
+	a.status.ClearFrameIRQ()
 }
 
 // MARK: フレームIRQを取得
@@ -305,7 +336,6 @@ func (a *APU) WriteFrameSequencer(data uint8) {
 
 	a.step = 0
 	a.cycles = 0
-	a.status.ClearFrameIRQ()
 }
 
 // MARK: 1chへの書き込みメソッド (矩形波)
@@ -361,17 +391,18 @@ func (a *APU) Write1ch(address uint16, data uint8) {
 				$4003への書き込みは長さカウンタのリロード，エンベロープの再起動，パルス生成器の位相のリセットが発生する
 		*/
 		a.channel1.sweepUnit.frequency = a.channel1.register.frequency
+		a.channel1.lengthCounter.update(
+			a.channel1.register.keyOffCount,
+			a.channel1.register.LengthCounterHalt(),
+		)
+		a.channel1.envelope.reset()
+		a.channel1.sweepUnit.reset()
+		a.channel1.sequencer = 0
+		a.channel1.timerReload = (uint16(a.channel1.register.frequency) + 1) * 2
+		a.channel1.timer = a.channel1.timerReload
+
 		if a.status.is1chEnabled() {
-			a.channel1.lengthCounter.update(
-				a.channel1.register.keyOffCount,
-				a.channel1.register.LengthCounterHalt(),
-			)
 			a.channel1.lengthCounter.reload()
-			a.channel1.envelope.reset()
-			a.channel1.sweepUnit.reset()
-			a.channel1.sequencer = 0
-			a.channel1.timerReload = (uint16(a.channel1.register.frequency) + 1) * 2
-			a.channel1.timer = a.channel1.timerReload
 		}
 	}
 }
@@ -428,17 +459,18 @@ func (a *APU) Write2ch(address uint16, data uint8) {
 				$4007への書き込みは長さカウンタのリロード，エンベロープの再起動，パルス生成器の位相のリセットが発生する
 		*/
 		a.channel2.sweepUnit.frequency = a.channel2.register.frequency
+		a.channel2.lengthCounter.update(
+			a.channel2.register.keyOffCount,
+			a.channel2.register.LengthCounterHalt(),
+		)
+		a.channel2.envelope.reset()
+		a.channel2.sweepUnit.reset()
+		a.channel2.sequencer = 0
+		a.channel2.timerReload = (uint16(a.channel2.register.frequency) + 1) * 2
+		a.channel2.timer = a.channel2.timerReload
+
 		if a.status.is2chEnabled() {
-			a.channel2.lengthCounter.update(
-				a.channel2.register.keyOffCount,
-				a.channel2.register.LengthCounterHalt(),
-			)
 			a.channel2.lengthCounter.reload()
-			a.channel2.envelope.reset()
-			a.channel2.sweepUnit.reset()
-			a.channel2.sequencer = 0
-			a.channel2.timerReload = (uint16(a.channel2.register.frequency) + 1) * 2
-			a.channel2.timer = a.channel2.timerReload
 		}
 	}
 }
@@ -479,8 +511,11 @@ func (a *APU) Write3ch(address uint16, data uint8) {
 			a.channel3.register.keyOffCount,
 			a.channel3.register.LengthCounterHalt(),
 		)
-		a.channel3.lengthCounter.reload()
 		a.channel3.linearCounter.setReload()
+
+		if a.status.is3chEnabled() {
+			a.channel3.lengthCounter.reload()
+		}
 	}
 }
 
@@ -523,14 +558,15 @@ func (a *APU) Write4ch(address uint16, data uint8) {
 			$4003への書き込みは長さカウンタのリロード，エンベロープの再起動，パルス生成器の位相のリセットが発生する
 		*/
 		a.channel4.index = a.channel4.register.frequency
+		a.channel4.lengthCounter.update(
+			a.channel4.register.keyOffCount,
+			a.channel4.register.LengthCounterHalt(),
+		)
+		a.channel4.envelope.reset()
+		a.channel4.phase = 0
+
 		if a.status.is4chEnabled() {
-			a.channel4.lengthCounter.update(
-				a.channel4.register.keyOffCount,
-				a.channel4.register.LengthCounterHalt(),
-			)
 			a.channel4.lengthCounter.reload()
-			a.channel4.envelope.reset()
-			a.channel4.phase = 0
 		}
 	}
 }
@@ -672,15 +708,7 @@ func (a *APU) clockFrameSequencer() {
 // MARK: リセット
 func (a *APU) Reset() {
 	a.WriteStatus(0x00)
-	a.frameCounter.Init()
-	a.frameCounter.DisableIRQ()
 	a.status.Init()
-
-	a.channel1.Init(a.config.APU.LOG_ENABLED)
-	a.channel2.Init(a.config.APU.LOG_ENABLED)
-	a.channel3.Init(a.config.APU.LOG_ENABLED)
-	a.channel4.Init(a.config.APU.LOG_ENABLED)
-	a.channel5.Init(a.cpuRead, a.config.APU.LOG_ENABLED)
 
 	a.channel1.buffer.Sync(0.0, a.sampleClock)
 	a.channel2.buffer.Sync(0.0, a.sampleClock)
@@ -693,9 +721,6 @@ func (a *APU) Reset() {
 	a.prevLevel3 = 0.0
 	a.prevLevel4 = 0.0
 	a.prevLevel5 = 0.0
-
-	a.cycles = 0
-	a.step = 0
 }
 
 // MARK: デバッグ用ログ出力切り替え

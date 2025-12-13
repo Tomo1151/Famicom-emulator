@@ -11,8 +11,8 @@
 - apu_mixer
   - dmc: F
     > don't become silent
-  - noise: U
-    > it fades out, but another sound is playing, it doesn't fade in
+  - noise: F
+    > another sound is playing
   - square: S
   - triangle: P
     > don't become silent
@@ -26,20 +26,15 @@
   - 4017_written: F
     > At power, \$4017 should be written with \$00  
     > Failed #2
-  - irq_flag_cleared: F
-  - len_ctrs_enabled: F
+  - irq_flag_cleared: S
+  - len_ctrs_enabled: S
   - works_immediately: F
     > At power, writes should work immediately  
     > Failed #2
 - apu_test
   - rom_singles
-    - 1-len_ctr: F
-      > Channel: 0  
-      > Problem with length counter load or \$4015  
-      > Failed #2
-    - 2-len_table: F
-      > Channel: 0  
-      > Failed
+    - 1-len_ctr: S
+    - 2-len_table: S
     - 3-irq_flag: F
       > Writing \$00 or \$80 to \$4017  
       > shouldn't affect flag  
