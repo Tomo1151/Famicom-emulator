@@ -139,11 +139,12 @@ This program implements the following components (some of which may not be compl
   - [x] official instructions
   - [x] unofficial instructions
   - [x] nestest.nes: completed
-  - [ ] reset
+  - [x] reset
 - [x] PPU
   - [x] rough scanline rendering (including scrolling)
   - [ ] accurate sprite 0 hit
   - [ ] accurate scanline rendering emulate
+  - [x] ppu open bus emulate
 - [x] APU
   - [x] square wave Channel (1 / 2ch)
   - [x] triangle wave Channel (3ch)
