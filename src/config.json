@@ -28,8 +28,8 @@
       "buttonSelect": "BACKSPACE"
     },
     "key2p": {
-      "buttonA": "SLASH",
-      "buttonB": "PERIOD",
+      "buttonA": "/",
+      "buttonB": ".",
       "buttonUp": "G",
       "buttonDown": "B",
       "buttonRight": "N",
