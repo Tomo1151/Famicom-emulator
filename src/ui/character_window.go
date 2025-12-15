@@ -113,7 +113,7 @@ func (c *CharacterWindow) Update() {
 	width := colsPerTable * tileSize * tables
 
 	// パレットはグレースケールで用意
-	palette := [4][3]uint8{{0, 0, 0}, {85, 85, 85}, {170, 170, 170}, {255, 255, 255}}
+	palette := [4][3]uint8{{200, 200, 200}, {170, 170, 170}, {85, 85, 85}, {0, 0, 0}}
 
 	for t := range tables {
 		for ty := range rowsPerTable {
@@ -126,7 +126,7 @@ func (c *CharacterWindow) Update() {
 				ppuBase := uint16(tileIdx * 16)
 
 				// CHR ROM viewer ではスキャンライン0時点のマッパーを使用
-				mapperFor := c.ppu.GetMapperForScanline(0)
+				mapperFor := c.ppu.GetMapperForScanline(c.ppu.Scanline())
 				if mapperFor == nil {
 					mapperFor = c.ppu.Mapper
 				}

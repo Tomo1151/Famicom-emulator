@@ -864,3 +864,8 @@ func (p *PPU) OAM() *[OAM_DATA_SIZE]uint8 {
 func (p *PPU) BackgroundPatternTableAddress() uint16 {
 	return p.control.BackgroundPatternTableAddress()
 }
+
+// MARK: Scanline の取得メソッド
+func (p *PPU) Scanline() uint16 {
+	return p.scanline
+}
