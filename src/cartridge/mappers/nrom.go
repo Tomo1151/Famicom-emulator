@@ -45,7 +45,8 @@ func (n *NROM) WriteToCharacterRom(address uint16, data uint8) {}
 
 // MARK: プログラムRAMの読み取り
 func (n *NROM) ReadProgramRam(address uint16) uint8 {
-	panic("Error: unsupported read program ROM on NROM")
+	// NROM にはプログラムRAMがないため，Open Busの挙動としてアドレス上位のバイトを返す
+	return uint8(address >> 8)
 }
 
 // MARK: プログラムRAMへの書き込み
