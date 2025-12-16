@@ -43,10 +43,11 @@ To run this program, execute the following command
 cd src && go run .
 ```
 
-Rom file load from default rom directory automatically.
+If `"autoLoading"` option in `config.json` is `true`, rom file load from default rom directory automatically.
+Otherwise, to launch the game, you'll need to D&D the file into the window after run, or specify the rom file name (relative path from the rom directory) as a startup argument.
 
 > [!Note]
-> By default, the last .nes file in the rom directory is loaded.
+> By default, the last \*.nes file in the rom directory is loaded.
 
 If you use specific Rom file, you can pass Rom path (from default rom directory) first argument.
 

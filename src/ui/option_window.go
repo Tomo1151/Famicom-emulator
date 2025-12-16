@@ -78,7 +78,7 @@ func (o *OptionWindow) Render() {
 	o.renderer.FillRect(&optionRect)
 
 	o.renderer.SetDrawColor(255, 200, 80, opacity)
-	volumeWidth := int32(float32(300) * o.config.APU.SOUND_VOLUME)
+	volumeWidth := int32(float32(300) * o.config.Apu.SOUND_VOLUME)
 	volumeRect := sdl.Rect{X: 30, Y: 100, W: volumeWidth, H: 20}
 	o.renderer.FillRect(&volumeRect)
 

@@ -41,9 +41,10 @@ var DefaultControl = ControlConfig{
 
 // MARK: Configの定義
 type Config struct {
-	CPU     CpuConfig     `json:"cpu"`
-	APU     ApuConfig     `json:"apu"`
+	Cpu     CpuConfig     `json:"cpu"`
+	Apu     ApuConfig     `json:"apu"`
 	Render  RenderConfig  `json:"render"`
+	Rom     RomConfig     `json:"rom"`
 	Control ControlConfig `json:"control"`
 }
 
@@ -67,6 +68,11 @@ type CpuConfig struct {
 type RenderConfig struct {
 	SCALE_FACTOR             int  `json:"scale"`
 	DOUBLE_BUFFERING_ENABLED bool `json:"doubleBuffering"`
+}
+
+// MARK: RomConfigの定義
+type RomConfig struct {
+	AUTO_LOADING bool `json:"autoLoading"`
 }
 
 // MARK: ControllerConfigの定義

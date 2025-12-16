@@ -15,11 +15,13 @@ func ParseArguments() (cartridge.Cartridge, *Config) {
 
 	flag.Parse()
 	rom := flag.Arg(0)
-	if len(rom) == 0 {
+	if len(rom) == 0 && config.Rom.AUTO_LOADING {
 		rom = defaultRomPath()
 	}
 
-	fmt.Println("Load ROM file:", rom)
+	if len(rom) != 0 {
+		fmt.Println("Load ROM file:", rom)
+	}
 
 	return cartridge.Cartridge{
 		ROM: filepath.Join("..", "rom", rom),
@@ -31,8 +33,8 @@ func defaultRomPath() string {
 	// rom/*.nes にマッチするROMのパスを取得
 	pattern := filepath.Join("..", "rom", "*.nes")
 	matches, err := filepath.Glob(pattern)
-
 	if err != nil || len(matches) == 0 {
+		fmt.Printf("[Warning] System: ROM file does not exist.\n")
 		return ""
 	}
 

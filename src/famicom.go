@@ -12,6 +12,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"path/filepath"
 	"runtime"
 	"time"
 
@@ -95,9 +96,9 @@ func (f *Famicom) loadDroppedFile(path string) {
 		&f.joypad2,
 		f.config,
 	)
-	f.cpu.Init(f.bus, f.config.CPU.LOG_ENABLED)
+	f.cpu.Init(f.bus, f.config.Cpu.LOG_ENABLED)
 	f.cpu.Reset()
-	fmt.Println("ROM file loaded")
+	fmt.Printf("Load ROM file: %s\n", filepath.Base(path))
 }
 
 // MARK: Famicomの起動
@@ -164,7 +165,7 @@ func (f *Famicom) Start() {
 
 	// CPU の作成（フレーム単位でメインが駆動する）
 	if f.romLoaded {
-		f.cpu.Init(f.bus, f.config.CPU.LOG_ENABLED)
+		f.cpu.Init(f.bus, f.config.Cpu.LOG_ENABLED)
 	}
 
 	// メインループ: メインが CPU をフレーム単位で駆動し、描画とイベント処理を行う。
@@ -211,25 +212,25 @@ func (f *Famicom) Start() {
 					case sdl.K_ESCAPE:
 						f.requestShutdown()
 					case sdl.K_F1:
-						if f.windows != nil {
+						if f.romLoaded && f.windows != nil {
 							if _, err := f.windows.ToggleOptionWindow(f.config); err != nil {
 								log.Printf("failed to toggle option window: %v", err)
 							}
 						}
 					case sdl.K_F2:
-						if f.windows != nil {
+						if f.romLoaded && f.windows != nil {
 							if _, err := f.windows.ToggleNameTableWindow(&f.ppu, f.config.Render.SCALE_FACTOR); err != nil {
 								log.Printf("failed to toggle name table window: %v", err)
 							}
 						}
 					case sdl.K_F3:
-						if f.windows != nil {
+						if f.romLoaded && f.windows != nil {
 							if _, err := f.windows.ToggleCharacterWindow(&f.ppu, f.config.Render.SCALE_FACTOR); err != nil {
 								log.Printf("failed to toggle character window: %v", err)
 							}
 						}
 					case sdl.K_F4:
-						if f.windows != nil {
+						if f.romLoaded && f.windows != nil {
 							if _, err := f.windows.ToggleAudioWindow(&f.apu, f.config.Render.SCALE_FACTOR); err != nil {
 								log.Printf("failed to toggle audio window: %v", err)
 							}

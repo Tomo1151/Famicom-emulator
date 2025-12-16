@@ -74,11 +74,11 @@ func (a *APU) Init(reader CpuBusReader, config config.Config) {
 	a.config = config
 
 	// 各チャンネルの初期化
-	a.channel1.Init(a.config.APU.LOG_ENABLED)
-	a.channel2.Init(a.config.APU.LOG_ENABLED)
-	a.channel3.Init(a.config.APU.LOG_ENABLED)
-	a.channel4.Init(a.config.APU.LOG_ENABLED)
-	a.channel5.Init(a.cpuRead, a.config.APU.LOG_ENABLED)
+	a.channel1.Init(a.config.Apu.LOG_ENABLED)
+	a.channel2.Init(a.config.Apu.LOG_ENABLED)
+	a.channel3.Init(a.config.Apu.LOG_ENABLED)
+	a.channel4.Init(a.config.Apu.LOG_ENABLED)
+	a.channel5.Init(a.cpuRead, a.config.Apu.LOG_ENABLED)
 
 	a.frameCounter.Init()
 	a.status.Init()
@@ -150,27 +150,27 @@ func AudioMixCallback(userdata unsafe.Pointer, stream *C.uint8_t, length C.int) 
 	ch4 := ch4Buffer[:n]
 	ch5 := ch5Buffer[:n]
 
-	if !apu.config.APU.MUTE_1CH {
+	if !apu.config.Apu.MUTE_1CH {
 		apu.channel1.buffer.Read(ch1, n)
 	} else {
 		apu.channel1.buffer.Fill(ch1, n, 0.0, apu.sampleClock)
 	}
-	if !apu.config.APU.MUTE_2CH {
+	if !apu.config.Apu.MUTE_2CH {
 		apu.channel2.buffer.Read(ch2, n)
 	} else {
 		apu.channel2.buffer.Fill(ch2, n, 0.0, apu.sampleClock)
 	}
-	if !apu.config.APU.MUTE_3CH {
+	if !apu.config.Apu.MUTE_3CH {
 		apu.channel3.buffer.Read(ch3, n)
 	} else {
 		apu.channel3.buffer.Fill(ch3, n, 0.0, apu.sampleClock)
 	}
-	if !apu.config.APU.MUTE_4CH {
+	if !apu.config.Apu.MUTE_4CH {
 		apu.channel4.buffer.Read(ch4, n)
 	} else {
 		apu.channel4.buffer.Fill(ch4, n, 0.0, apu.sampleClock)
 	}
-	if !apu.config.APU.MUTE_5CH {
+	if !apu.config.Apu.MUTE_5CH {
 		apu.channel5.buffer.Read(ch5, n)
 	} else {
 		apu.channel5.buffer.Fill(ch5, n, 0.0, apu.sampleClock)
@@ -187,7 +187,7 @@ func AudioMixCallback(userdata unsafe.Pointer, stream *C.uint8_t, length C.int) 
 		}
 
 		// SDLへサンプルとして渡す
-		buffer[i] = mixed * apu.config.APU.SOUND_VOLUME
+		buffer[i] = mixed * apu.config.Apu.SOUND_VOLUME
 	}
 }
 
@@ -726,12 +726,12 @@ func (a *APU) Reset() {
 
 // MARK: デバッグ用ログ出力切り替え
 func (a *APU) ToggleLog() {
-	if a.config.APU.LOG_ENABLED {
+	if a.config.Apu.LOG_ENABLED {
 		fmt.Println("[APU] Debug log: OFF")
 	} else {
 		fmt.Println("[APU] Debug log: ON")
 	}
-	a.config.APU.LOG_ENABLED = !a.config.APU.LOG_ENABLED
+	a.config.Apu.LOG_ENABLED = !a.config.Apu.LOG_ENABLED
 	a.channel1.ToggleLog()
 	a.channel2.ToggleLog()
 	a.channel3.ToggleLog()
@@ -741,14 +741,14 @@ func (a *APU) ToggleLog() {
 
 // MARK: 1chミュート切り替え
 func (a *APU) ToggleMute1ch() {
-	if a.config.APU.MUTE_1CH {
+	if a.config.Apu.MUTE_1CH {
 		fmt.Println("[APU] 1ch (square): Unmuted")
 	} else {
 		fmt.Println("[APU] 1ch (square): Muted")
 	}
-	a.config.APU.MUTE_1CH = !a.config.APU.MUTE_1CH
+	a.config.Apu.MUTE_1CH = !a.config.Apu.MUTE_1CH
 
-	if a.config.APU.MUTE_1CH {
+	if a.config.Apu.MUTE_1CH {
 		// ミュートした瞬間はバッファを0に同期して過去サンプルを破棄
 		a.channel1.buffer.Sync(0.0, a.sampleClock)
 		// APU 側の prevLevel も 0 にして差分発生を防ぐ
@@ -763,14 +763,14 @@ func (a *APU) ToggleMute1ch() {
 
 // MARK: 2chミュート切り替え
 func (a *APU) ToggleMute2ch() {
-	if a.config.APU.MUTE_2CH {
+	if a.config.Apu.MUTE_2CH {
 		fmt.Println("[APU] 2ch (square): Unmuted")
 	} else {
 		fmt.Println("[APU] 2ch (square): Muted")
 	}
-	a.config.APU.MUTE_2CH = !a.config.APU.MUTE_2CH
+	a.config.Apu.MUTE_2CH = !a.config.Apu.MUTE_2CH
 
-	if a.config.APU.MUTE_2CH {
+	if a.config.Apu.MUTE_2CH {
 		a.channel2.buffer.Sync(0.0, a.sampleClock)
 		a.prevLevel2 = 0.0
 	} else {
@@ -782,14 +782,14 @@ func (a *APU) ToggleMute2ch() {
 
 // MARK: 3chミュート切り替え
 func (a *APU) ToggleMute3ch() {
-	if a.config.APU.MUTE_3CH {
+	if a.config.Apu.MUTE_3CH {
 		fmt.Println("[APU] 3ch (triangle): Unmuted")
 	} else {
 		fmt.Println("[APU] 3ch (triangle): Muted")
 	}
-	a.config.APU.MUTE_3CH = !a.config.APU.MUTE_3CH
+	a.config.Apu.MUTE_3CH = !a.config.Apu.MUTE_3CH
 
-	if a.config.APU.MUTE_3CH {
+	if a.config.Apu.MUTE_3CH {
 		a.channel3.buffer.Sync(0.0, a.sampleClock)
 		a.prevLevel2 = 0.0
 	} else {
@@ -801,14 +801,14 @@ func (a *APU) ToggleMute3ch() {
 
 // MARK: 4chミュート切り替え
 func (a *APU) ToggleMute4ch() {
-	if a.config.APU.MUTE_4CH {
+	if a.config.Apu.MUTE_4CH {
 		fmt.Println("[APU] 4ch (noise): Unmuted")
 	} else {
 		fmt.Println("[APU] 4ch (noise): Muted")
 	}
-	a.config.APU.MUTE_4CH = !a.config.APU.MUTE_4CH
+	a.config.Apu.MUTE_4CH = !a.config.Apu.MUTE_4CH
 
-	if a.config.APU.MUTE_4CH {
+	if a.config.Apu.MUTE_4CH {
 		a.channel4.buffer.Sync(0.0, a.sampleClock)
 		a.prevLevel4 = 0.0
 	} else {
@@ -820,14 +820,14 @@ func (a *APU) ToggleMute4ch() {
 
 // MARK: 5chミュート切り替え
 func (a *APU) ToggleMute5ch() {
-	if a.config.APU.MUTE_5CH {
+	if a.config.Apu.MUTE_5CH {
 		fmt.Println("[APU] 5ch (DPCM): Unmuted")
 	} else {
 		fmt.Println("[APU] 5ch (DPCM): Muted")
 	}
-	a.config.APU.MUTE_5CH = !a.config.APU.MUTE_5CH
+	a.config.Apu.MUTE_5CH = !a.config.Apu.MUTE_5CH
 
-	if a.config.APU.MUTE_5CH {
+	if a.config.Apu.MUTE_5CH {
 		a.channel5.buffer.Sync(0.0, a.sampleClock)
 		a.prevLevel5 = 0.0
 	} else {

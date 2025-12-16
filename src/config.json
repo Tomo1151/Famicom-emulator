@@ -1,4 +1,7 @@
 {
+  "rom": {
+    "autoLoading": false
+  },
   "render": {
     "scale": 3,
     "doubleBuffering": true
