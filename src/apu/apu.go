@@ -62,7 +62,8 @@ type APU struct {
 	prevLevel4 float32
 	prevLevel5 float32
 
-	config config.Config
+	isAudioInitialized bool
+	config             config.Config
 }
 
 // MARK: APUの初期化メソッド
@@ -91,7 +92,9 @@ func (a *APU) Init(reader CpuBusReader, config config.Config) {
 	a.WriteFrameSequencer(0x00)
 
 	// オーディオデバイスの初期化
-	a.initAudioDevice()
+	if !a.isAudioInitialized {
+		a.initAudioDevice()
+	}
 }
 
 // MARK: オーディオデバイスの初期化メソッド
@@ -114,6 +117,7 @@ func (a *APU) initAudioDevice() {
 
 	// オーディオ再生開始
 	sdl.PauseAudio(false)
+	a.isAudioInitialized = true
 }
 
 // MARK: SDLのオーディオコールバック

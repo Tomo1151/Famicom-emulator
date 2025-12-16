@@ -66,7 +66,7 @@ func (c *Canvas) Init(config config.Config) {
 }
 
 // MARK: キャンバスの指定した座標に色をセット
-func (c *Canvas) setPixelAt(x uint, y uint, palette [3]uint8) {
+func (c *Canvas) SetPixelAt(x uint, y uint, palette [3]uint8) {
 	if x >= c.Width || y >= c.Height {
 		return
 	}
@@ -110,6 +110,6 @@ func RenderScanlineToCanvas(ppu *PPU, canvas *Canvas, scanline uint16) {
 	ppu.CalculateScanlineSprite(canvas, scanline)
 
 	for x := range SCREEN_WIDTH {
-		canvas.setPixelAt(x, uint(scanline), ppu.lineBuffer[x].Value(ppu))
+		canvas.SetPixelAt(x, uint(scanline), ppu.lineBuffer[x].Value(ppu))
 	}
 }

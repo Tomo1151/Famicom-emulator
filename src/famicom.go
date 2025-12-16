@@ -49,21 +49,22 @@ type Famicom struct {
 	adapter1 joypad.JoyPadAdapter // 1Pコントローラのアダプタ
 	adapter2 joypad.JoyPadAdapter // 2Pコントローラのアダプタ
 
+	romLoaded bool
+
 	config  *config.Config
 	windows *ui.WindowManager
 }
 
 // MARK: Famicomの初期化メソッド
 func (f *Famicom) Init(cartridge cartridge.Cartridge, config *config.Config) {
+	f.config = config
+
 	// ROMファイルのロード
 	f.cartridge = cartridge
 	err := f.cartridge.Load()
-	if err != nil {
-		log.Fatalf("Cartridge loading error: %v", err)
-	}
+	f.romLoaded = err == nil
 
 	// 各コンポーネントの接続
-	f.config = config
 	f.bus.ConnectComponents(
 		&f.ppu,
 		&f.apu,
@@ -72,6 +73,31 @@ func (f *Famicom) Init(cartridge cartridge.Cartridge, config *config.Config) {
 		&f.joypad2,
 		f.config,
 	)
+}
+
+func (f *Famicom) loadDroppedFile(path string) {
+	fmt.Printf("Loading dropped file: %s\n", path)
+	cartridge := cartridge.Cartridge{ROM: path}
+	err := cartridge.Load()
+	if err != nil {
+		fmt.Printf("Failed to load cartridge: %v\n", err)
+		return
+	}
+
+	f.cartridge = cartridge
+	// 各コンポーネントの接続
+	f.romLoaded = true
+	f.bus.ConnectComponents(
+		&f.ppu,
+		&f.apu,
+		&f.cartridge,
+		&f.joypad1,
+		&f.joypad2,
+		f.config,
+	)
+	f.cpu.Init(f.bus, f.config.CPU.LOG_ENABLED)
+	f.cpu.Reset()
+	fmt.Println("ROM file loaded")
 }
 
 // MARK: Famicomの起動
@@ -137,7 +163,9 @@ func (f *Famicom) Start() {
 	f.windows.Add(gameWindow)
 
 	// CPU の作成（フレーム単位でメインが駆動する）
-	f.cpu.Init(f.bus, f.config.CPU.LOG_ENABLED)
+	if f.romLoaded {
+		f.cpu.Init(f.bus, f.config.CPU.LOG_ENABLED)
+	}
 
 	// メインループ: メインが CPU をフレーム単位で駆動し、描画とイベント処理を行う。
 	// フレームあたりの CPU サイクル数を計算して RunCycles に渡す。
@@ -159,11 +187,22 @@ func (f *Famicom) Start() {
 		cyclesThisFrame := uint(baseCycles + extra)
 
 		// CPU をフレーム分だけ実行する（これがエミュレータの実時間を決める）
-		f.cpu.RunCycles(cyclesThisFrame)
+		if f.romLoaded {
+			f.cpu.RunCycles(cyclesThisFrame)
+		} else {
+			const prompt = "DROP ROM FILE HERE"
+			ui.ClearScreen(f.bus.Canvas(), [3]uint8{0, 0, 0})
+			ui.DrawText(f.bus.Canvas(), (int(ppu.SCREEN_WIDTH)-len(prompt)*int(ppu.TILE_SIZE))/2, int(ppu.SCREEN_HEIGHT-ppu.TILE_SIZE)/2, prompt, [3]uint8{250, 250, 250})
+			f.bus.Canvas().Swap()
+		}
 
 		// イベント処理
 		for event := eventPump(); event != nil; event = eventPump() {
 			switch e := event.(type) {
+			case *sdl.DropEvent:
+				if e.Type == sdl.DROPFILE {
+					f.loadDroppedFile(e.File)
+				}
 			case *sdl.QuitEvent:
 				f.requestShutdown()
 			case *sdl.KeyboardEvent:
@@ -200,7 +239,9 @@ func (f *Famicom) Start() {
 					case sdl.K_F11:
 						f.cpu.ToggleLog()
 					case sdl.K_y:
-						f.cpu.Reset()
+						if f.romLoaded {
+							f.cpu.Reset()
+						}
 					case sdl.K_1:
 						f.apu.ToggleMute1ch()
 					case sdl.K_2:
@@ -255,7 +296,9 @@ func (f *Famicom) requestShutdown() {
 	if f.windows != nil {
 		f.windows.CloseAll()
 	}
-	f.bus.Shutdown()
+	if f.romLoaded {
+		f.bus.Shutdown()
+	}
 	os.Exit(0)
 }
 
