@@ -193,7 +193,7 @@ func (f *Famicom) Start() {
 		} else {
 			const prompt = "DROP ROM FILE HERE"
 			ui.ClearScreen(f.bus.Canvas(), [3]uint8{0, 0, 0})
-			ui.DrawText(f.bus.Canvas(), (int(ppu.SCREEN_WIDTH)-len(prompt)*int(ppu.TILE_SIZE))/2, int(ppu.SCREEN_HEIGHT-ppu.TILE_SIZE)/2, prompt, [3]uint8{250, 250, 250})
+			ui.DrawText(f.bus.Canvas(), (int(ppu.SCREEN_WIDTH)-len(prompt)*int(ppu.TILE_SIZE))/2, int(ppu.SCREEN_HEIGHT-ppu.TILE_SIZE)/2, prompt)
 			f.bus.Canvas().Swap()
 		}
 
