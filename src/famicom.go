@@ -155,7 +155,7 @@ func (f *Famicom) Start() {
 	})
 
 	// ゲームウィンドウの作成
-	gameWindow, err := ui.NewGameWindow(f.config.Render.SCALE_FACTOR, f.bus.Canvas(), func() {
+	gameWindow, err := ui.NewGameWindow(f.config.Render.SCALE_FACTOR, f.config.Render.FULLSCREEN, f.bus.Canvas(), func() {
 		f.requestShutdown()
 	})
 	if err != nil {

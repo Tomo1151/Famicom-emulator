@@ -4,7 +4,8 @@
   },
   "render": {
     "scale": 3,
-    "doubleBuffering": true
+    "doubleBuffering": true,
+    "fullscreen": false
   },
   "apu": {
     "volume": 1.0,

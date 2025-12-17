@@ -68,6 +68,7 @@ type CpuConfig struct {
 type RenderConfig struct {
 	SCALE_FACTOR             int  `json:"scale"`
 	DOUBLE_BUFFERING_ENABLED bool `json:"doubleBuffering"`
+	FULLSCREEN               bool `json:"fullscreen"`
 }
 
 // MARK: RomConfigの定義

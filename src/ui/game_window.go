@@ -19,7 +19,7 @@ type GameWindow struct {
 }
 
 // MARK: GameWindow の作成メソッド
-func NewGameWindow(scale int, canvas *ppu.Canvas, onClose func()) (*GameWindow, error) {
+func NewGameWindow(scale int, isFullscreen bool, canvas *ppu.Canvas, onClose func()) (*GameWindow, error) {
 	w, err := sdl.CreateWindow(
 		"Famicom emu",
 		sdl.WINDOWPOS_UNDEFINED,
@@ -57,7 +57,11 @@ func NewGameWindow(scale int, canvas *ppu.Canvas, onClose func()) (*GameWindow, 
 		return nil, err
 	}
 
-	return &GameWindow{window: w, renderer: r, texture: t, canvas: canvas, isFullscreen: false, scale: scale, onClose: onClose}, nil
+	if isFullscreen {
+		w.SetFullscreen(sdl.WINDOW_FULLSCREEN_DESKTOP)
+	}
+
+	return &GameWindow{window: w, renderer: r, texture: t, canvas: canvas, isFullscreen: isFullscreen, scale: scale, onClose: onClose}, nil
 }
 
 // MARK: ウィンドウのID取得メソッド
