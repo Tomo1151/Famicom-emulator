@@ -7,9 +7,10 @@
 
 ## Screenshots
 
-### Game titles
+### Game window
 
 <p align="center">
+<img width="352" height="344" alt="スクリーンショット 2025-12-17 18 02 02" src="https://github.com/user-attachments/assets/a29a8e69-0275-4b86-bbff-06edf495cdd7" />
 <img width="352" height="344" alt="スクリーンショット 2025-12-09 11 50 39" src="https://github.com/user-attachments/assets/02619446-3b26-4897-91d4-04b772dd1fe6" />
 <img width="352" height="344" alt="スクリーンショット 2025-12-09 11 51 10" src="https://github.com/user-attachments/assets/16896ccf-b52f-49cb-a5b7-827c6d7e4b56" />
 <img width="352" height="344" alt="スクリーンショット 2025-12-09 11 51 31" src="https://github.com/user-attachments/assets/a35038de-a99d-417e-958a-3a7ef296c316" />
@@ -190,3 +191,4 @@ This is an emulator for the Nintendo Entertainment System (NES) / Family Compute
 **"NES," "Nintendo," and "Famicom (Family Computer)" are trademarks of Nintendo Co., Ltd.**
 
 This project is not authorized, approved, or in any way associated with Nintendo. We respect the intellectual property rights of all content owners.
+
