@@ -78,9 +78,9 @@ func (n *NameTableWindow) HandleEvent(event sdl.Event) {
 			switch e.Keysym.Sym {
 			case sdl.K_ESCAPE:
 				n.requestClose()
-			case sdl.K_UP:
+			case sdl.K_PLUS, sdl.K_SEMICOLON:
 				n.setScale(n.scale + 1)
-			case sdl.K_DOWN:
+			case sdl.K_MINUS:
 				n.setScale(n.scale - 1)
 			}
 		}

@@ -243,6 +243,10 @@ func (f *Famicom) Start() {
 						if f.romLoaded {
 							f.cpu.Reset()
 						}
+					case sdl.K_UP:
+						f.apu.SetVolume(f.apu.Volume() + .05)
+					case sdl.K_DOWN:
+						f.apu.SetVolume(f.apu.Volume() - .05)
 					case sdl.K_1:
 						f.apu.ToggleMute1ch()
 					case sdl.K_2:

@@ -65,9 +65,9 @@ func (aw *AudioWindow) HandleEvent(event sdl.Event) {
 			switch e.Keysym.Sym {
 			case sdl.K_ESCAPE:
 				aw.requestClose()
-			case sdl.K_UP:
+			case sdl.K_PLUS, sdl.K_SEMICOLON:
 				aw.setScale(aw.scale + 1)
-			case sdl.K_DOWN:
+			case sdl.K_MINUS:
 				aw.setScale(aw.scale - 1)
 			}
 		}

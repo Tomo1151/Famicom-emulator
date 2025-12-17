@@ -78,9 +78,9 @@ func (c *CharacterWindow) HandleEvent(event sdl.Event) {
 			switch e.Keysym.Sym {
 			case sdl.K_ESCAPE:
 				c.requestClose()
-			case sdl.K_UP:
+			case sdl.K_PLUS, sdl.K_SEMICOLON:
 				c.setScale(c.scale + 1)
-			case sdl.K_DOWN:
+			case sdl.K_MINUS:
 				c.setScale(c.scale - 1)
 			}
 		}

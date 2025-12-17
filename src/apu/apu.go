@@ -187,7 +187,7 @@ func AudioMixCallback(userdata unsafe.Pointer, stream *C.uint8_t, length C.int) 
 		}
 
 		// SDLへサンプルとして渡す
-		buffer[i] = mixed * apu.config.Apu.SOUND_VOLUME
+		buffer[i] = min(mixed*apu.config.Apu.SOUND_VOLUME, MAX_VOLUME)
 	}
 }
 
@@ -835,6 +835,18 @@ func (a *APU) ToggleMute5ch() {
 		a.prevLevel5 = current
 		a.channel5.buffer.Sync(current, a.sampleClock)
 	}
+}
+
+// MARK: 現在のボリュームを取得するメソッド
+func (a *APU) Volume() float32 {
+	return a.config.Apu.SOUND_VOLUME
+}
+
+// MARK: ボリュームをセットするメソッド
+func (a *APU) SetVolume(volume float32) {
+	value := max(min(volume, MAX_VOLUME), 0.0)
+	fmt.Printf("[APU] volume: %1.2f\n", value)
+	a.config.Apu.SOUND_VOLUME = value
 }
 
 // MARK: SDLコールバックのサンプル数を取得するメソッド

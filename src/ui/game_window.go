@@ -76,12 +76,15 @@ func (g *GameWindow) HandleEvent(event sdl.Event) {
 	case *sdl.KeyboardEvent:
 		if e.State == sdl.PRESSED {
 			switch e.Keysym.Sym {
+			case sdl.K_PLUS, sdl.K_SEMICOLON:
+				g.setScale(g.scale + 1)
+			case sdl.K_MINUS:
+				g.setScale(g.scale - 1)
 			case sdl.K_F12:
 				if g.isFullscreen {
 					g.window.SetFullscreen(0)
 					g.setScale(g.scale)
 				} else {
-					g.setScale(1)
 					g.window.SetFullscreen(sdl.WINDOW_FULLSCREEN_DESKTOP)
 				}
 				g.isFullscreen = !g.isFullscreen
@@ -94,6 +97,7 @@ func (g *GameWindow) HandleEvent(event sdl.Event) {
 func (g *GameWindow) setScale(s int) {
 	// 1 ~ 8 の間に設定
 	s = min(max(s, 1), 8)
+	g.scale = s
 
 	if g.window != nil {
 		g.window.SetSize(int32(ppu.SCREEN_WIDTH)*int32(s),
