@@ -537,46 +537,63 @@ func (p *PPU) CalculateScanlineBackground(canvas *Canvas, scanline uint16) {
 	v := p.vLineStart
 
 	// 画面の左端から右端まで
+	mapper := p.Mapper
+	bank := p.control.BackgroundPatternTableAddress()
+	transparentBgColor := PALETTE[p.paletteTable[0]]
+
 	fineX := uint(p.x.fineX) // ここからはローカルで進める。p.xは書き換えない
-	for x := range SCREEN_WIDTH {
-		// 左端8pxの描画有無を判定（描画はしないが、アドレスの前進は必要）
-		if p.mask.leftmostBackgroundEnable || x >= TILE_SIZE {
-			// 現在のピクセル位置でのタイル座標を計算
-			tileX := uint(v.coarseX)
-			tileY := uint(v.coarseY)
-			fineY := uint(v.fineY)
+	var x uint = 0
+	for x < SCREEN_WIDTH {
+		// 今のfineXからタイル境界までの残りピクセル数(
+		span := min(SCREEN_WIDTH-x, TILE_SIZE-(fineX%TILE_SIZE))
 
-			// ネームテーブルの選択
-			nameTable := *p.nameTable(v)
+		// 左端8pxの描画有無を判定
+		if !p.mask.leftmostBackgroundEnable && x < TILE_SIZE {
+			skip := min(TILE_SIZE-x, span)
 
-			// タイルのインデックスを取得
-			tileIndex := uint16(nameTable[tileY*32+tileX])
+			x += skip
+			fineX += skip
+			if fineX%TILE_SIZE == 0 {
+				v.incrementCoarseX()
+			}
+			continue
+		}
 
-			// 属性テーブルからパレット情報を取得
-			attributeTable := nameTable[0x3C0:0x400]
-			palette := p.bgPalette(&attributeTable, tileX, tileY)
+		// 現在のピクセル位置でのタイル座標を計算
+		tileX := uint(v.coarseX)
+		tileY := uint(v.coarseY)
+		fineY := uint(v.fineY)
 
-			// パターンテーブルからタイルのピクセルデータを取得
-			bank := p.control.BackgroundPatternTableAddress()
-			tileBasePointer := bank + tileIndex*uint16(TILE_SIZE*2)
+		// ネームテーブルの選択
+		nameTable := *p.nameTable(v)
 
-			upper := p.Mapper.ReadCharacterRom(tileBasePointer + uint16(fineY))
-			lower := p.Mapper.ReadCharacterRom(tileBasePointer + uint16(fineY) + uint16(TILE_SIZE))
+		// タイルのインデックスを取得
+		tileIndex := uint16(nameTable[tileY*32+tileX])
 
-			// ピクセル位置を計算（fineXを使用）
-			pixelIndex := (7 - (fineX % 8)) // 0..7
+		// 属性テーブルからパレット情報を取得
+		attributeTable := nameTable[0x3C0:0x400]
+		palette := p.bgPalette(&attributeTable, tileX, tileY)
+
+		// パターンテーブルからタイルのピクセルデータを取得
+		tileBasePointer := bank + tileIndex*uint16(TILE_SIZE*2)
+		upper := mapper.ReadCharacterRom(tileBasePointer + uint16(fineY))
+		lower := mapper.ReadCharacterRom(tileBasePointer + uint16(fineY) + uint16(TILE_SIZE))
+
+		// タイル内の開始ビット位置（7..0）
+		startBit := uint8(7 - (fineX % TILE_SIZE))
+		for i := uint(0); i < span; i++ {
+			pixelIndex := uint8(startBit - uint8(i))
 			value := ((lower>>pixelIndex)&1)<<1 | ((upper >> pixelIndex) & 1)
 			color := PALETTE[palette[value]]
 
-			// ラインバッファに登録
-			p.lineBuffer[x].backgroundValue = color
-			p.lineBuffer[x].priority = 0x00
-			p.lineBuffer[x].isBgTransparent = color == PALETTE[p.paletteTable[0]]
+			p.lineBuffer[x+i].backgroundValue = color
+			p.lineBuffer[x+i].priority = 0x00
+			p.lineBuffer[x+i].isBgTransparent = color == transparentBgColor
 		}
 
-		// 次のピクセルへ進む（描画しない場合でも必ず進める）
-		fineX++
-		if fineX%8 == 0 {
+		x += span
+		fineX += span
+		if fineX%TILE_SIZE == 0 {
 			// タイル境界を越えたらタイルを進める
 			v.incrementCoarseX()
 		}
