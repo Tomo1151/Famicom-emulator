@@ -33,7 +33,7 @@ const (
 // MARK: PPUの定義
 type PPU struct {
 	mapper       mappers.Mapper
-	paletteTable [PALETTE_TABLE_SIZE + 1]uint8
+	paletteTable [PALETTE_TABLE_SIZE]uint8
 	vram         [VRAM_SIZE]uint8
 	oam          [OAM_DATA_SIZE]uint8
 
@@ -834,6 +834,11 @@ func (p *PPU) Tick(canvas *Canvas, cycles uint) bool {
 // MARK: VRAM の取得メソッド
 func (p *PPU) VRAM() *[VRAM_SIZE]uint8 {
 	return &p.vram
+}
+
+// MARK: パレットの取得メソッド
+func (p *PPU) PaletteTable() *[PALETTE_TABLE_SIZE]uint8 {
+	return &p.paletteTable
 }
 
 // MARK: 指定したスキャンラインのマッパーのスナップショットを保存

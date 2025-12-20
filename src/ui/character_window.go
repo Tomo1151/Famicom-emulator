@@ -7,35 +7,45 @@ import (
 	"github.com/veandco/go-sdl2/sdl"
 )
 
+// MARK: 定数定義
+const (
+	TABLE_COLUMNS = 16
+	TABLE_ROWS    = 16
+	TABLES        = 2
+
+	PALETTE_COLUMNS = 16
+	PALETTE_ROWS    = 2
+	SWATCH          = 16
+)
+
 // MARK: CharacterWindowの定義
 type CharacterWindow struct {
 	window   *sdl.Window
 	renderer *sdl.Renderer
 	texture  *sdl.Texture
 	ppu      *ppu.PPU
-	buf      []byte
+	buffer   []byte
 	onClose  func(id uint32)
 	baseW    int
 	baseH    int
+	tileH    int
 	scale    int
 }
 
 // MARK: CharacterWindow の作成メソッド
 func NewCharacterWindow(p *ppu.PPU, scale int, onClose func(id uint32)) (*CharacterWindow, error) {
-	const tileSize = 8
-	const colsPerTable = 16
-	const rowsPerTable = 16
-	const tables = 2
+	tileH := TABLE_ROWS * int(ppu.TILE_SIZE) // 128
+	paletteH := SWATCH * PALETTE_ROWS        // 32
 
-	w := colsPerTable * tileSize * tables // 256
-	h := rowsPerTable * tileSize          // 128
+	width := TABLE_COLUMNS * int(ppu.TILE_SIZE) * TABLES // 256
+	height := tileH + paletteH                           // 160
 
 	win, err := sdl.CreateWindow(
 		"CHR ROM Viewer",
 		sdl.WINDOWPOS_CENTERED,
 		sdl.WINDOWPOS_CENTERED,
-		int32(w*scale),
-		int32(h*scale),
+		int32(width*scale),
+		int32(height*scale),
 		sdl.WINDOW_SHOWN,
 	)
 	if err != nil {
@@ -48,16 +58,16 @@ func NewCharacterWindow(p *ppu.PPU, scale int, onClose func(id uint32)) (*Charac
 		return nil, err
 	}
 
-	t, err := r.CreateTexture(sdl.PIXELFORMAT_RGB24, sdl.TEXTUREACCESS_STREAMING, int32(w), int32(h))
+	t, err := r.CreateTexture(sdl.PIXELFORMAT_RGB24, sdl.TEXTUREACCESS_STREAMING, int32(width), int32(height))
 	if err != nil {
 		r.Destroy()
 		win.Destroy()
 		return nil, err
 	}
 
-	buf := make([]byte, w*h*3)
+	buffer := make([]byte, width*height*3)
 
-	return &CharacterWindow{window: win, renderer: r, texture: t, ppu: p, buf: buf, onClose: onClose, baseW: w, baseH: h, scale: scale}, nil
+	return &CharacterWindow{window: win, renderer: r, texture: t, ppu: p, buffer: buffer, onClose: onClose, baseW: width, baseH: height, tileH: tileH, scale: scale}, nil
 }
 
 // MARK: ウィンドウのID取得メソッド
@@ -105,49 +115,74 @@ func (c *CharacterWindow) setScale(s int) {
 
 // MARK: ウィンドウの更新メソッド
 func (c *CharacterWindow) Update() {
-	const tileSize = 8
-	const colsPerTable = 16
-	const rowsPerTable = 16
-	const tables = 2
 
-	width := colsPerTable * tileSize * tables
+	width := TABLE_COLUMNS * ppu.TILE_SIZE * TABLES
 
 	// パレットはグレースケールで用意
-	palette := [4][3]uint8{{200, 200, 200}, {170, 170, 170}, {85, 85, 85}, {0, 0, 0}}
+	paletteTable := c.ppu.PaletteTable()
+	bgPalette := [4]uint8{
+		(*paletteTable)[0],
+		(*paletteTable)[1],
+		(*paletteTable)[2],
+		(*paletteTable)[3],
+	}
 
-	for t := range tables {
-		for ty := range rowsPerTable {
-			for tx := range colsPerTable {
-				tileIdx := t*256 + ty*colsPerTable + tx
+	// タイル一覧描画
+	for t := range TABLES {
+		for ty := range TABLE_ROWS {
+			for tx := range TABLE_COLUMNS {
+				tileIdx := t*256 + ty*TABLE_COLUMNS + tx
 
-				basePx := tx*tileSize + t*colsPerTable*tileSize
-				basePy := ty * tileSize
+				basePx := tx*int(ppu.TILE_SIZE) + t*TABLE_COLUMNS*int(ppu.TILE_SIZE)
+				basePy := ty * int(ppu.TILE_SIZE)
 
 				ppuBase := uint16(tileIdx * 16)
 
 				// CHR ROM viewer ではスキャンライン0時点のマッパーを使用
-				mapperFor := c.ppu.GetMapperForScanline(c.ppu.Scanline())
+				mapperFor := c.ppu.GetMapperForScanline(0)
 
-				for row := range tileSize {
+				for row := range int(ppu.TILE_SIZE) {
 					b0 := mapperFor.ReadCharacterRom(ppuBase + uint16(row))
 					b1 := mapperFor.ReadCharacterRom(ppuBase + uint16(row) + 8)
-					for col := range tileSize {
+					for col := range int(ppu.TILE_SIZE) {
 						bit := (((b1 >> (7 - uint(col))) & 1) << 1) | ((b0 >> (7 - uint(col))) & 1)
-						color := palette[bit]
+						index := bgPalette[bit]
+						color := ppu.PALETTE[index]
 
 						px := basePx + col
 						py := basePy + row
-						pos := (py*width + px) * 3
-						c.buf[pos+0] = color[0]
-						c.buf[pos+1] = color[1]
-						c.buf[pos+2] = color[2]
+						pos := (py*int(width) + px) * 3
+						c.buffer[pos+0] = color[0]
+						c.buffer[pos+1] = color[1]
+						c.buffer[pos+2] = color[2]
 					}
 				}
 			}
 		}
 	}
 
-	c.texture.Update(nil, unsafe.Pointer(&c.buf[0]), int(width*3))
+	// パレット一覧描画
+	paletteTop := c.tileH
+	for i := range PALETTE_ROWS * PALETTE_COLUMNS {
+		px0 := (i % PALETTE_COLUMNS) * SWATCH
+		py0 := (i/PALETTE_COLUMNS)*SWATCH + paletteTop
+
+		index := (*paletteTable)[i]
+		color := ppu.PALETTE[index]
+
+		for dy := range SWATCH {
+			py := py0 + dy
+			for dx := range SWATCH {
+				px := px0 + dx
+				pos := (py*int(width) + px) * 3
+				c.buffer[pos+0] = color[0]
+				c.buffer[pos+1] = color[1]
+				c.buffer[pos+2] = color[2]
+			}
+		}
+	}
+
+	c.texture.Update(nil, unsafe.Pointer(&c.buffer[0]), int(width*3))
 }
 
 // MARK: 描画メソッド
