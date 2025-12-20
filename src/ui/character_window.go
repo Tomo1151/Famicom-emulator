@@ -127,9 +127,6 @@ func (c *CharacterWindow) Update() {
 
 				// CHR ROM viewer ではスキャンライン0時点のマッパーを使用
 				mapperFor := c.ppu.GetMapperForScanline(c.ppu.Scanline())
-				if mapperFor == nil {
-					mapperFor = c.ppu.Mapper
-				}
 
 				for row := range tileSize {
 					b0 := mapperFor.ReadCharacterRom(ppuBase + uint16(row))

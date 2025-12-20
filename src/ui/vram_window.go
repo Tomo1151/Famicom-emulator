@@ -8,13 +8,19 @@ import (
 	"github.com/veandco/go-sdl2/sdl"
 )
 
+// MARK: 定数定義
+const (
+	TILE_COLUMNS = 32
+	TILE_ROWS    = 30
+)
+
 // MARK: NameTableWindow の定義
 type NameTableWindow struct {
 	window   *sdl.Window
 	renderer *sdl.Renderer
 	texture  *sdl.Texture
 	ppu      *ppu.PPU
-	buf      []byte
+	buffer   []byte
 	onClose  func(id uint32)
 	baseW    int
 	baseH    int
@@ -23,19 +29,14 @@ type NameTableWindow struct {
 
 // MARK: NameTableWindow の作成メソッド
 func NewNameTableWindow(p *ppu.PPU, scale int, onClose func(id uint32)) (*NameTableWindow, error) {
-	const tileSize = 8
-	const cols = 32
-	const rows = 30
-	// Show 4 nametables arranged as 2x2 (classic layout)
-	const w = cols * 2 * tileSize // 512 (two tables horizontally)
-	const h = rows * 2 * tileSize // 480 (two tables vertically)
-
+	const width = int(TILE_COLUMNS * 2 * ppu.TILE_SIZE) // 512px: 2画面分
+	const height = int(TILE_ROWS * 2 * ppu.TILE_SIZE)   // 480px: 2画面分
 	win, err := sdl.CreateWindow(
 		"Name Table Viewer",
 		sdl.WINDOWPOS_CENTERED,
 		sdl.WINDOWPOS_CENTERED,
-		int32(w*scale),
-		int32(h*scale),
+		int32(width*scale),
+		int32(height*scale),
 		sdl.WINDOW_SHOWN,
 	)
 	if err != nil {
@@ -48,16 +49,16 @@ func NewNameTableWindow(p *ppu.PPU, scale int, onClose func(id uint32)) (*NameTa
 		return nil, err
 	}
 
-	t, err := r.CreateTexture(sdl.PIXELFORMAT_RGB24, sdl.TEXTUREACCESS_STREAMING, int32(w), int32(h))
+	t, err := r.CreateTexture(sdl.PIXELFORMAT_RGB24, sdl.TEXTUREACCESS_STREAMING, int32(width), int32(height))
 	if err != nil {
 		r.Destroy()
 		win.Destroy()
 		return nil, err
 	}
 
-	buf := make([]byte, w*h*3)
+	buffer := make([]byte, width*height*3)
 
-	return &NameTableWindow{window: win, renderer: r, texture: t, ppu: p, buf: buf, onClose: onClose, baseW: w, baseH: h, scale: scale}, nil
+	return &NameTableWindow{window: win, renderer: r, texture: t, ppu: p, buffer: buffer, onClose: onClose, baseW: width, baseH: height, scale: scale}, nil
 }
 
 // MARK: ウィンドウのIDを取得するメソッド
@@ -103,101 +104,66 @@ func (n *NameTableWindow) setScale(s int) {
 // MARK: 更新メソッド
 func (n *NameTableWindow) Update() {
 	vramPtr := n.ppu.VRAM()
-	paletteTable := n.ppu.PaletteTable()
+
+	const cols uint = 32
+	const rows uint = 30
+	const ntSize uint = 1024
+	width := cols * 2 * ppu.TILE_SIZE
+
+	// フレーム最初のマッパーでミラーリングを判別
+	mapper := n.ppu.GetMapperForScanline(0)
+	mirroring := mapper.Mirroring()
 	bankBase := n.ppu.BackgroundPatternTableAddress()
 
-	const cols = 32
-	const rows = 30
-	const ntSize = 1024
-	const tileSize = 8
-	width := cols * 2 * tileSize
-
-	// NT0: 左上, NT1: 右上, NT2: 左下, NT3: 右下
+	// 4つのネームテーブルを描画
 	for nt := range 4 {
-		// マッパーをもとにVRAMの基準を計算
-		mirr := n.ppu.Mapper.Mirroring()
-		var physicalPage int
-		switch mirr {
+		xOffset := uint(nt%2) * cols * ppu.TILE_SIZE
+		yOffset := uint(nt/2) * rows * ppu.TILE_SIZE
+
+		var physicalPage uint
+		switch mirroring {
 		case mappers.MIRRORING_VERTICAL:
-			// Vertical: NT0==NT2, NT1==NT3 -> pages: 0,1,0,1
-			physicalPage = nt % 2
+			physicalPage = uint(nt % 2) // 0,1,0,1
 		case mappers.MIRRORING_HORIZONTAL:
-			// Horizontal: NT0==NT1, NT2==NT3 -> pages: 0,0,1,1
-			physicalPage = nt / 2
+			physicalPage = uint(nt / 2) // 0,0,1,1
 		default:
-			physicalPage = nt % 2
+			physicalPage = uint(nt % 2)
 		}
+
 		base := physicalPage * ntSize
 		attrStart := base + 0x3C0
+		attributeTable := (*vramPtr)[int(attrStart):int(attrStart+0x40)]
 
-		xOffset := (nt % 2) * cols * tileSize
-		yOffset := (nt / 2) * rows * tileSize
-
-		// 全てのタイルに対して処理
 		for ty := range rows {
 			for tx := range cols {
 				idx := base + ty*cols + tx
 				tileIndex := (*vramPtr)[idx]
+				palette := n.ppu.BackgroundColorPalette(&attributeTable, tx, ty)
+				tileBase := bankBase + uint16(tileIndex)*uint16(ppu.TILE_SIZE*2)
 
-				// 属性テーブルのインデックスを計算
-				attrTableIdx := (ty/4)*8 + (tx / 4)
-				attrByte := (*vramPtr)[attrStart+attrTableIdx]
+				// 各タイルの描画
+				for row := range ppu.TILE_SIZE {
+					upper := mapper.ReadCharacterRom(tileBase + uint16(row))
+					lower := mapper.ReadCharacterRom(tileBase + uint16(row) + uint16(ppu.TILE_SIZE))
 
-				// パレットインデックスの計算 (各2x2ブロックごとに2bit)
-				sx := (tx % 4) / 2
-				sy := (ty % 4) / 2
-				var paletteIdx uint8
-				if sx == 0 && sy == 0 {
-					paletteIdx = (attrByte) & 0b11
-				} else if sx == 1 && sy == 0 {
-					paletteIdx = (attrByte >> 2) & 0b11
-				} else if sx == 0 && sy == 1 {
-					paletteIdx = (attrByte >> 4) & 0b11
-				} else {
-					paletteIdx = (attrByte >> 6) & 0b11
-				}
-
-				// パレットの決定
-				paletteStart := 1 + uint(paletteIdx)*4
-				paletteIndices := [4]uint8{
-					(*paletteTable)[0],
-					(*paletteTable)[paletteStart+0],
-					(*paletteTable)[paletteStart+1],
-					(*paletteTable)[paletteStart+2],
-				}
-
-				// タイルパターンのフェッチ
-				tileBase := bankBase + uint16(tileIndex)*uint16(tileSize*2)
-
-				// タイルの座標に合わせたマッパーのスナップショットを取得
-				scanlineForTile := (yOffset + ty*tileSize) % int(ppu.SCREEN_HEIGHT)
-				mapperForTile := n.ppu.GetMapperForScanline(uint16(scanlineForTile))
-				if mapperForTile == nil {
-					mapperForTile = n.ppu.Mapper
-				}
-
-				for row := range tileSize {
-					upper := mapperForTile.ReadCharacterRom(tileBase + uint16(row))
-					lower := mapperForTile.ReadCharacterRom(tileBase + uint16(row) + uint16(tileSize))
-
-					for col := range tileSize {
+					for col := range ppu.TILE_SIZE {
 						bit := (((lower >> (7 - uint(col))) & 1) << 1) | ((upper >> (7 - uint(col))) & 1)
-						colorIdx := paletteIndices[bit]
+						colorIdx := palette[bit]
 						color := ppu.PALETTE[colorIdx]
 
-						px := xOffset + tx*tileSize + col
-						py := yOffset + ty*tileSize + row
+						px := xOffset + tx*ppu.TILE_SIZE + col
+						py := yOffset + ty*ppu.TILE_SIZE + row
 						pos := (py*width + px) * 3
-						n.buf[pos+0] = color[0]
-						n.buf[pos+1] = color[1]
-						n.buf[pos+2] = color[2]
+						n.buffer[pos+0] = color[0]
+						n.buffer[pos+1] = color[1]
+						n.buffer[pos+2] = color[2]
 					}
 				}
 			}
 		}
 	}
 
-	n.texture.Update(nil, unsafe.Pointer(&n.buf[0]), int(width*3))
+	n.texture.Update(nil, unsafe.Pointer(&n.buffer[0]), int(width*3))
 }
 
 // MARK: 描画メソッド
