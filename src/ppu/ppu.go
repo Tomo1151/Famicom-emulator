@@ -48,9 +48,6 @@ type PPU struct {
 	x InternalXRegister        // x スクロール
 	w InternalWRegister        // 書き込みラッチ
 
-	// 1ライン描画開始時点のv（レンダラ用スナップショット）
-	vLineStart InternalAddressRegiseter
-
 	scanline           uint16 // 現在描画中のスキャンライン
 	cycles             uint   // PPUサイクル
 	internalDataBuffer uint8
@@ -63,8 +60,9 @@ type PPU struct {
 	openBusDecayTimer int // OpenBus減衰のタイマー
 
 	// デバッグウィンドウ用のスナップショット
-	mapperSnapshots []mappers.Mapper
-	vLineSnapshots  []InternalAddressRegiseter
+	vLineStart     InternalAddressRegiseter
+	vLineSnapshots []InternalAddressRegiseter
+	mapperSnapshot mappers.Mapper
 }
 
 // MARK: PPUの初期化メソッド
@@ -115,7 +113,7 @@ func (p *PPU) Init(mapper mappers.Mapper) {
 		}
 	}
 
-	p.mapperSnapshots = make([]mappers.Mapper, SCREEN_HEIGHT)
+	p.mapperSnapshot = p.mapper
 	p.vLineSnapshots = make([]InternalAddressRegiseter, SCREEN_HEIGHT)
 }
 
@@ -803,8 +801,10 @@ func (p *PPU) Tick(canvas *Canvas, cycles uint) bool {
 		if SCANLINE_START <= p.scanline && p.scanline < SCANLINE_POSTRENDER {
 			RenderScanlineToCanvas(p, canvas, p.scanline)
 
-			// デバッグウィンドウ用のマッパースナップショットを保存
-			p.takeMapperSnapshot(p.scanline)
+			if p.scanline == SCANLINE_START {
+				// デバッグウィンドウ用のマッパースナップショットを保存
+				p.mapperSnapshot = p.mapper.Clone()
+			}
 		}
 
 		// スキャンラインを進める
@@ -841,26 +841,9 @@ func (p *PPU) PaletteTable() *[PALETTE_TABLE_SIZE]uint8 {
 	return &p.paletteTable
 }
 
-// MARK: 指定したスキャンラインのマッパーのスナップショットを保存
-func (p *PPU) takeMapperSnapshot(scanline uint16) {
-	idx := int(scanline)
-	if idx < 0 || idx >= len(p.mapperSnapshots) {
-		return
-	}
-	if p.mapper == nil {
-		p.mapperSnapshots[idx] = nil
-		return
-	}
-	p.mapperSnapshots[idx] = p.mapper.Clone()
-}
-
-// MARK: 指定したスキャンラインのマッパースナップショットを取得
-func (p *PPU) GetMapperForScanline(scanline uint16) mappers.Mapper {
-	idx := int(scanline)
-	if idx >= 0 && idx < len(p.mapperSnapshots) && p.mapperSnapshots[idx] != nil {
-		return p.mapperSnapshots[idx]
-	}
-	return p.mapper
+// MARK: マッパー を取得するメソッド
+func (p *PPU) MapperSnapshot() mappers.Mapper {
+	return p.mapperSnapshot
 }
 
 // MARK: 指定したスキャンラインのvLineStart のスナップショットを取得

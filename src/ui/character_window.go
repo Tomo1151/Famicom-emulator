@@ -138,12 +138,12 @@ func (c *CharacterWindow) Update() {
 
 				ppuBase := uint16(tileIdx * 16)
 
-				// CHR ROM viewer ではスキャンライン0時点のマッパーを使用
-				mapperFor := c.ppu.GetMapperForScanline(0)
+				// フレーム最初のマッパーを使用
+				mapper := c.ppu.MapperSnapshot()
 
 				for row := range int(ppu.TILE_SIZE) {
-					b0 := mapperFor.ReadCharacterRom(ppuBase + uint16(row))
-					b1 := mapperFor.ReadCharacterRom(ppuBase + uint16(row) + 8)
+					b0 := mapper.ReadCharacterRom(ppuBase + uint16(row))
+					b1 := mapper.ReadCharacterRom(ppuBase + uint16(row) + 8)
 					for col := range int(ppu.TILE_SIZE) {
 						bit := (((b1 >> (7 - uint(col))) & 1) << 1) | ((b0 >> (7 - uint(col))) & 1)
 						index := bgPalette[bit]

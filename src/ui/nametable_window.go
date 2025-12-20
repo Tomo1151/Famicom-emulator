@@ -111,7 +111,7 @@ func (n *NameTableWindow) Update() {
 	width := cols * 2 * ppu.TILE_SIZE
 
 	// フレーム最初のマッパーでミラーリングを判別
-	mapper := n.ppu.GetMapperForScanline(0)
+	mapper := n.ppu.MapperSnapshot()
 	mirroring := mapper.Mirroring()
 	bankBase := n.ppu.BackgroundPatternTableAddress()
 
