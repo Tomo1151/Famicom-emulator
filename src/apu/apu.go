@@ -844,9 +844,14 @@ func (a *APU) Volume() float32 {
 
 // MARK: ボリュームをセットするメソッド
 func (a *APU) SetVolume(volume float32) {
+	current := a.config.Apu.SOUND_VOLUME
+	if (current <= 0.0 && volume < current) || (MAX_VOLUME <= current && current < volume) {
+		return
+	}
+
 	value := max(min(volume, MAX_VOLUME), 0.0)
-	fmt.Printf("[APU] volume: %1.2f\n", value)
 	a.config.Apu.SOUND_VOLUME = value
+	fmt.Printf("[APU] volume: %1.2f\n", a.config.Apu.SOUND_VOLUME)
 }
 
 // MARK: SDLコールバックのサンプル数を取得するメソッド
