@@ -457,6 +457,7 @@ func (p *PPU) ClearLineBuffer() {
 		p.lineBuffer[x].backgroundValue = PALETTE[p.paletteTable[0]]
 		p.lineBuffer[x].spriteValue = PALETTE[p.paletteTable[0]]
 		p.lineBuffer[x].priority = 0x00
+		p.lineBuffer[x].isBgTransparent = true
 		p.lineBuffer[x].isSpriteTransparent = true
 	}
 }
@@ -476,7 +477,7 @@ func (p *PPU) FindScanlineSprite(spriteHeight uint8, scanline uint16) (uint, *[S
 					U8 x;
 			};
 		*/
-		spriteY := uint16(p.oam[index]) // OAM各スプライトの0バイト目がY座標
+		spriteY := uint16(p.oam[index]) + 1 // OAM各スプライトの0バイト目がY座標
 
 		// スプライトが現在のスキャンラインに収まっているかをチェックする
 		if scanline >= spriteY && scanline < spriteY+uint16(spriteHeight) {
@@ -537,7 +538,6 @@ func (p *PPU) CalculateScanlineBackground(canvas *Canvas, scanline uint16) {
 	// 画面の左端から右端まで
 	mapper := p.mapper
 	bank := p.control.BackgroundPatternTableAddress()
-	transparentBgColor := PALETTE[p.paletteTable[0]]
 
 	fineX := uint(p.x.fineX) // ここからはローカルで進める。p.xは書き換えない
 	var x uint = 0
@@ -586,7 +586,7 @@ func (p *PPU) CalculateScanlineBackground(canvas *Canvas, scanline uint16) {
 
 			p.lineBuffer[x+i].backgroundValue = color
 			p.lineBuffer[x+i].priority = 0x00
-			p.lineBuffer[x+i].isBgTransparent = color == transparentBgColor
+			p.lineBuffer[x+i].isBgTransparent = (value == 0)
 		}
 
 		x += span
@@ -627,7 +627,7 @@ func (p *PPU) CalculateScanlineSprite(canvas *Canvas, scanline uint16) {
 
 		// 描画するスプライトを取得
 		sprite := sprites[index]
-		spriteY := uint16(sprite[OAM_SPRITE_Y])
+		spriteY := uint16(sprite[OAM_SPRITE_Y]) + 1
 		spriteX := uint16(sprite[OAM_SPRITE_X])
 		tileIndex := uint16(sprite[OAM_SPRITE_TILE])
 		attributes := sprite[OAM_SPRITE_ATTR]
