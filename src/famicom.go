@@ -213,23 +213,17 @@ func (f *Famicom) Start() {
 						f.requestShutdown()
 					case sdl.K_F1:
 						if f.romLoaded && f.windows != nil {
-							if _, err := f.windows.ToggleOptionWindow(f.config); err != nil {
-								log.Printf("failed to toggle option window: %v", err)
-							}
-						}
-					case sdl.K_F2:
-						if f.romLoaded && f.windows != nil {
 							if _, err := f.windows.ToggleNameTableWindow(&f.ppu, f.config.Render.SCALE_FACTOR); err != nil {
 								log.Printf("failed to toggle name table window: %v", err)
 							}
 						}
-					case sdl.K_F3:
+					case sdl.K_F2:
 						if f.romLoaded && f.windows != nil {
 							if _, err := f.windows.ToggleCharacterWindow(&f.ppu, f.config.Render.SCALE_FACTOR); err != nil {
 								log.Printf("failed to toggle character window: %v", err)
 							}
 						}
-					case sdl.K_F4:
+					case sdl.K_F3:
 						if f.romLoaded && f.windows != nil {
 							if _, err := f.windows.ToggleAudioWindow(&f.apu, f.config.Render.SCALE_FACTOR); err != nil {
 								log.Printf("failed to toggle audio window: %v", err)
