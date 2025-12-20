@@ -20,6 +20,8 @@ type JoyPad struct {
 	strobe      bool
 	ButtonIndex uint8
 	State       uint8
+
+	latchedState uint8 // $4016ストローブでラッチされたスナップショット
 }
 
 // MARK: JoyPadの初期化メソッド
@@ -27,35 +29,56 @@ func (j *JoyPad) Init() {
 	j.strobe = false
 	j.ButtonIndex = 0
 	j.State = 0
+	j.latchedState = 0
 }
 
 // MARK: JoyPadへの書き込み
 func (j *JoyPad) Write(data uint8) {
+	prevStrobe := j.strobe
 	j.strobe = data&1 == 1
+
+	// ストローブがhighになった時点で状態をラッチ
 	if j.strobe {
 		j.ButtonIndex = 0
+		j.latchedState = j.State
+		return
+	}
+
+	// ダウンエッジでシフト読み取り開始
+	if prevStrobe && !j.strobe {
+		j.ButtonIndex = 0
+		j.latchedState = j.State
 	}
 }
 
 // MARK: JoyPadの読み取り
 func (j *JoyPad) Read() uint8 {
-	if j.ButtonIndex > 7 {
-		return 0x01
-	}
-	response := (j.State & (1 << j.ButtonIndex)) >> j.ButtonIndex
+	// bit 6 を立てておく
+	const openBus uint8 = 0x40
 
-	if !j.strobe && j.ButtonIndex <= 7 {
-		j.ButtonIndex++
+	// ストローブHigh: Aボタン(bit0)を返し続ける（インデックスは進めない）
+	if j.strobe {
+		return openBus | (j.State & 0x01)
 	}
 
-	return response
+	// ストローブLow: ラッチした8bitを順番に返す
+	var bit uint8
+	if j.ButtonIndex < 8 {
+		bit = (j.latchedState >> j.ButtonIndex) & 0x01
+	} else {
+		// 8回読み切った後は1を返し続ける
+		bit = 0x01
+	}
+
+	j.ButtonIndex++
+	return openBus | bit
 }
 
 // MARK: ボタン押下状態のセット
 func (j *JoyPad) SetButtonPressed(buttonIndex JoyPadButton, pressed bool) {
 	if pressed {
-		j.State |= (1 << buttonIndex)
+		j.State |= uint8(1) << uint8(buttonIndex)
 	} else {
-		j.State &^= (1 << buttonIndex)
+		j.State &^= uint8(1) << uint8(buttonIndex)
 	}
 }
