@@ -2,7 +2,6 @@ package ui
 
 import (
 	"Famicom-emulator/apu"
-	"Famicom-emulator/config"
 	"Famicom-emulator/ppu"
 
 	"github.com/veandco/go-sdl2/sdl"
@@ -94,25 +93,6 @@ func (wm *WindowManager) dispatch(windowID uint32, event sdl.Event) {
 	if w, ok := wm.windows[windowID]; ok {
 		w.HandleEvent(event)
 	}
-}
-
-// MARK: OptionWindow の表示/非表示切り替えメソッド
-func (wm *WindowManager) ToggleOptionWindow(cfg *config.Config) (uint32, error) {
-	// 既に開かれていれば閉じる
-	for _, w := range wm.windows {
-		if ow, ok := w.(*OptionWindow); ok {
-			id := ow.ID()
-			wm.Remove(id)
-			return 0, nil
-		}
-	}
-
-	ow, err := NewOptionWindow(cfg, func(id uint32) { wm.Remove(id) })
-	if err != nil {
-		return 0, err
-	}
-	wm.Add(ow)
-	return ow.ID(), nil
 }
 
 // MARK: NameTableWindow の表示/非表示切り替えメソッド
