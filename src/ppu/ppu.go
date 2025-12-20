@@ -581,7 +581,7 @@ func (p *PPU) CalculateScanlineBackground(canvas *Canvas, scanline uint16) {
 
 		// タイル内の開始ビット位置（7..0）
 		startBit := uint8(7 - (fineX % TILE_SIZE))
-		for i := uint(0); i < span; i++ {
+		for i := range span {
 			pixelIndex := uint8(startBit - uint8(i))
 			value := ((lower>>pixelIndex)&1)<<1 | ((upper >> pixelIndex) & 1)
 			color := PALETTE[palette[value]]
