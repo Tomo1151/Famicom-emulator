@@ -186,8 +186,8 @@ func (t *TxROM) calcCharacterRomAddress(address uint16) uint {
 
 	mode := t.bank & 0x80
 
-	r0Bank := uint(t.bankData[0])
-	r1Bank := uint(t.bankData[1])
+	r0Bank := uint(t.bankData[0] & 0xFE)
+	r1Bank := uint(t.bankData[1] & 0xFE)
 	r2Bank := uint(t.bankData[2])
 	r3Bank := uint(t.bankData[3])
 	r4Bank := uint(t.bankData[4])
