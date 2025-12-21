@@ -85,7 +85,8 @@ cd src && go run . tests/example_rom.nes
 | Toggle Fullscreen                                    | F12 |
 | Show / Hide nametable viewer                         | F1  |
 | Show / Hide CHR ROM viewer                           | F2  |
-| Show / Hide audio visualizer                         | F3  |
+| Show / Hide OAM viewer                               | F3  |
+| Show / Hide audio visualizer                         | F4  |
 | Expand debug window                                  |  -  |
 | Shrink debug window                                  |  +  |
 | Enable / Disable APU log                             | F10 |
