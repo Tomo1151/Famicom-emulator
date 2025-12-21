@@ -210,6 +210,12 @@ func (f *Famicom) Start() {
 								log.Printf("failed to toggle audio window: %v", err)
 							}
 						}
+					case sdl.K_F4:
+						if f.romLoaded && f.windows != nil {
+							if _, err := f.windows.ToggleOAMWindow(&f.ppu, f.config.Render.SCALE_FACTOR); err != nil {
+								log.Printf("failed to toggle oam window: %v", err)
+							}
+						}
 					case sdl.K_F10:
 						f.apu.ToggleLog()
 					case sdl.K_F11:
