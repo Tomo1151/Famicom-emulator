@@ -865,6 +865,16 @@ func (p *PPU) BackgroundPatternTableAddress() uint16 {
 	return p.control.BackgroundPatternTableAddress()
 }
 
+// MARK: Sprite pattern table address の取得メソッド
+func (p *PPU) SpritePatternTableAddress() uint16 {
+	return p.control.SpritePatternTableAddress()
+}
+
+// MARK: Sprite size の取得メソッド
+func (p *PPU) SpriteSize() uint8 {
+	return p.control.SpriteSize()
+}
+
 // MARK: Scanline の取得メソッド
 func (p *PPU) Scanline() uint16 {
 	return p.scanline
