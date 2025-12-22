@@ -147,3 +147,20 @@ func (wm *WindowManager) ToggleAudioWindow(a *apu.APU, scale int) (uint32, error
 	wm.Add(aw)
 	return aw.ID(), nil
 }
+
+// MARK: OAMWindow の表示/非表示切り替えメソッド
+func (wm *WindowManager) ToggleOAMWindow(p *ppu.PPU, scale int) (uint32, error) {
+	for _, w := range wm.windows {
+		if ow, ok := w.(*OAMWindow); ok {
+			id := ow.ID()
+			wm.Remove(id)
+			return 0, nil
+		}
+	}
+	ow, err := NewOAMWindow(p, scale, func(id uint32) { wm.Remove(id) })
+	if err != nil {
+		return 0, err
+	}
+	wm.Add(ow)
+	return ow.ID(), nil
+}
