@@ -163,7 +163,7 @@ func (f *Famicom) Start() {
 	}
 	f.windows.Add(gameWindow)
 
-	// CPU の作成（フレーム単位でメインが駆動する）
+	// CPU の初期化
 	if f.romLoaded {
 		f.cpu.Init(f.bus, f.config.Cpu.LOG_ENABLED)
 	}
@@ -178,25 +178,6 @@ func (f *Famicom) Start() {
 	lastFrameTime := time.Now()
 
 	for {
-		// フレームのサイクル数を計算
-		remAcc += remainderPerFrame
-		extra := 0
-		if remAcc >= FRAME_PER_SECOND {
-			extra = 1
-			remAcc -= FRAME_PER_SECOND
-		}
-		cyclesThisFrame := uint(baseCycles + extra)
-
-		// CPU をフレーム分だけ実行する（これがエミュレータの実時間を決める）
-		if f.romLoaded {
-			f.cpu.RunCycles(cyclesThisFrame)
-		} else {
-			const prompt = "DROP ROM FILE HERE"
-			ui.ClearScreen(f.bus.Canvas(), [3]uint8{0, 0, 0})
-			ui.DrawText(f.bus.Canvas(), (int(ppu.SCREEN_WIDTH)-len(prompt)*int(ppu.TILE_SIZE))/2, int(ppu.SCREEN_HEIGHT-ppu.TILE_SIZE)/2, prompt)
-			f.bus.Canvas().Swap()
-		}
-
 		// イベント処理
 		for event := eventPump(); event != nil; event = eventPump() {
 			switch e := event.(type) {
@@ -213,23 +194,17 @@ func (f *Famicom) Start() {
 						f.requestShutdown()
 					case sdl.K_F1:
 						if f.romLoaded && f.windows != nil {
-							if _, err := f.windows.ToggleOptionWindow(f.config); err != nil {
-								log.Printf("failed to toggle option window: %v", err)
-							}
-						}
-					case sdl.K_F2:
-						if f.romLoaded && f.windows != nil {
 							if _, err := f.windows.ToggleNameTableWindow(&f.ppu, f.config.Render.SCALE_FACTOR); err != nil {
 								log.Printf("failed to toggle name table window: %v", err)
 							}
 						}
-					case sdl.K_F3:
+					case sdl.K_F2:
 						if f.romLoaded && f.windows != nil {
 							if _, err := f.windows.ToggleCharacterWindow(&f.ppu, f.config.Render.SCALE_FACTOR); err != nil {
 								log.Printf("failed to toggle character window: %v", err)
 							}
 						}
-					case sdl.K_F4:
+					case sdl.K_F3:
 						if f.romLoaded && f.windows != nil {
 							if _, err := f.windows.ToggleAudioWindow(&f.apu, f.config.Render.SCALE_FACTOR); err != nil {
 								log.Printf("failed to toggle audio window: %v", err)
@@ -276,17 +251,33 @@ func (f *Famicom) Start() {
 				}
 			}
 
-			// JoyPad状態の更新
-			f.updateJoyPad(&f.joypad1, &f.keyboard1, &f.controller1)
-			f.updateJoyPad(&f.joypad2, &f.keyboard2, &f.controller2)
-
 			f.windows.HandleEvent(event)
 		}
 
-		// 描画（PPU フレームに合わせて）
+		// JoyPad状態の更新
+		f.updateJoyPad(&f.joypad1, &f.keyboard1, &f.controller1)
+		f.updateJoyPad(&f.joypad2, &f.keyboard2, &f.controller2)
+
+		// フレームのサイクル数を計算
+		remAcc += remainderPerFrame
+		extra := 0
+		if remAcc >= FRAME_PER_SECOND {
+			extra = 1
+			remAcc -= FRAME_PER_SECOND
+		}
+		cyclesThisFrame := uint(baseCycles + extra)
+
+		// CPU をフレーム分だけ実行する
+		if f.romLoaded {
+			f.cpu.RunCycles(cyclesThisFrame)
+		} else {
+			f.renderStartScreen()
+		}
+
+		// 全ウィンドウを描画
 		f.windows.RenderAll()
 
-		// フレームレート制御: PPU が速すぎて音より先行するのを防ぐ
+		// フレームレート制御
 		frameDuration := time.Second / FRAME_PER_SECOND
 		now := time.Now()
 		if elapsed := now.Sub(lastFrameTime); elapsed < frameDuration {
@@ -294,6 +285,14 @@ func (f *Famicom) Start() {
 		}
 		lastFrameTime = time.Now()
 	}
+}
+
+// MARK: ROM読み込み待機画面の描画メソッド
+func (f *Famicom) renderStartScreen() {
+	const prompt = "DROP ROM FILE HERE"
+	ui.ClearScreen(f.bus.Canvas(), [3]uint8{0, 0, 0})
+	ui.DrawText(f.bus.Canvas(), (int(ppu.SCREEN_WIDTH)-len(prompt)*int(ppu.TILE_SIZE))/2, int(ppu.SCREEN_HEIGHT-ppu.TILE_SIZE)/2, prompt)
+	f.bus.Canvas().Swap()
 }
 
 // MARK: ゲームの終了メソッド
@@ -421,6 +420,13 @@ func (f *Famicom) updateJoyPad(j *joypad.JoyPad, k *InputState, c *InputState) {
 	buttonDown := k.Down || c.Down
 	buttonLeft := k.Left || c.Left
 	buttonRight := k.Right || c.Right
+
+	if buttonUp && buttonDown {
+		buttonUp, buttonDown = false, false
+	}
+	if buttonLeft && buttonRight {
+		buttonLeft, buttonRight = false, false
+	}
 
 	// JoyPadの状態を更新
 	j.SetButtonPressed(joypad.JOYPAD_BUTTON_A_POSITION, buttonA)
