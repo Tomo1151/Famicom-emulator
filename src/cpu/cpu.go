@@ -68,6 +68,16 @@ func (c *CPU) Init(bus bus.Bus, debug bool) {
 
 // MARK:  命令の実行
 func (c *CPU) Step() {
+	// NMIの実行
+	if c.bus.NMI() {
+		c.interrupt(NMI)
+	}
+
+	// IRQの実行
+	if !c.registers.P.Interrupt && (c.bus.APUIRQ() || c.bus.MapperIRQ()) {
+		c.interrupt(IRQ)
+	}
+
 	// 命令のフェッチ
 	opecode := c.ReadByteFrom(c.registers.PC)
 
@@ -103,20 +113,6 @@ func (c *CPU) Run() {
 
 func (c *CPU) RunWithCallback(callback func(c *CPU)) {
 	for {
-		// NMIが発生したら処理をする
-		nmi := c.bus.NMI()
-		if nmi {
-			c.interrupt(NMI)
-		}
-
-		apuIrq := c.bus.APUIRQ()
-		mapperIrq := c.bus.MapperIRQ()
-
-		// APUまたはマッパーでIRQが発生していて割込み禁止フラグが立っていないならIRQを処理
-		if !c.registers.P.Interrupt && (apuIrq || mapperIrq) {
-			c.interrupt(IRQ)
-		}
-
 		// コールバックを実行
 		callback(c)
 
@@ -132,8 +128,8 @@ func (c *CPU) interrupt(interrupt Interrupt) {
 
 	// ステータスレジスタをスタックにプッシュ
 	status := c.registers.P
-	status.Break = interrupt.BFlagMask&0b0001_0000 == 1
-	status.Reserved = interrupt.BFlagMask&0b0010_0000 == 1
+	status.Break = interrupt.BFlagMask&0b0001_0000 != 0
+	status.Reserved = interrupt.BFlagMask&0b0010_0000 != 0
 	c.pushByte(status.ToByte())
 	c.registers.P.Interrupt = true
 
@@ -501,13 +497,13 @@ func (c *CPU) bpl(mode AddressingMode) {
 
 // MARK: BRK命令の実装
 func (c *CPU) brk(mode AddressingMode) {
-	if c.registers.P.Interrupt {
-		return
-	}
+	c.pushWord(c.registers.PC + 2)
 
-	c.pushWord(c.registers.PC + 1)
-	c.registers.P.Break = true
-	c.pushByte(c.registers.P.ToByte())
+	status := c.registers.P
+	status.Break = true
+	c.pushByte(status.ToByte())
+
+	c.registers.P.Interrupt = true
 	c.registers.PC = c.ReadWordFrom(0xFFFE)
 }
 
