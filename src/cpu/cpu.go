@@ -68,6 +68,16 @@ func (c *CPU) Init(bus bus.Bus, debug bool) {
 
 // MARK:  命令の実行
 func (c *CPU) Step() {
+	// NMIの実行
+	if c.bus.NMI() {
+		c.interrupt(NMI)
+	}
+
+	// IRQの実行
+	if !c.registers.P.Interrupt && (c.bus.APUIRQ() || c.bus.MapperIRQ()) {
+		c.interrupt(IRQ)
+	}
+
 	// 命令のフェッチ
 	opecode := c.ReadByteFrom(c.registers.PC)
 
@@ -103,20 +113,6 @@ func (c *CPU) Run() {
 
 func (c *CPU) RunWithCallback(callback func(c *CPU)) {
 	for {
-		// NMIが発生したら処理をする
-		nmi := c.bus.NMI()
-		if nmi {
-			c.interrupt(NMI)
-		}
-
-		apuIrq := c.bus.APUIRQ()
-		mapperIrq := c.bus.MapperIRQ()
-
-		// APUまたはマッパーでIRQが発生していて割込み禁止フラグが立っていないならIRQを処理
-		if !c.registers.P.Interrupt && (apuIrq || mapperIrq) {
-			c.interrupt(IRQ)
-		}
-
 		// コールバックを実行
 		callback(c)
 
