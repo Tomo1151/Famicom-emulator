@@ -561,6 +561,7 @@ func generateInstructionSet(c *CPU) instructionSet {
 		Bytes:          1,
 		Cycles:         7,
 		PageCycles:     0,
+		Jump:           true,
 		Handler:        c.brk,
 	}
 
