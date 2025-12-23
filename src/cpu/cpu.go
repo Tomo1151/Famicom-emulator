@@ -132,8 +132,8 @@ func (c *CPU) interrupt(interrupt Interrupt) {
 
 	// ステータスレジスタをスタックにプッシュ
 	status := c.registers.P
-	status.Break = interrupt.BFlagMask&0b0001_0000 == 1
-	status.Reserved = interrupt.BFlagMask&0b0010_0000 == 1
+	status.Break = interrupt.BFlagMask&0b0001_0000 != 0
+	status.Reserved = interrupt.BFlagMask&0b0010_0000 != 0
 	c.pushByte(status.ToByte())
 	c.registers.P.Interrupt = true
 
@@ -501,13 +501,13 @@ func (c *CPU) bpl(mode AddressingMode) {
 
 // MARK: BRK命令の実装
 func (c *CPU) brk(mode AddressingMode) {
-	if c.registers.P.Interrupt {
-		return
-	}
+	c.pushWord(c.registers.PC + 2)
 
-	c.pushWord(c.registers.PC + 1)
-	c.registers.P.Break = true
-	c.pushByte(c.registers.P.ToByte())
+	status := c.registers.P
+	status.Break = true
+	c.pushByte(status.ToByte())
+
+	c.registers.P.Interrupt = true
 	c.registers.PC = c.ReadWordFrom(0xFFFE)
 }
 

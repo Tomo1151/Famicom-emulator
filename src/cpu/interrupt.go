@@ -14,6 +14,6 @@ type Interrupt struct {
 	CPUCycles     uint8
 }
 
-var NMI = Interrupt{Type: TYPE_NMI, VectorAddress: 0xFFFA, BFlagMask: 0b0010_0000, CPUCycles: 2}
+var NMI = Interrupt{Type: TYPE_NMI, VectorAddress: 0xFFFA, BFlagMask: 0b0010_0000, CPUCycles: 7}
 
-var IRQ = Interrupt{Type: TYPE_IRQ, VectorAddress: 0xFFFE, BFlagMask: 0b0001_0000, CPUCycles: 2}
+var IRQ = Interrupt{Type: TYPE_IRQ, VectorAddress: 0xFFFE, BFlagMask: 0b0010_0000, CPUCycles: 7}
