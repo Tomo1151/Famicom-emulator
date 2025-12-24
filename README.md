@@ -149,6 +149,7 @@ This program implements the following components (some of which may not be compl
   - [x] accurate sprite 0 hit
   - [ ] accurate scanline rendering emulate
   - [x] ppu open bus emulate
+  - [ ] MMC3 IRQ clocking via PPU A12 (mmc3_irq_tests)
 - [x] APU
   - [x] square wave Channel (1 / 2ch)
   - [x] triangle wave Channel (3ch)
