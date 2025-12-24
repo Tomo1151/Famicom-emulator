@@ -60,6 +60,61 @@ cd src && go run . example_rom.nes
 cd src && go run . tests/example_rom.nes
 ```
 
+## Configuratoin
+
+This emulator loads its startup configuration from `src/config.json`.
+Editing this file lets you change runtime options (rendering / audio / ROM loading) and key mappings.
+
+Config structure:
+
+```jsonc
+{
+  "rom": {
+    "autoLoading": false
+  },
+  "render": {
+    "scale": 3,
+    "doubleBuffering": true,
+    "fullscreen": false
+  },
+  "apu": {
+    "volume": 1.0,
+    "log": false,
+    "mute1ch": false,
+    "mute2ch": false,
+    "mute3ch": false,
+    "mute4ch": false,
+    "mute5ch": false
+  },
+  "cpu": {
+    "log": false
+  },
+  "control": {
+    "gamepadAxisThreshold": 8000,
+    "key1p": {
+      "buttonA": "K",
+      "buttonB": "J",
+      "buttonUp": "W",
+      "buttonDown": "S",
+      "buttonRight": "D",
+      "buttonLeft": "A",
+      "buttonStart": "RETURN",
+      "buttonSelect": "BACKSPACE"
+    },
+    "key2p": {
+      "buttonA": "/",
+      "buttonB": ".",
+      "buttonUp": "G",
+      "buttonDown": "B",
+      "buttonRight": "N",
+      "buttonLeft": "V",
+      "buttonStart": "RETURN",
+      "buttonSelect": "BACKSPACE"
+    }
+  }
+}
+```
+
 ## Controls
 
 ### Gamepad
@@ -147,9 +202,10 @@ This program implements the following components (some of which may not be compl
   - [x] reset
 - [x] PPU
   - [x] rough scanline rendering (including scrolling)
-  - [ ] accurate sprite 0 hit
+  - [x] accurate sprite 0 hit
   - [ ] accurate scanline rendering emulate
   - [x] ppu open bus emulate
+  - [ ] MMC3 IRQ clocking via PPU A12 (mmc3_irq_tests)
 - [x] APU
   - [x] square wave Channel (1 / 2ch)
   - [x] triangle wave Channel (3ch)

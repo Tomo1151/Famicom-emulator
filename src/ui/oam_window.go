@@ -123,7 +123,7 @@ func (o *OAMWindow) Update() {
 	// フレーム最初のマッパーを使用
 	mapper := o.ppu.MapperSnapshot()
 
-	oam := o.ppu.OAM()
+	oam := o.ppu.Oam()
 
 	// クリア（前フレームの残りが見えないように）
 	for i := 0; i < len(o.buffer); i += 3 {

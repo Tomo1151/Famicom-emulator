@@ -514,48 +514,38 @@
     > unable to verify because the screen is not displayed
     > T+ clock (decimal) ?
 - sprite_hit_tests_2005.10.05
-  - 01.basics: F
-    > 4: Should miss when background rendering is off
-  - 02.alignment: F
-    > 3: Sprite should miss left side of bg tile
+  - 01.basics: S
+  - 02.alignment: S
   - 03.corners: S
   - 04.flip: S
-  - 05.left_clip: F
-    > 2: Should miss when entirely n left-edge clipping
-  - 06.right_edge: F
-    > 2: Should always miss when X = 255
-  - 07.screen_bottom: F
-    > 3: Can hit when Y < 239
-  - 08.double_height: F
-    > 2: Lower sprite tile should miss bottom of bg tile
-  - 09.timing_basics: F
-    > 3: Upper-left corner too late
-  - 10.timing_order: F
-    > 3: Upper-left corner too late
+  - 05.left_clip: S
+  - 06.right_edge: S
+  - 07.screen_bottom: S
+  - 08.double_height: S
+  - 09.timing_basics: S
+  - 10.timing_order: S
   - 11.edge_timing: S
 - sprite_overflow_tests
   - 1.Basics: F
-    > 5: Should be cleared at the end of VBL
+    > 2: Should be set when 9 sprites are on a scanline
   - 2.Details: F
-    > 3: Disabling rendering shouldn't clear flag
+    > 2: Should be set even when sprites are under left clip (X = 0)
   - 3.Timing: F
-    > 2: Cleared too late
+    > 3: Too early at end of VBL
   - 4.Obscure: F
     > 2: Checks that second byte of sprite #10 is treated as its Y
   - 5.Emulator: F
-    > 3: Disabling rendering didn't recalculate flag time
+    > 2: Didn't calculate overflow when there was no $2002 read for frame
 - tvpassfail
   - tv: P
     > incorrect aspect ratio
 - vbl_nmi_timing
-  - 1.frame_basics: F
-    > 5: PPU frame with BG enabled is too long
+  - 1.frame_basics: S
   - 2.vbl_timing: F
     > 8: Reading 1 PPU clock before VBL should suppress setting
   - 3.even_odd_frames: F
     > 3: Pattern BB--- should skip 1 clock
-  - 4.vbl_clear_timing: F
-    > 5: Cleared 3 or more PPU clock too late
+  - 4.vbl_clear_timing: S
   - 5.nmi_suppression: F
     > 3: Reading flag when it's set should suppress NMI
   - 6.nmi_disable: F
