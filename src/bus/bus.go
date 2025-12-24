@@ -287,10 +287,27 @@ func (b *Bus) WriteByteAt(address uint16, data uint8) {
 		for i := range 256 {
 			buffer[i] = b.ReadByteFrom(upper + uint16(i))
 		}
-		// DMA転送には513PPU tick掛かる
-		for range 513 {
+
+		// OAM DMA は 513 / 514 CPU サイクル を消費する
+		var dmaCpuCycles uint
+		if b.cycles%2 == 0 {
+			dmaCpuCycles = 513
+		} else {
+			dmaCpuCycles = 514
+		}
+		b.cycles += dmaCpuCycles
+
+		// PPU のサイクルを進める
+		for range dmaCpuCycles * 3 {
 			b.ppu.Tick(b.canvas, 1)
 		}
+
+		// APU のサイクルを進める
+		for range dmaCpuCycles {
+			b.apu.Tick(1)
+		}
+
+		// 用意されたデータを転送
 		b.ppu.DMATransfer(&buffer)
 	case address == 0x4015: // APU
 		b.apu.WriteStatus(data)
