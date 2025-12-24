@@ -41,7 +41,16 @@ func (n *NROM) ReadCharacterRom(address uint16) uint8 {
 }
 
 // MARK: キャラクタROMへの書き込み
-func (n *NROM) WriteToCharacterRom(address uint16, data uint8) {}
+func (n *NROM) WriteToCharacterRom(address uint16, data uint8) {
+	// CHR RAM のときのみ互換性のため書き込み可能にする
+	if !n.isCharacterRam {
+		return
+	}
+	if int(address) < 0 || int(address) >= len(n.characterRom) {
+		return
+	}
+	n.characterRom[address] = data
+}
 
 // MARK: プログラムRAMの読み取り
 func (n *NROM) ReadProgramRam(address uint16) uint8 {
