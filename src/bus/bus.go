@@ -84,7 +84,7 @@ func (b *Bus) ConnectComponents(
 
 // MARK: NMIを取得
 func (b *Bus) NMI() bool {
-	return b.ppu.NMI()
+	return b.ppu.PollNmiStatus()
 }
 
 // MARK: APUのIRQを取得
@@ -112,7 +112,7 @@ func (b *Bus) Shutdown() {
 func (b *Bus) Tick(cycles uint) {
 	b.cycles += cycles
 
-	nmiBefore := b.ppu.CheckNMI()
+	nmiBefore := b.ppu.Nmi()
 
 	frameEnd := false
 
@@ -129,7 +129,7 @@ func (b *Bus) Tick(cycles uint) {
 	// APUと同期
 	b.apu.Tick(cycles)
 
-	nmiAfter := b.ppu.CheckNMI()
+	nmiAfter := b.ppu.Nmi()
 	if frameEnd || (!nmiBefore && nmiAfter) {
 		b.apu.EndFrame()
 		b.callback(b.ppu, b.canvas, b.joypad1, b.joypad2)

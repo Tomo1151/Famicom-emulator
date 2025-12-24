@@ -146,7 +146,7 @@ This program implements the following components (some of which may not be compl
   - [x] reset
 - [x] PPU
   - [x] rough scanline rendering (including scrolling)
-  - [ ] accurate sprite 0 hit
+  - [x] accurate sprite 0 hit
   - [ ] accurate scanline rendering emulate
   - [x] ppu open bus emulate
 - [x] APU

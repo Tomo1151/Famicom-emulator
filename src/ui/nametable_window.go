@@ -103,7 +103,7 @@ func (n *NameTableWindow) setScale(s int) {
 
 // MARK: 更新メソッド
 func (n *NameTableWindow) Update() {
-	vramPtr := n.ppu.VRAM()
+	vramPtr := n.ppu.Vram()
 
 	const cols uint = 32
 	const rows uint = 30
