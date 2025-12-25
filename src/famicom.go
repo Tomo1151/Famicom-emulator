@@ -216,7 +216,10 @@ func (f *Famicom) Start() {
 								log.Printf("failed to toggle audio window: %v", err)
 							}
 						}
-
+					case sdl.K_F8:
+						f.ppu.ToggleBackgroundEnabled()
+					case sdl.K_F9:
+						f.ppu.ToggleSpriteEnabled()
 					case sdl.K_F10:
 						f.apu.ToggleLog()
 					case sdl.K_F11:

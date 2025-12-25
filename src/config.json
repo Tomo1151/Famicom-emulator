@@ -19,6 +19,10 @@
   "cpu": {
     "log": false
   },
+  "ppu": {
+    "background": true,
+    "sprite": true
+  },
   "control": {
     "gamepadAxisThreshold": 8000,
     "key1p": {

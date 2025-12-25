@@ -88,6 +88,10 @@ Config structure:
   "cpu": {
     "log": false
   },
+  "ppu": {
+    "background": true,
+    "sprite": true
+  },
   "control": {
     "gamepadAxisThreshold": 8000,
     "key1p": {
@@ -144,6 +148,8 @@ Config structure:
 | Show / Hide audio visualizer                         | F4  |
 | Expand debug window                                  |  -  |
 | Shrink debug window                                  |  +  |
+| Enable / Disable Background                          | F8  |
+| Enable / Disable Sprite                              | F9  |
 | Enable / Disable APU log                             | F10 |
 | Enable / Disable CPU log (very processing intensive) | F11 |
 | Reset                                                |  Y  |
