@@ -115,44 +115,15 @@ func (f *Famicom) Start() {
 	defer f.windows.CloseAll()
 
 	// ゲームコントローラの接続
-	var gamepad1, gamepad2 *sdl.GameController
-	if sdl.NumJoysticks() == 0 {
-		fmt.Println("No controller detected")
-	}
-	if sdl.NumJoysticks() > 0 {
-		gamepad1 = sdl.GameControllerOpen(0)
-		if gamepad1 != nil {
-			f.gamepad1 = gamepad1.Joystick().InstanceID()
-			fmt.Println("Controller opened for 1P:", gamepad1.Name())
-			f.adapter1.Init(gamepad1.Name())
-			defer gamepad1.Close()
-		}
-	}
-	if sdl.NumJoysticks() > 1 {
-		gamepad2 = sdl.GameControllerOpen(1)
-		if gamepad2 != nil {
-			f.gamepad2 = gamepad2.Joystick().InstanceID()
-			f.adapter2.Init(gamepad2.Name())
-			fmt.Println("Controller opened for 2P:", gamepad2.Name())
-			defer gamepad2.Close()
-		}
-	}
+	f.setupGamepads()
 
-	// 状態変数の定義
-	eventPump := sdl.PollEvent
+	// Busの初期化
+	f.bus.Init()
 
-	// フレーム同期用チャネル: PPU がフレーム完了を通知するが、
-	// メインスレッドが CPU を駆動しているので非ブロッキングで通知する。
-	frameCh := make(chan struct{}, 1) // PPU -> main (non-blocking, buffered)
-
-	// Busの初期化とフレーム毎に実行されるコールバックの定義
-	// PPU のフレーム到達を非ブロッキングで通知する（CPU はメインループが駆動する）。
-	f.bus.Init(func(p *ppu.PPU, c *ppu.Canvas, j1 *joypad.JoyPad, j2 *joypad.JoyPad) {
-		select {
-		case frameCh <- struct{}{}:
-		default:
-		}
-	})
+	// CPU の初期化
+	if f.romLoaded {
+		f.cpu.Init(f.bus, *f.config)
+	}
 
 	// ゲームウィンドウの作成
 	gameWindow, err := ui.NewGameWindow(f.config.Render.SCALE_FACTOR, f.config.Render.FULLSCREEN, f.bus.Canvas(), func() {
@@ -163,23 +134,19 @@ func (f *Famicom) Start() {
 	}
 	f.windows.Add(gameWindow)
 
-	// CPU の初期化
-	if f.romLoaded {
-		f.cpu.Init(f.bus, *f.config)
-	}
-
-	// メインループ: メインが CPU をフレーム単位で駆動し、描画とイベント処理を行う。
-	// フレームあたりの CPU サイクル数を計算して RunCycles に渡す。
-	const ntscCpuClock = 1789773
-	baseCycles := int(ntscCpuClock / FRAME_PER_SECOND)        // 29829
-	remainderPerFrame := int(ntscCpuClock % FRAME_PER_SECOND) // 33
-	remAcc := 0
-
-	lastFrameTime := time.Now()
+	/*
+		メインループ:
+			- CPUは実時間に追従するようにサイクルを進める
+			- 描画は SDL の VSync(Present待ち) がフレームペースを作る
+	*/
+	const ntscCpuClockHz = 1789773.0
+	lastTick := time.Now()
+	cpuCycleAcc := 0.0
+	const maxDtSec = 0.25
 
 	for {
 		// イベント処理
-		for event := eventPump(); event != nil; event = eventPump() {
+		for event := sdl.PollEvent(); event != nil; event = sdl.PollEvent() {
 			switch e := event.(type) {
 			case *sdl.DropEvent:
 				if e.Type == sdl.DROPFILE {
@@ -268,32 +235,54 @@ func (f *Famicom) Start() {
 		f.updateJoyPad(&f.joypad1, &f.keyboard1, &f.controller1)
 		f.updateJoyPad(&f.joypad2, &f.keyboard2, &f.controller2)
 
-		// フレームのサイクル数を計算
-		remAcc += remainderPerFrame
-		extra := 0
-		if remAcc >= FRAME_PER_SECOND {
-			extra = 1
-			remAcc -= FRAME_PER_SECOND
+		// 経過時間に応じた CPU サイクルを実行
+		now := time.Now()
+		dtSec := now.Sub(lastTick).Seconds()
+		lastTick = now
+		if dtSec > maxDtSec {
+			dtSec = maxDtSec
 		}
-		cyclesThisFrame := uint(baseCycles + extra)
+		cpuCycleAcc += ntscCpuClockHz * dtSec
+		cyclesToRun := uint(cpuCycleAcc)
+		if cyclesToRun > 0 {
+			if f.romLoaded {
+				f.cpu.RunCycles(cyclesToRun)
+			}
+			cpuCycleAcc -= float64(cyclesToRun)
+		}
 
-		// CPU をフレーム分だけ実行する
-		if f.romLoaded {
-			f.cpu.RunCycles(cyclesThisFrame)
-		} else {
+		if !f.romLoaded {
 			f.renderStartScreen()
 		}
 
 		// 全ウィンドウを描画
 		f.windows.RenderAll()
+	}
+}
 
-		// フレームレート制御
-		frameDuration := time.Second / FRAME_PER_SECOND
-		now := time.Now()
-		if elapsed := now.Sub(lastFrameTime); elapsed < frameDuration {
-			time.Sleep(frameDuration - elapsed)
+// MARK: ゲームコントローラのセットアップ
+func (f *Famicom) setupGamepads() {
+	var gamepad1, gamepad2 *sdl.GameController
+	if sdl.NumJoysticks() == 0 {
+		fmt.Println("No controller detected")
+	}
+	if sdl.NumJoysticks() > 0 {
+		gamepad1 = sdl.GameControllerOpen(0)
+		if gamepad1 != nil {
+			f.gamepad1 = gamepad1.Joystick().InstanceID()
+			fmt.Println("Controller opened for 1P:", gamepad1.Name())
+			f.adapter1.Init(gamepad1.Name())
+			defer gamepad1.Close()
 		}
-		lastFrameTime = time.Now()
+	}
+	if sdl.NumJoysticks() > 1 {
+		gamepad2 = sdl.GameControllerOpen(1)
+		if gamepad2 != nil {
+			f.gamepad2 = gamepad2.Joystick().InstanceID()
+			f.adapter2.Init(gamepad2.Name())
+			fmt.Println("Controller opened for 2P:", gamepad2.Name())
+			defer gamepad2.Close()
+		}
 	}
 }
 

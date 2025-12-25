@@ -71,6 +71,15 @@ func (b *BlipBuffer) Read(out []float32, count int) int {
 	b.mutex.Lock()
 	defer b.mutex.Unlock()
 
+	// 生成速度が消費速度を上回る場合にバッファが肥大化し、遅延が増大するのを防ぐ
+	if len(b.samples) > BUFFER_SIZE {
+		drop := len(b.samples) - BUFFER_SIZE
+		b.samples = b.samples[drop:]
+		if b.log {
+			fmt.Printf("[BlipBuffer] Dropped %d samples to prevent latency\n", drop)
+		}
+	}
+
 	var last float32 = b.lastLevel
 	n := min(len(b.samples), count)
 
