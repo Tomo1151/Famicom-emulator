@@ -78,6 +78,11 @@ func (c *CPU) Step() {
 		c.interrupt(IRQ)
 	}
 
+	// 実行ログのトレース
+	if c.config.Cpu.LOG_ENABLED {
+		fmt.Println(c.Trace())
+	}
+
 	// 命令のフェッチ
 	opecode := c.ReadByteFrom(c.registers.PC)
 
@@ -1219,25 +1224,9 @@ func (c *CPU) REPL(commands []uint8) {
 
 // MARK: サイクル数を指定してCPUを実行
 func (c *CPU) RunCycles(targetCycles uint) {
-	if c.config.Cpu.LOG_ENABLED {
-		fmt.Println(c.Trace())
-	}
-
 	var executed uint = 0
 
 	for executed < targetCycles {
-		// Handle interrupts
-		nmi := c.bus.NMI()
-		if nmi {
-			c.interrupt(NMI)
-		}
-
-		apuIrq := c.bus.APUIRQ()
-		mapperIrq := c.bus.MapperIRQ()
-		if !c.registers.P.Interrupt && (apuIrq || mapperIrq) {
-			c.interrupt(IRQ)
-		}
-
 		prev := c.bus.Cycles()
 		c.Step()
 		post := c.bus.Cycles()
