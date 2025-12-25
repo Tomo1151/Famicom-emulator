@@ -29,7 +29,6 @@ type Bus struct {
 	joypad1   *joypad.JoyPad           // ポインタに変更
 	joypad2   *joypad.JoyPad           // コントローラ (2P)
 	cycles    uint                     // CPUサイクル
-	callback  func(*ppu.PPU, *ppu.Canvas, *joypad.JoyPad, *joypad.JoyPad)
 	canvas    *ppu.Canvas
 	config    *config.Config
 }
@@ -42,11 +41,10 @@ func (b *Bus) InitForTest() {
 }
 
 // MARK: Busの初期化メソッド (ConnectComponents後に呼ばれる)
-func (b *Bus) Init(callback func(*ppu.PPU, *ppu.Canvas, *joypad.JoyPad, *joypad.JoyPad)) {
+func (b *Bus) Init() {
 	for addr := range b.wram {
 		b.wram[addr] = 0x00
 	}
-	b.callback = callback
 	b.canvas = &ppu.Canvas{}
 	b.canvas.Init(*b.config)
 }
@@ -132,7 +130,6 @@ func (b *Bus) Tick(cycles uint) {
 	nmiAfter := b.ppu.CheckNMI()
 	if frameEnd || (!nmiBefore && nmiAfter) {
 		b.apu.EndFrame()
-		b.callback(b.ppu, b.canvas, b.joypad1, b.joypad2)
 	}
 }
 
