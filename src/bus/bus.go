@@ -76,7 +76,7 @@ func (b *Bus) ConnectComponents(
 	b.joypad2 = joypad2
 
 	// 各コンポーネントを初期化
-	b.ppu.Init(b.cartridge.Mapper())
+	b.ppu.Init(b.cartridge.Mapper(), *b.config)
 	b.apu.Init(b.ReadByteFrom, *b.config)
 	b.joypad1.Init()
 	b.joypad2.Init()

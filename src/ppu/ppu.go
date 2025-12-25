@@ -2,6 +2,7 @@ package ppu
 
 import (
 	"Famicom-emulator/cartridge/mappers"
+	"Famicom-emulator/config"
 	"fmt"
 )
 
@@ -81,11 +82,14 @@ type PPU struct {
 	// デバッグウィンドウ用のスナップショット
 	vLineStart     InternalAddressRegiseter
 	mapperSnapshot mappers.Mapper
+
+	config config.Config
 }
 
 // MARK: PPUの初期化メソッド
-func (p *PPU) Init(mapper mappers.Mapper) {
+func (p *PPU) Init(mapper mappers.Mapper, config config.Config) {
 	p.mapper = mapper
+	p.config = config
 
 	// VRAM/OAM/パレットの初期化
 	for addr := range p.vram {
@@ -677,7 +681,7 @@ func (p *PPU) fetchSpriteRowBytes(tileIndex uint16, spriteHeight uint8, tileY ui
 // MARK: 指定したスキャンラインのBG面を計算
 func (p *PPU) CalculateScanlineBackground(canvas *Canvas, scanline uint16) {
 	// BGが無効であれば描画をしない
-	if !p.mask.backgroundEnable {
+	if !p.mask.backgroundEnable || !p.config.Ppu.BACKGROUND_ENABLED {
 		return
 	}
 
@@ -747,7 +751,7 @@ func (p *PPU) CalculateScanlineBackground(canvas *Canvas, scanline uint16) {
 // MARK: 指定したスキャンラインのスプライトを計算
 func (p *PPU) CalculateScanlineSprite(canvas *Canvas, scanline uint16) {
 	// スプライトが無効であれば描画しない
-	if !p.mask.spriteEnable {
+	if !p.mask.spriteEnable || !p.config.Ppu.SPRITE_ENABLED {
 		return
 	}
 
@@ -1066,4 +1070,34 @@ func (p *PPU) Scanline() uint16 {
 // MARK: 待機しているNMIを確認
 func (p *PPU) Nmi() bool {
 	return p.nmi
+}
+
+// MARK: コンフィグのBG描画有効/無効の取得メソッド
+func (p *PPU) ConfigBackgroundEnabled() bool {
+	return p.config.Ppu.BACKGROUND_ENABLED
+}
+
+// MARK: コンフィグのBG描画有効/無効の切り替えメソッド
+func (p *PPU) ToggleBackgroundEnabled() {
+	if p.config.Ppu.BACKGROUND_ENABLED {
+		fmt.Println("[PPU] Background: OFF")
+	} else {
+		fmt.Println("[PPU] Background: ON")
+	}
+	p.config.Ppu.BACKGROUND_ENABLED = !p.config.Ppu.BACKGROUND_ENABLED
+}
+
+// MARK: コンフィグのSprite描画有効/無効の取得メソッド
+func (p *PPU) ConfigSpriteEnabled() bool {
+	return p.config.Ppu.SPRITE_ENABLED
+}
+
+// MARK: コンフィグのスプライト描画有効/無効の切り替えメソッド
+func (p *PPU) ToggleSpriteEnabled() {
+	if p.config.Ppu.SPRITE_ENABLED {
+		fmt.Println("[PPU] Sprite: OFF")
+	} else {
+		fmt.Println("[PPU] Sprite: ON")
+	}
+	p.config.Ppu.SPRITE_ENABLED = !p.config.Ppu.SPRITE_ENABLED
 }

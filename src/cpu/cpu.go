@@ -5,15 +5,15 @@ import (
 	"log"
 
 	"Famicom-emulator/bus"
+	"Famicom-emulator/config"
 )
 
 // MARK: CPUの定義
 type CPU struct {
-	registers      registers      // レジスタ
-	InstructionSet instructionSet // 命令セット
-
-	bus bus.Bus
-	log bool // デバッグ出力フラグ
+	registers      registers
+	InstructionSet instructionSet
+	bus            bus.Bus
+	config         config.Config
 }
 
 // MARK: CPUの初期化メソッド (カートリッジ無し，デバッグ・テスト用)
@@ -39,11 +39,11 @@ func (c *CPU) InitForTest(debug bool) {
 	c.bus = bus.Bus{}
 	c.bus.InitForTest()
 	c.InstructionSet = generateInstructionSet(c)
-	c.log = debug
+	c.config.Cpu.LOG_ENABLED = debug
 }
 
 // MARK: CPUの初期化メソッド (Bus有り)
-func (c *CPU) Init(bus bus.Bus, debug bool) {
+func (c *CPU) Init(bus bus.Bus, config config.Config) {
 	c.bus = bus
 	c.registers = registers{
 		A: 0x00,
@@ -63,7 +63,7 @@ func (c *CPU) Init(bus bus.Bus, debug bool) {
 		PC: c.ReadWordFrom(0xFFFC),
 	}
 	c.InstructionSet = generateInstructionSet(c)
-	c.log = debug
+	c.config = config
 }
 
 // MARK:  命令の実行
@@ -105,7 +105,7 @@ func (c *CPU) Step() {
 // MARK: ループ実行
 func (c *CPU) Run() {
 	c.RunWithCallback(func(c *CPU) {
-		if c.log {
+		if c.config.Cpu.LOG_ENABLED {
 			fmt.Println(c.Trace())
 		}
 	})
@@ -1192,12 +1192,12 @@ func (c *CPU) Trace() string {
 
 // MARK: デバッグ用ログ出力切り替え
 func (c *CPU) ToggleLog() {
-	if c.log {
+	if c.config.Cpu.LOG_ENABLED {
 		fmt.Println("[CPU] Debug log: OFF")
 	} else {
 		fmt.Println("[CPU] Debug log: ON")
 	}
-	c.log = !c.log
+	c.config.Cpu.LOG_ENABLED = !c.config.Cpu.LOG_ENABLED
 }
 
 // MARK: デバッグ用実行メソッド
@@ -1219,7 +1219,7 @@ func (c *CPU) REPL(commands []uint8) {
 
 // MARK: サイクル数を指定してCPUを実行
 func (c *CPU) RunCycles(targetCycles uint) {
-	if c.log {
+	if c.config.Cpu.LOG_ENABLED {
 		fmt.Println(c.Trace())
 	}
 

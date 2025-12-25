@@ -96,7 +96,7 @@ func (f *Famicom) loadDroppedFile(path string) {
 		&f.joypad2,
 		f.config,
 	)
-	f.cpu.Init(f.bus, f.config.Cpu.LOG_ENABLED)
+	f.cpu.Init(f.bus, *f.config)
 	f.cpu.Reset()
 	fmt.Printf("Load ROM file: %s\n", filepath.Base(path))
 }
@@ -165,7 +165,7 @@ func (f *Famicom) Start() {
 
 	// CPU の初期化
 	if f.romLoaded {
-		f.cpu.Init(f.bus, f.config.Cpu.LOG_ENABLED)
+		f.cpu.Init(f.bus, *f.config)
 	}
 
 	// メインループ: メインが CPU をフレーム単位で駆動し、描画とイベント処理を行う。
@@ -216,7 +216,10 @@ func (f *Famicom) Start() {
 								log.Printf("failed to toggle audio window: %v", err)
 							}
 						}
-
+					case sdl.K_F8:
+						f.ppu.ToggleBackgroundEnabled()
+					case sdl.K_F9:
+						f.ppu.ToggleSpriteEnabled()
 					case sdl.K_F10:
 						f.apu.ToggleLog()
 					case sdl.K_F11:

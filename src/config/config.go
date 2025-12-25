@@ -42,6 +42,7 @@ var DefaultControl = ControlConfig{
 // MARK: Configの定義
 type Config struct {
 	Cpu     CpuConfig     `json:"cpu"`
+	Ppu     PpuConfig     `json:"ppu"`
 	Apu     ApuConfig     `json:"apu"`
 	Render  RenderConfig  `json:"render"`
 	Rom     RomConfig     `json:"rom"`
@@ -62,6 +63,12 @@ type ApuConfig struct {
 // MARK: CpuConfigの定義
 type CpuConfig struct {
 	LOG_ENABLED bool `json:"log"`
+}
+
+// MARK: PpuConfigの定義
+type PpuConfig struct {
+	BACKGROUND_ENABLED bool `json:"background"`
+	SPRITE_ENABLED     bool `json:"sprite"`
 }
 
 // MARK: RenderConfigの定義
