@@ -116,13 +116,26 @@
     > 3
 - cpu_dummy_writes
   - cpu_dummy_writes_oam: U
-    > \$2002 must be mirrored every 8 bytes to \$3FFA  
-    > Error 2
+    > 0E2E4E6ECEEE 1E3E5E7EDEFE *12  
+    > 0F2F4F6FCFEF 1F3F5F7FDFFF *12  
+    > 03234363C3E3 13335373D3F3 *12  
+    > 1B3B5B7BDBFB *6  
+    > 42 OPCODES FAILED THE TEST  
+    > Failed #5
   - cpu_dummy_writes_ppumem: F
-    > panic: attempt to write to PPU Status register (specification investigation required)
+    > 0E2E4E6ECEEE 1E3E5E7EDEFE *12  
+    > 0F2F4F6FCFEF 1F3F5F7FDFFF *12  
+    > 03234363C3E3 13335373D3F3 *12  
+    > 1B3B5B7BDBFB *6  
+    > 42 OPCODES FAILED THE TEST  
+    > Failed #9
 - cpu_exec_space
   - test_cpu_exec_space_apu: F
-    > panic: attempt to read from OAM Data register (specification investigation required)
+    > 4000 ERROR  
+    > Mysteriously Landed at $0234  
+    > Program flow did not follow the planned path, for a number of different possible reasons.  
+    > Failure To Obey Predetermined Execution Path  
+    > Failed #2
   - test_cpu_exec_space_ppuio: F
     > An RTS opcode should still do a dummy fetch of the next opcode. (The same goes for all one-byte opcodes, really).  
     > Failed #5
@@ -256,10 +269,8 @@
     - 11-jmp_jsr: S
     - 12-rts: S
     - 13-rti: S
-    - 14-brk: F
-      > panic: attempt to read from PPU Address register
-    - 15-special: F
-      > panic: unsupported: read program ROM on NROM
+    - 14-brk: S
+    - 15-special: S
 - instr_timing
   - instr_timing: F
     > unsupported mirroring mode
@@ -292,28 +303,24 @@
       - RRA tests: S
 - nes_instr_test
   - rom_singles
-    - 01-implied: F
-      > unsupported read program RAM on NROM
+    - 01-implied: S
     - 02-immediate: F
-      > unsupported read program RAM on NROM
-    - 03-zero_page: F
-      > unsupported read program RAM on NROM
-    - 04-zp_xy: F
-      > unsupported read program RAM on NROM
-    - 05-absolute: F
-      > unsupported read program RAM on NROM
+      > 6B ARR #n  
+      > AB ATX #n  
+      > Failed
+    - 03-zero_page: S
+    - 04-zp_xy: S
+    - 05-absolute: S
     - 06-abs_xy: F
-      > unsupported read program RAM on NROM
-    - 07-ind_x: F
-      > unsupported read program RAM on NROM
-    - 08-ind_y: F
-      > unsupported read program RAM on NROM
-    - 09-branches: F
-      > unsupported read program RAM on NROM
-    - 10-stack: F
-      > unsupported read program RAM on NROM
-    - 11-special: F
-      > unsupported read program RAM on NROM
+      > 9C SYA abs, X  
+      > 9E SXA abs, Y  
+      > Failed
+    - 07-ind_x: S
+    - 08-ind_y: S
+    - 09-branches: S
+    - 10-stack: S
+    - 11-special: U
+      > unable to verify because the screen is not displayed
 
 ## Mapper
 
@@ -392,8 +399,7 @@
 
   - rom_singles
 
-    - 01-vbl_basics.nes: F
-      > panic: attemp to write to PPU Status register
+    - 01-vbl_basics: S
     - 02-vbl_set_time: F
 
       > T+ 1 2  
