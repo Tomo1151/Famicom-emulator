@@ -243,12 +243,12 @@ func (f *Famicom) Start() {
 			dtSec = maxDtSec
 		}
 		cpuCycleAcc += ntscCpuClockHz * dtSec
-		cyclesToRun := uint(cpuCycleAcc)
-		if cyclesToRun > 0 {
+		cycles := uint(cpuCycleAcc)
+		if cycles > 0 {
 			if f.romLoaded {
-				f.cpu.RunCycles(cyclesToRun)
+				f.cpu.Tick(cycles)
 			}
-			cpuCycleAcc -= float64(cyclesToRun)
+			cpuCycleAcc -= float64(cycles)
 		}
 
 		if !f.romLoaded {
