@@ -1223,10 +1223,10 @@ func (c *CPU) REPL(commands []uint8) {
 }
 
 // MARK: サイクル数を指定してCPUを実行
-func (c *CPU) RunCycles(targetCycles uint) {
+func (c *CPU) Tick(cycles uint) {
 	var executed uint = 0
 
-	for executed < targetCycles {
+	for executed < cycles {
 		prev := c.bus.Cycles()
 		c.Step()
 		post := c.bus.Cycles()
