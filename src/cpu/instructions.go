@@ -37,8 +37,8 @@ const (
 	AbsoluteYIndexed                       // abs,Y
 	Relative                               // rel
 	Indirect                               // Ind
-	IndirectXIndexed                       // X,Ind
-	IndirectYIndexed                       // Ind,Y
+	IndexedIndirect                        // X,Ind
+	IndirectIndexed                        // Ind,Y
 )
 
 const (
@@ -171,7 +171,7 @@ func generateInstructionSet(c *CPU) instructionSet {
 	instructionSet[0x83] = Instruction{
 		Opecode:        0x83,
 		Code:           AAX,
-		AddressingMode: IndirectXIndexed,
+		AddressingMode: IndexedIndirect,
 		Bytes:          2,
 		Cycles:         6,
 		PageCycles:     0,
@@ -252,7 +252,7 @@ func generateInstructionSet(c *CPU) instructionSet {
 	instructionSet[0x61] = Instruction{
 		Opecode:        0x61,
 		Code:           ADC,
-		AddressingMode: IndirectXIndexed,
+		AddressingMode: IndexedIndirect,
 		Bytes:          2,
 		Cycles:         6,
 		PageCycles:     0,
@@ -262,7 +262,7 @@ func generateInstructionSet(c *CPU) instructionSet {
 	instructionSet[0x71] = Instruction{
 		Opecode:        0x71,
 		Code:           ADC,
-		AddressingMode: IndirectYIndexed,
+		AddressingMode: IndirectIndexed,
 		Bytes:          2,
 		Cycles:         5,
 		PageCycles:     1,
@@ -333,7 +333,7 @@ func generateInstructionSet(c *CPU) instructionSet {
 	instructionSet[0x21] = Instruction{
 		Opecode:        0x21,
 		Code:           AND,
-		AddressingMode: IndirectXIndexed,
+		AddressingMode: IndexedIndirect,
 		Bytes:          2,
 		Cycles:         6,
 		PageCycles:     0,
@@ -343,7 +343,7 @@ func generateInstructionSet(c *CPU) instructionSet {
 	instructionSet[0x31] = Instruction{
 		Opecode:        0x31,
 		Code:           AND,
-		AddressingMode: IndirectYIndexed,
+		AddressingMode: IndirectIndexed,
 		Bytes:          2,
 		Cycles:         5,
 		PageCycles:     1,
@@ -448,7 +448,7 @@ func generateInstructionSet(c *CPU) instructionSet {
 	instructionSet[0x93] = Instruction{
 		Opecode:        0x93,
 		Code:           AXA,
-		AddressingMode: IndirectYIndexed,
+		AddressingMode: IndirectIndexed,
 		Bytes:          2,
 		Cycles:         6,
 		PageCycles:     0,
@@ -695,7 +695,7 @@ func generateInstructionSet(c *CPU) instructionSet {
 	instructionSet[0xC1] = Instruction{
 		Opecode:        0xC1,
 		Code:           CMP,
-		AddressingMode: IndirectXIndexed,
+		AddressingMode: IndexedIndirect,
 		Bytes:          2,
 		Cycles:         6,
 		PageCycles:     0,
@@ -705,7 +705,7 @@ func generateInstructionSet(c *CPU) instructionSet {
 	instructionSet[0xD1] = Instruction{
 		Opecode:        0xD1,
 		Code:           CMP,
-		AddressingMode: IndirectYIndexed,
+		AddressingMode: IndirectIndexed,
 		Bytes:          2,
 		Cycles:         5,
 		PageCycles:     1,
@@ -828,7 +828,7 @@ func generateInstructionSet(c *CPU) instructionSet {
 	instructionSet[0xC3] = Instruction{
 		Opecode:        0xC3,
 		Code:           DCP,
-		AddressingMode: IndirectXIndexed,
+		AddressingMode: IndexedIndirect,
 		Bytes:          2,
 		Cycles:         8,
 		PageCycles:     0,
@@ -838,7 +838,7 @@ func generateInstructionSet(c *CPU) instructionSet {
 	instructionSet[0xD3] = Instruction{
 		Opecode:        0xD3,
 		Code:           DCP,
-		AddressingMode: IndirectYIndexed,
+		AddressingMode: IndirectIndexed,
 		Bytes:          2,
 		Cycles:         8,
 		PageCycles:     0,
@@ -1113,7 +1113,7 @@ func generateInstructionSet(c *CPU) instructionSet {
 	instructionSet[0x41] = Instruction{
 		Opecode:        0x41,
 		Code:           EOR,
-		AddressingMode: IndirectXIndexed,
+		AddressingMode: IndexedIndirect,
 		Bytes:          2,
 		Cycles:         6,
 		PageCycles:     0,
@@ -1123,7 +1123,7 @@ func generateInstructionSet(c *CPU) instructionSet {
 	instructionSet[0x51] = Instruction{
 		Opecode:        0x51,
 		Code:           EOR,
-		AddressingMode: IndirectYIndexed,
+		AddressingMode: IndirectIndexed,
 		Bytes:          2,
 		Cycles:         5,
 		PageCycles:     1,
@@ -1247,7 +1247,7 @@ func generateInstructionSet(c *CPU) instructionSet {
 	instructionSet[0xE3] = Instruction{
 		Opecode:        0xE3,
 		Code:           ISC,
-		AddressingMode: IndirectXIndexed,
+		AddressingMode: IndexedIndirect,
 		Bytes:          2,
 		Cycles:         8,
 		PageCycles:     0,
@@ -1257,7 +1257,7 @@ func generateInstructionSet(c *CPU) instructionSet {
 	instructionSet[0xF3] = Instruction{
 		Opecode:        0xF3,
 		Code:           ISC,
-		AddressingMode: IndirectYIndexed,
+		AddressingMode: IndirectIndexed,
 		Bytes:          2,
 		Cycles:         8,
 		PageCycles:     0,
@@ -1475,7 +1475,7 @@ func generateInstructionSet(c *CPU) instructionSet {
 	instructionSet[0xA3] = Instruction{
 		Opecode:        0xA3,
 		Code:           LAX,
-		AddressingMode: IndirectXIndexed,
+		AddressingMode: IndexedIndirect,
 		Bytes:          2,
 		Cycles:         6,
 		PageCycles:     0,
@@ -1485,7 +1485,7 @@ func generateInstructionSet(c *CPU) instructionSet {
 	instructionSet[0xB3] = Instruction{
 		Opecode:        0xB3,
 		Code:           LAX,
-		AddressingMode: IndirectYIndexed,
+		AddressingMode: IndirectIndexed,
 		Bytes:          2,
 		Cycles:         5,
 		PageCycles:     1,
@@ -1556,7 +1556,7 @@ func generateInstructionSet(c *CPU) instructionSet {
 	instructionSet[0xA1] = Instruction{
 		Opecode:        0xA1,
 		Code:           LDA,
-		AddressingMode: IndirectXIndexed,
+		AddressingMode: IndexedIndirect,
 		Bytes:          2,
 		Cycles:         6,
 		PageCycles:     0,
@@ -1566,7 +1566,7 @@ func generateInstructionSet(c *CPU) instructionSet {
 	instructionSet[0xB1] = Instruction{
 		Opecode:        0xB1,
 		Code:           LDA,
-		AddressingMode: IndirectYIndexed,
+		AddressingMode: IndirectIndexed,
 		Bytes:          2,
 		Cycles:         5,
 		PageCycles:     1,
@@ -1861,7 +1861,7 @@ func generateInstructionSet(c *CPU) instructionSet {
 	instructionSet[0x01] = Instruction{
 		Opecode:        0x01,
 		Code:           ORA,
-		AddressingMode: IndirectXIndexed,
+		AddressingMode: IndexedIndirect,
 		Bytes:          2,
 		Cycles:         6,
 		PageCycles:     0,
@@ -1871,7 +1871,7 @@ func generateInstructionSet(c *CPU) instructionSet {
 	instructionSet[0x11] = Instruction{
 		Opecode:        0x11,
 		Code:           ORA,
-		AddressingMode: IndirectYIndexed,
+		AddressingMode: IndirectIndexed,
 		Bytes:          2,
 		Cycles:         5,
 		PageCycles:     1,
@@ -1976,7 +1976,7 @@ func generateInstructionSet(c *CPU) instructionSet {
 	instructionSet[0x23] = Instruction{
 		Opecode:        0x23,
 		Code:           RLA,
-		AddressingMode: IndirectXIndexed,
+		AddressingMode: IndexedIndirect,
 		Bytes:          2,
 		Cycles:         8,
 		PageCycles:     0,
@@ -1986,7 +1986,7 @@ func generateInstructionSet(c *CPU) instructionSet {
 	instructionSet[0x33] = Instruction{
 		Opecode:        0x33,
 		Code:           RLA,
-		AddressingMode: IndirectYIndexed,
+		AddressingMode: IndirectIndexed,
 		Bytes:          2,
 		Cycles:         8,
 		PageCycles:     0,
@@ -2149,7 +2149,7 @@ func generateInstructionSet(c *CPU) instructionSet {
 	instructionSet[0x63] = Instruction{
 		Opecode:        0x63,
 		Code:           RRA,
-		AddressingMode: IndirectXIndexed,
+		AddressingMode: IndexedIndirect,
 		Bytes:          2,
 		Cycles:         8,
 		PageCycles:     0,
@@ -2159,7 +2159,7 @@ func generateInstructionSet(c *CPU) instructionSet {
 	instructionSet[0x73] = Instruction{
 		Opecode:        0x73,
 		Code:           RRA,
-		AddressingMode: IndirectYIndexed,
+		AddressingMode: IndirectIndexed,
 		Bytes:          2,
 		Cycles:         8,
 		PageCycles:     0,
@@ -2254,7 +2254,7 @@ func generateInstructionSet(c *CPU) instructionSet {
 	instructionSet[0xE1] = Instruction{
 		Opecode:        0xE1,
 		Code:           SBC,
-		AddressingMode: IndirectXIndexed,
+		AddressingMode: IndexedIndirect,
 		Bytes:          2,
 		Cycles:         6,
 		PageCycles:     0,
@@ -2264,7 +2264,7 @@ func generateInstructionSet(c *CPU) instructionSet {
 	instructionSet[0xF1] = Instruction{
 		Opecode:        0xF1,
 		Code:           SBC,
-		AddressingMode: IndirectYIndexed,
+		AddressingMode: IndirectIndexed,
 		Bytes:          2,
 		Cycles:         5,
 		PageCycles:     1,
@@ -2368,7 +2368,7 @@ func generateInstructionSet(c *CPU) instructionSet {
 	instructionSet[0x03] = Instruction{
 		Opecode:        0x03,
 		Code:           SLO,
-		AddressingMode: IndirectXIndexed,
+		AddressingMode: IndexedIndirect,
 		Bytes:          2,
 		Cycles:         8,
 		PageCycles:     0,
@@ -2378,7 +2378,7 @@ func generateInstructionSet(c *CPU) instructionSet {
 	instructionSet[0x13] = Instruction{
 		Opecode:        0x13,
 		Code:           SLO,
-		AddressingMode: IndirectYIndexed,
+		AddressingMode: IndirectIndexed,
 		Bytes:          2,
 		Cycles:         8,
 		PageCycles:     0,
@@ -2439,7 +2439,7 @@ func generateInstructionSet(c *CPU) instructionSet {
 	instructionSet[0x43] = Instruction{
 		Opecode:        0x43,
 		Code:           SRE,
-		AddressingMode: IndirectXIndexed,
+		AddressingMode: IndexedIndirect,
 		Bytes:          2,
 		Cycles:         8,
 		PageCycles:     0,
@@ -2449,7 +2449,7 @@ func generateInstructionSet(c *CPU) instructionSet {
 	instructionSet[0x53] = Instruction{
 		Opecode:        0x53,
 		Code:           SRE,
-		AddressingMode: IndirectYIndexed,
+		AddressingMode: IndirectIndexed,
 		Bytes:          2,
 		Cycles:         8,
 		PageCycles:     0,
@@ -2510,7 +2510,7 @@ func generateInstructionSet(c *CPU) instructionSet {
 	instructionSet[0x81] = Instruction{
 		Opecode:        0x81,
 		Code:           STA,
-		AddressingMode: IndirectXIndexed,
+		AddressingMode: IndexedIndirect,
 		Bytes:          2,
 		Cycles:         6,
 		PageCycles:     0,
@@ -2520,7 +2520,7 @@ func generateInstructionSet(c *CPU) instructionSet {
 	instructionSet[0x91] = Instruction{
 		Opecode:        0x91,
 		Code:           STA,
-		AddressingMode: IndirectYIndexed,
+		AddressingMode: IndirectIndexed,
 		Bytes:          2,
 		Cycles:         6,
 		PageCycles:     0,
@@ -2799,8 +2799,8 @@ func (am AddressingMode) ToString() string {
 		"AbsoluteYIndexed", // abs,Y
 		"Relative",         // rel
 		"Indirect",         // Ind
-		"IndirectXIndexed", // X,Ind
-		"IndirectYIndexed", // Ind,Y
+		"IndexedIndirect",  // X,Ind
+		"IndirectIndexed",  // Ind,Y
 	}
 
 	if int(am) < len(names) {
