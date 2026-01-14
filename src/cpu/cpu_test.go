@@ -560,7 +560,7 @@ func TestLDA(t *testing.T) {
 		{
 			name:     "LDA Indirect,X",
 			opcode:   0xA1,
-			addrMode: IndirectXIndexed,
+			addrMode: IndexedIndirect,
 			setupMemory: func(c *CPU) {
 				c.registers.X = 0x04
 				c.WriteByteAt(c.registers.PC, 0xA1)   // LDA命令
@@ -576,7 +576,7 @@ func TestLDA(t *testing.T) {
 		{
 			name:     "LDA Indirect,Y",
 			opcode:   0xB1,
-			addrMode: IndirectYIndexed,
+			addrMode: IndirectIndexed,
 			setupMemory: func(c *CPU) {
 				c.registers.Y = 0x10
 				c.WriteByteAt(c.registers.PC, 0xB1)   // LDA命令
@@ -895,7 +895,7 @@ func TestSTA(t *testing.T) {
 		{
 			name:     "STA Indirect,X",
 			opcode:   0x81,
-			addrMode: IndirectXIndexed,
+			addrMode: IndexedIndirect,
 			setupCPU: func(c *CPU) {
 				c.registers.A = 0x42
 				c.registers.X = 0x04
@@ -913,7 +913,7 @@ func TestSTA(t *testing.T) {
 		{
 			name:     "STA Indirect,Y",
 			opcode:   0x91,
-			addrMode: IndirectYIndexed,
+			addrMode: IndirectIndexed,
 			setupCPU: func(c *CPU) {
 				c.registers.A = 0x42
 				c.registers.Y = 0x10
@@ -1658,7 +1658,7 @@ func TestADC(t *testing.T) {
 		{
 			name:     "ADC Indirect,X",
 			opcode:   0x61,
-			addrMode: IndirectXIndexed,
+			addrMode: IndexedIndirect,
 			setupCPU: func(c *CPU) {
 				c.registers.A = 0x42
 				c.registers.X = 0x04
@@ -1678,7 +1678,7 @@ func TestADC(t *testing.T) {
 		{
 			name:     "ADC Indirect,Y",
 			opcode:   0x71,
-			addrMode: IndirectYIndexed,
+			addrMode: IndirectIndexed,
 			setupCPU: func(c *CPU) {
 				c.registers.A = 0x42
 				c.registers.Y = 0x10
@@ -1902,7 +1902,7 @@ func TestSBC(t *testing.T) {
 		{
 			name:     "SBC Indirect,X",
 			opcode:   0xE1,
-			addrMode: IndirectXIndexed,
+			addrMode: IndexedIndirect,
 			setupCPU: func(c *CPU) {
 				c.registers.A = 0x50
 				c.registers.X = 0x04
@@ -1922,7 +1922,7 @@ func TestSBC(t *testing.T) {
 		{
 			name:     "SBC Indirect,Y",
 			opcode:   0xF1,
-			addrMode: IndirectYIndexed,
+			addrMode: IndirectIndexed,
 			setupCPU: func(c *CPU) {
 				c.registers.A = 0x50
 				c.registers.Y = 0x10
@@ -2076,7 +2076,7 @@ func TestAND(t *testing.T) {
 		{
 			name:     "AND Indirect,X",
 			opcode:   0x21,
-			addrMode: IndirectXIndexed,
+			addrMode: IndexedIndirect,
 			setupCPU: func(c *CPU) {
 				c.registers.A = 0xF0
 				c.registers.X = 0x04
@@ -2093,7 +2093,7 @@ func TestAND(t *testing.T) {
 		{
 			name:     "AND Indirect,Y",
 			opcode:   0x31,
-			addrMode: IndirectYIndexed,
+			addrMode: IndirectIndexed,
 			setupCPU: func(c *CPU) {
 				c.registers.A = 0xF0
 				c.registers.Y = 0x10
@@ -2236,7 +2236,7 @@ func TestORA(t *testing.T) {
 		{
 			name:     "ORA Indirect,X",
 			opcode:   0x01,
-			addrMode: IndirectXIndexed,
+			addrMode: IndexedIndirect,
 			setupCPU: func(c *CPU) {
 				c.registers.A = 0xF0
 				c.registers.X = 0x04
@@ -2253,7 +2253,7 @@ func TestORA(t *testing.T) {
 		{
 			name:     "ORA Indirect,Y",
 			opcode:   0x11,
-			addrMode: IndirectYIndexed,
+			addrMode: IndirectIndexed,
 			setupCPU: func(c *CPU) {
 				c.registers.A = 0xF0
 				c.registers.Y = 0x10
@@ -2396,7 +2396,7 @@ func TestEOR(t *testing.T) {
 		{
 			name:     "EOR Indirect,X",
 			opcode:   0x41,
-			addrMode: IndirectXIndexed,
+			addrMode: IndexedIndirect,
 			setupCPU: func(c *CPU) {
 				c.registers.A = 0xF0
 				c.registers.X = 0x04
@@ -2413,7 +2413,7 @@ func TestEOR(t *testing.T) {
 		{
 			name:     "EOR Indirect,Y",
 			opcode:   0x51,
-			addrMode: IndirectYIndexed,
+			addrMode: IndirectIndexed,
 			setupCPU: func(c *CPU) {
 				c.registers.A = 0xF0
 				c.registers.Y = 0x10
@@ -2911,7 +2911,7 @@ func TestCMP(t *testing.T) {
 		{
 			name:     "CMP Indirect,X",
 			opcode:   0xC1,
-			addrMode: IndirectXIndexed,
+			addrMode: IndexedIndirect,
 			setupCPU: func(c *CPU) {
 				c.registers.A = 0x42
 				c.registers.X = 0x04
@@ -2928,7 +2928,7 @@ func TestCMP(t *testing.T) {
 		{
 			name:     "CMP Indirect,Y",
 			opcode:   0xD1,
-			addrMode: IndirectYIndexed,
+			addrMode: IndirectIndexed,
 			setupCPU: func(c *CPU) {
 				c.registers.A = 0x42
 				c.registers.Y = 0x10

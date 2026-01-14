@@ -210,13 +210,13 @@ func (c *CPU) calcOperandAddress(mode AddressingMode) (uint16, bool) {
 		} else {
 			return c.ReadWordFrom(ptr), false
 		}
-	case IndirectXIndexed:
+	case IndexedIndirect:
 		base := c.ReadByteFrom(c.registers.PC + 1)
 		ptr := uint8(base + c.registers.X)
 		lower := c.ReadByteFrom(uint16(ptr))
 		upper := c.ReadByteFrom(uint16(ptr+1) & 0xFF)
 		return uint16(upper)<<8 | uint16(lower), false
-	case IndirectYIndexed:
+	case IndirectIndexed:
 		base := c.ReadByteFrom(c.registers.PC + 1)
 		ptr := uint8(base)
 		lower := c.ReadByteFrom(uint16(ptr))
@@ -1154,7 +1154,7 @@ func (c *CPU) Trace() string {
 			target = c.ReadWordFrom(ptr)
 		}
 		operandStr = fmt.Sprintf("($%04X) = %04X", ptr, target)
-	case IndirectXIndexed:
+	case IndexedIndirect:
 		base := b1
 		ptr := uint8(base + c.registers.X)
 		low := c.ReadByteFrom(uint16(ptr))
@@ -1167,7 +1167,7 @@ func (c *CPU) Trace() string {
 			}
 		}
 		operandStr = fmt.Sprintf("($%02X,X) @ %02X = %04X", base, ptr, effAddr)
-	case IndirectYIndexed:
+	case IndirectIndexed:
 		base := b1
 		low := c.ReadByteFrom(uint16(base))
 		high := c.ReadByteFrom(uint16(base+1) & 0x00FF)
