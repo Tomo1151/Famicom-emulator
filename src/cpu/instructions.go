@@ -8,7 +8,7 @@ type Instruction struct {
 	AddressingMode AddressingMode     // アドレッシングモード
 	Bytes          uint8              // 命令のバイト数
 	Cycles         uint8              // 基本サイクル数
-	PageCycles     uint8              // ページ協会を越えた場合の追加サイクル
+	PageCycles     uint8              // ページ境界を越えた場合の追加サイクル
 	Jump           bool               // PCを書き換える命令かどうか
 	Handler        InstructionHandler // 命令の実装
 }
