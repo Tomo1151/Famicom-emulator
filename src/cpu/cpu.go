@@ -173,7 +173,6 @@ func (c *CPU) WriteWordAt(address uint16, data uint16) {
 
 func (c *CPU) isPageCrossed(address1 uint16, address2 uint16) bool {
 	cond := (address1 & 0xFF00) != (address2 & 0xFF00)
-	// fmt.Println("page crossed")
 	return cond
 }
 
@@ -203,7 +202,7 @@ func (c *CPU) calcOperandAddress(mode AddressingMode) (uint16, bool) {
 	case Indirect:
 		ptr := c.ReadWordFrom(c.registers.PC + 1)
 		// ページ境界をまたぐ際のバグを再現
-		if (ptr & 0xFF) == 0xFF {
+		if c.isPageCrossed(ptr, ptr+1) {
 			lower := c.ReadByteFrom(ptr)
 			upper := c.ReadByteFrom(ptr & 0xFF00)
 			return uint16(upper)<<8 | uint16(lower), false
@@ -226,15 +225,12 @@ func (c *CPU) calcOperandAddress(mode AddressingMode) (uint16, bool) {
 		return deref, c.isPageCrossed(deref, derefBase)
 	case Relative:
 		offset := int8(c.ReadByteFrom(c.registers.PC + 1))
-		return uint16(offset), false
+		return uint16(int32(c.registers.PC) + int32(offset)), false // 符号反転させずに足すためint32を用いる
 	case Accumulator:
-		// log.Fatalf("Error: Mode Accumulator doesn't take any operands")
 		return 0x0000, false
 	case Implied:
-		// log.Fatalf("Error: Mode Implied doesn't take any operands")
 		return 0x0000, false
 	default:
-		// log.Fatalf("Error: Unsupported addressing type '%v'", mode)
 		return 0x0000, false
 	}
 }
@@ -415,12 +411,11 @@ func (c *CPU) axs(mode AddressingMode) {
 func (c *CPU) bcc(mode AddressingMode) {
 	if !c.registers.P.Carry {
 		c.bus.Tick(1)
-		offset, _ := c.calcOperandAddress(mode)
-		jumpAddr := uint16(int32(c.registers.PC) + int32(offset)) // 符号反転させなずに足すためint32を用いる
-		if c.isPageCrossed(c.registers.PC, jumpAddr) {
+		addr, _ := c.calcOperandAddress(mode)
+		if c.isPageCrossed(c.registers.PC, addr) {
 			c.bus.Tick(1)
 		}
-		c.registers.PC = jumpAddr
+		c.registers.PC = addr
 	}
 }
 
@@ -428,12 +423,11 @@ func (c *CPU) bcc(mode AddressingMode) {
 func (c *CPU) bcs(mode AddressingMode) {
 	if c.registers.P.Carry {
 		c.bus.Tick(1)
-		offset, _ := c.calcOperandAddress(mode)
-		jumpAddr := uint16(int32(c.registers.PC) + int32(offset)) // 符号反転させなずに足すためint32を用いる
-		if c.isPageCrossed(c.registers.PC, jumpAddr) {
+		addr, _ := c.calcOperandAddress(mode)
+		if c.isPageCrossed(c.registers.PC, addr) {
 			c.bus.Tick(1)
 		}
-		c.registers.PC = jumpAddr
+		c.registers.PC = addr
 	}
 }
 
@@ -441,12 +435,11 @@ func (c *CPU) bcs(mode AddressingMode) {
 func (c *CPU) beq(mode AddressingMode) {
 	if c.registers.P.Zero {
 		c.bus.Tick(1)
-		offset, _ := c.calcOperandAddress(mode)
-		jumpAddr := uint16(int32(c.registers.PC) + int32(offset)) // 符号反転させなずに足すためint32を用いる
-		if c.isPageCrossed(c.registers.PC, jumpAddr) {
+		addr, _ := c.calcOperandAddress(mode)
+		if c.isPageCrossed(c.registers.PC, addr) {
 			c.bus.Tick(1)
 		}
-		c.registers.PC = jumpAddr
+		c.registers.PC = addr
 	}
 }
 
@@ -465,12 +458,11 @@ func (c *CPU) bit(mode AddressingMode) {
 func (c *CPU) bmi(mode AddressingMode) {
 	if c.registers.P.Negative {
 		c.bus.Tick(1)
-		offset, _ := c.calcOperandAddress(mode)
-		jumpAddr := uint16(int32(c.registers.PC) + int32(offset)) // 符号反転させなずに足すためint32を用いる
-		if c.isPageCrossed(c.registers.PC, jumpAddr) {
+		addr, _ := c.calcOperandAddress(mode)
+		if c.isPageCrossed(c.registers.PC, addr) {
 			c.bus.Tick(1)
 		}
-		c.registers.PC = jumpAddr
+		c.registers.PC = addr
 	}
 }
 
@@ -478,12 +470,11 @@ func (c *CPU) bmi(mode AddressingMode) {
 func (c *CPU) bne(mode AddressingMode) {
 	if !c.registers.P.Zero {
 		c.bus.Tick(1)
-		offset, _ := c.calcOperandAddress(mode)
-		jumpAddr := uint16(int32(c.registers.PC) + int32(offset)) // 符号反転させなずに足すためint32を用いる
-		if c.isPageCrossed(c.registers.PC, jumpAddr) {
+		addr, _ := c.calcOperandAddress(mode)
+		if c.isPageCrossed(c.registers.PC, addr) {
 			c.bus.Tick(1)
 		}
-		c.registers.PC = jumpAddr
+		c.registers.PC = addr
 	}
 }
 
@@ -491,12 +482,11 @@ func (c *CPU) bne(mode AddressingMode) {
 func (c *CPU) bpl(mode AddressingMode) {
 	if !c.registers.P.Negative {
 		c.bus.Tick(1)
-		offset, _ := c.calcOperandAddress(mode)
-		jumpAddr := uint16(int32(c.registers.PC) + int32(offset)) // 符号反転させなずに足すためint32を用いる
-		if c.isPageCrossed(c.registers.PC, jumpAddr) {
+		addr, _ := c.calcOperandAddress(mode)
+		if c.isPageCrossed(c.registers.PC, addr) {
 			c.bus.Tick(1)
 		}
-		c.registers.PC = jumpAddr
+		c.registers.PC = addr
 	}
 }
 
@@ -516,12 +506,11 @@ func (c *CPU) brk(mode AddressingMode) {
 func (c *CPU) bvc(mode AddressingMode) {
 	if !c.registers.P.Overflow {
 		c.bus.Tick(1)
-		offset, _ := c.calcOperandAddress(mode)
-		jumpAddr := uint16(int32(c.registers.PC) + int32(offset)) // 符号反転させなずに足すためint32を用いる
-		if c.isPageCrossed(c.registers.PC, jumpAddr) {
+		addr, _ := c.calcOperandAddress(mode)
+		if c.isPageCrossed(c.registers.PC, addr) {
 			c.bus.Tick(1)
 		}
-		c.registers.PC = jumpAddr
+		c.registers.PC = addr
 	}
 }
 
@@ -529,12 +518,11 @@ func (c *CPU) bvc(mode AddressingMode) {
 func (c *CPU) bvs(mode AddressingMode) {
 	if c.registers.P.Overflow {
 		c.bus.Tick(1)
-		offset, _ := c.calcOperandAddress(mode)
-		jumpAddr := uint16(int32(c.registers.PC) + int32(offset)) // 符号反転させなずに足すためint32を用いる
-		if c.isPageCrossed(c.registers.PC, jumpAddr) {
+		addr, _ := c.calcOperandAddress(mode)
+		if c.isPageCrossed(c.registers.PC, addr) {
 			c.bus.Tick(1)
 		}
-		c.registers.PC = jumpAddr
+		c.registers.PC = addr
 	}
 }
 
