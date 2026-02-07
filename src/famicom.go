@@ -217,6 +217,7 @@ func (f *Famicom) Start() {
 				case f.gamepad2.Gamepad.Joystick().InstanceID():
 					f.handleButtonPress(e, &f.controller2)
 				}
+				continue
 			case *sdl.ControllerAxisEvent:
 				switch e.Which {
 				case f.gamepad1.Gamepad.Joystick().InstanceID():
@@ -224,6 +225,7 @@ func (f *Famicom) Start() {
 				case f.gamepad2.Gamepad.Joystick().InstanceID():
 					f.handleAxisMotion(e, &f.controller2)
 				}
+				continue
 			}
 
 			f.windows.HandleEvent(event)
