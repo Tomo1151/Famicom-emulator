@@ -45,10 +45,8 @@ type Famicom struct {
 	controller1 InputState // 1Pの入力状態 (コントローラ)
 	controller2 InputState // 2Pの入力状態 (コントローラ)
 
-	gamepad1 sdl.JoystickID       // SDLのコントローラID (1P)
-	gamepad2 sdl.JoystickID       // SDLのコントローラID (2P)
-	adapter1 joypad.JoyPadAdapter // 1Pコントローラのアダプタ
-	adapter2 joypad.JoyPadAdapter // 2Pコントローラのアダプタ
+	gamepad1 joypad.JoyPadAdapter // 接続中のコントローラデバイス (1P)
+	gamepad2 joypad.JoyPadAdapter // 接続中のコントローラデバイス (2P)
 
 	romLoaded bool
 
@@ -214,16 +212,16 @@ func (f *Famicom) Start() {
 				f.handleKeyPress(e, &f.keyboard1, &f.keyboard2)
 			case *sdl.ControllerButtonEvent:
 				switch e.Which {
-				case f.gamepad1:
+				case f.gamepad1.Gamepad.Joystick().InstanceID():
 					f.handleButtonPress(e, &f.controller1)
-				case f.gamepad2:
+				case f.gamepad2.Gamepad.Joystick().InstanceID():
 					f.handleButtonPress(e, &f.controller2)
 				}
 			case *sdl.ControllerAxisEvent:
 				switch e.Which {
-				case f.gamepad1:
+				case f.gamepad1.Gamepad.Joystick().InstanceID():
 					f.handleAxisMotion(e, &f.controller1)
-				case f.gamepad2:
+				case f.gamepad2.Gamepad.Joystick().InstanceID():
 					f.handleAxisMotion(e, &f.controller2)
 				}
 			}
@@ -262,26 +260,21 @@ func (f *Famicom) Start() {
 
 // MARK: ゲームコントローラのセットアップ
 func (f *Famicom) setupGamepads() {
-	var gamepad1, gamepad2 *sdl.GameController
 	if sdl.NumJoysticks() == 0 {
 		fmt.Println("No controller detected")
 	}
 	if sdl.NumJoysticks() > 0 {
-		gamepad1 = sdl.GameControllerOpen(0)
+		gamepad1 := sdl.GameControllerOpen(0)
 		if gamepad1 != nil {
-			f.gamepad1 = gamepad1.Joystick().InstanceID()
-			fmt.Println("Controller opened for 1P:", gamepad1.Name())
-			f.adapter1.Init(gamepad1.Name())
-			defer gamepad1.Close()
+			f.gamepad1.Init(gamepad1)
+			fmt.Println("Controller opened for 1P:", f.gamepad1.Gamepad.Name())
 		}
 	}
 	if sdl.NumJoysticks() > 1 {
-		gamepad2 = sdl.GameControllerOpen(1)
+		gamepad2 := sdl.GameControllerOpen(1)
 		if gamepad2 != nil {
-			f.gamepad2 = gamepad2.Joystick().InstanceID()
-			f.adapter2.Init(gamepad2.Name())
-			fmt.Println("Controller opened for 2P:", gamepad2.Name())
-			defer gamepad2.Close()
+			f.gamepad2.Init(gamepad2)
+			fmt.Println("Controller opened for 2P:", f.gamepad2.Gamepad.Name())
 		}
 	}
 }
@@ -296,6 +289,15 @@ func (f *Famicom) renderStartScreen() {
 
 // MARK: ゲームの終了メソッド
 func (f *Famicom) requestShutdown() {
+	// 使用中のコントローラを解放
+	if f.gamepad1.Gamepad != nil {
+		f.gamepad1.Gamepad.Close()
+	}
+	if f.gamepad2.Gamepad != nil {
+		f.gamepad2.Gamepad.Close()
+	}
+
+	// ウィンドウを閉じる
 	if f.windows != nil {
 		f.windows.CloseAll()
 	}
@@ -351,10 +353,10 @@ func (f *Famicom) handleKeyPress(e *sdl.KeyboardEvent, c1 *InputState, c2 *Input
 func (f *Famicom) handleButtonPress(e *sdl.ControllerButtonEvent, c *InputState) {
 	var adapter joypad.JoyPadAdapter
 	switch e.Which {
-	case f.gamepad1:
-		adapter = f.adapter1
-	case f.gamepad2:
-		adapter = f.adapter2
+	case f.gamepad1.Gamepad.Joystick().InstanceID():
+		adapter = f.gamepad1
+	case f.gamepad2.Gamepad.Joystick().InstanceID():
+		adapter = f.gamepad2
 	default:
 		return
 	}

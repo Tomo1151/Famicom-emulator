@@ -39,17 +39,17 @@ const (
 
 // MARK: コントローラアダプタ
 type JoyPadAdapter struct {
-	name string
+	Gamepad *sdl.GameController
 }
 
 // MARK: コントローラアダプタの初期化メソッド
-func (a *JoyPadAdapter) Init(name string) {
-	a.name = name
+func (a *JoyPadAdapter) Init(gamepad *sdl.GameController) {
+	a.Gamepad = gamepad
 }
 
 // MARK: Aボタンのアクセサ
 func (a *JoyPadAdapter) ButtonA() uint8 {
-	switch a.name {
+	switch a.Gamepad.Name() {
 	case JOY_CON_L, JOY_CON_R:
 		return JOYCON_R_BUTTON_A
 	case HVC_CONTROLLER_1, HVC_CONTROLLER_2:
@@ -61,7 +61,7 @@ func (a *JoyPadAdapter) ButtonA() uint8 {
 
 // MARK: Bボタンのアクセサ
 func (a *JoyPadAdapter) ButtonB() uint8 {
-	switch a.name {
+	switch a.Gamepad.Name() {
 	case JOY_CON_L, JOY_CON_R:
 		return JOYCON_R_BUTTON_B
 	case HVC_CONTROLLER_1, HVC_CONTROLLER_2:
@@ -73,7 +73,7 @@ func (a *JoyPadAdapter) ButtonB() uint8 {
 
 // MARK: 十字キー上のアクセサ
 func (a *JoyPadAdapter) ButtonUp() uint8 {
-	switch a.name {
+	switch a.Gamepad.Name() {
 	case HVC_CONTROLLER_1, HVC_CONTROLLER_2:
 		return HVC_BUTTON_UP
 	default:
@@ -83,7 +83,7 @@ func (a *JoyPadAdapter) ButtonUp() uint8 {
 
 // MARK: 十字キー下のアクセサ
 func (a *JoyPadAdapter) ButtonDown() uint8 {
-	switch a.name {
+	switch a.Gamepad.Name() {
 	case HVC_CONTROLLER_1, HVC_CONTROLLER_2:
 		return HVC_BUTTON_DOWN
 	default:
@@ -93,7 +93,7 @@ func (a *JoyPadAdapter) ButtonDown() uint8 {
 
 // MARK: 十字キー右のアクセサ
 func (a *JoyPadAdapter) ButtonRight() uint8 {
-	switch a.name {
+	switch a.Gamepad.Name() {
 	case HVC_CONTROLLER_1, HVC_CONTROLLER_2:
 		return HVC_BUTTON_RIGHT
 	default:
@@ -103,7 +103,7 @@ func (a *JoyPadAdapter) ButtonRight() uint8 {
 
 // MARK: 十字キー左のアクセサ
 func (a *JoyPadAdapter) ButtonLeft() uint8 {
-	switch a.name {
+	switch a.Gamepad.Name() {
 	case HVC_CONTROLLER_1, HVC_CONTROLLER_2:
 		return HVC_BUTTON_LEFT
 	default:
@@ -113,7 +113,7 @@ func (a *JoyPadAdapter) ButtonLeft() uint8 {
 
 // MARK: スタートボタンのアクセサ
 func (a *JoyPadAdapter) ButtonStart() uint8 {
-	switch a.name {
+	switch a.Gamepad.Name() {
 	case JOY_CON_L, JOY_CON_R:
 		return JOYCON_R_BUTTON_PLUS
 	case HVC_CONTROLLER_1:
@@ -128,7 +128,7 @@ func (a *JoyPadAdapter) ButtonStart() uint8 {
 
 // MARK: セレクトボタンのアクセサ
 func (a *JoyPadAdapter) ButtonSelect() uint8 {
-	switch a.name {
+	switch a.Gamepad.Name() {
 	case JOY_CON_L, JOY_CON_R:
 		return JOYCON_R_BUTTON_HOME
 	case HVC_CONTROLLER_1:
