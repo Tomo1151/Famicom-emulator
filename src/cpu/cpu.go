@@ -1195,6 +1195,23 @@ func (c *CPU) Trace() string {
 		c.registers.P.ToByte(), c.registers.SP)
 }
 
+// MARK: 現在の実行速度を取得するメソッド
+func (c *CPU) Speed() float32 {
+	return c.config.Cpu.SPEED
+}
+
+// MARK: 実行速度をセットするメソッド
+func (c *CPU) SetSpeed(speed float32) {
+	current := c.config.Cpu.SPEED
+	if (current <= 0.0 && speed < current) {
+		return
+	}
+
+	value := max(0.0, speed)
+	c.config.Cpu.SPEED = value
+	fmt.Printf("[CPU] emulation speed: % 1.2f\n", c.config.Cpu.SPEED)
+}
+
 // MARK: デバッグ用ログ出力切り替え
 func (c *CPU) ToggleLog() {
 	if c.config.Cpu.LOG_ENABLED {

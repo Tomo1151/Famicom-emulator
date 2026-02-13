@@ -193,6 +193,10 @@ func (f *Famicom) Start() {
 						if f.romLoaded {
 							f.cpu.Reset()
 						}
+					case sdl.K_9:
+						f.cpu.SetSpeed(f.cpu.Speed() - .05)
+					case sdl.K_0:
+						f.cpu.SetSpeed(f.cpu.Speed() + .05)
 					case sdl.K_UP:
 						f.apu.SetVolume(f.apu.Volume() + .05)
 					case sdl.K_DOWN:
@@ -243,10 +247,10 @@ func (f *Famicom) Start() {
 			dtSec = maxDtSec
 		}
 		cpuCycleAcc += ntscCpuClockHz * dtSec
-		cycles := uint(cpuCycleAcc)
+		cycles := float32(cpuCycleAcc)
 		if cycles > 0 {
 			if f.romLoaded {
-				f.cpu.Tick(cycles)
+				f.cpu.Tick(uint(cycles * f.cpu.Speed()))
 			}
 			cpuCycleAcc -= float64(cycles)
 		}
