@@ -62,6 +62,7 @@ type ApuConfig struct {
 
 // MARK: CpuConfigの定義
 type CpuConfig struct {
+	SPEED float32 `json:"speed"`
 	LOG_ENABLED bool `json:"log"`
 }
 
@@ -136,8 +137,15 @@ func LoadFromFile() *Config {
 			Render: RenderConfig{
 				SCALE_FACTOR: 3,
 			},
+			Cpu: CpuConfig{
+				SPEED: 1.0,
+			},
 			Control: DefaultControl,
 		}
+	}
+
+	if config.Cpu.SPEED <= 0 {
+		config.Cpu.SPEED = 1.0
 	}
 
 	return &config

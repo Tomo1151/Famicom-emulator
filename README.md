@@ -69,12 +69,12 @@ Config structure:
 ```jsonc
 {
   "rom": {
-    "autoLoading": false
+    "autoLoading": false,
   },
   "render": {
     "scale": 3,
     "doubleBuffering": true,
-    "fullscreen": false
+    "fullscreen": false,
   },
   "apu": {
     "volume": 1.0,
@@ -83,14 +83,15 @@ Config structure:
     "mute2ch": false,
     "mute3ch": false,
     "mute4ch": false,
-    "mute5ch": false
+    "mute5ch": false,
   },
   "cpu": {
-    "log": false
+    "speed": 1.0,
+    "log": false,
   },
   "ppu": {
     "background": true,
-    "sprite": true
+    "sprite": true,
   },
   "control": {
     "gamepadAxisThreshold": 8000,
@@ -102,7 +103,7 @@ Config structure:
       "buttonRight": "D",
       "buttonLeft": "A",
       "buttonStart": "RETURN",
-      "buttonSelect": "BACKSPACE"
+      "buttonSelect": "BACKSPACE",
     },
     "key2p": {
       "buttonA": "/",
@@ -112,9 +113,9 @@ Config structure:
       "buttonRight": "N",
       "buttonLeft": "V",
       "buttonStart": "RETURN",
-      "buttonSelect": "BACKSPACE"
-    }
-  }
+      "buttonSelect": "BACKSPACE",
+    },
+  },
 }
 ```
 
@@ -160,6 +161,8 @@ Config structure:
 | Mute / Unmute APU 3ch                                |  3  |
 | Mute / Unmute APU 4ch                                |  4  |
 | Mute / Unmute APU 5ch                                |  5  |
+| Emulation speed down                                 |  9  |
+| Emulation speed up                                   |  0  |
 
 ## Dependencies
 

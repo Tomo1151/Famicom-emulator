@@ -17,6 +17,7 @@
     "mute5ch": false
   },
   "cpu": {
+    "speed": 1.0,
     "log": false
   },
   "ppu": {
