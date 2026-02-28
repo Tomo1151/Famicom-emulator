@@ -413,7 +413,7 @@ func (p *PPU) FindScanlineSprite(spriteHeight uint8, scanline uint16) (uint, *[S
 					U8 x;
 			};
 		*/
-		spriteY := uint16(p.oam[index]) // OAM各スプライトの0バイト目がY座標
+		spriteY := uint16(p.oam[index]) + 1 // OAM各スプライトの0バイト目がY座標
 
 		// スプライトが現在のスキャンラインに収まっているかをチェックする
 		if scanline >= spriteY && scanline < spriteY+uint16(spriteHeight) {
@@ -547,7 +547,7 @@ func (p *PPU) CalculateScanlineSprite(canvas *Canvas, scanline uint16) {
 
 		// 描画するスプライトを取得
 		sprite := sprites[index]
-		spriteY := uint16(sprite[OAM_SPRITE_Y])
+		spriteY := uint16(sprite[OAM_SPRITE_Y]) + 1
 		spriteX := uint16(sprite[OAM_SPRITE_X])
 		tileIndex := uint16(sprite[OAM_SPRITE_TILE])
 		attributes := sprite[OAM_SPRITE_ATTR]
