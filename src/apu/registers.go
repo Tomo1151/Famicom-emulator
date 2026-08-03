@@ -418,8 +418,18 @@ func (sr *StatusRegister) ClearFrameIRQ() {
 }
 
 // MARK: DMC IRQフラグの取得
-func (sr *StatusRegister) EnableDMCIRQ() bool {
+func (sr *StatusRegister) DMCIRQ() bool {
 	return sr.enableDMCIRQ
+}
+
+// MARK: DMC IRQフラグをセット
+func (sr *StatusRegister) SetDMCIRQ() {
+	sr.enableDMCIRQ = true
+}
+
+// MARK: DMC IRQフラグをクリア
+func (sr *StatusRegister) ClearDMCIRQ() {
+	sr.enableDMCIRQ = false
 }
 
 // MARK: 1chの有効/無効を取得

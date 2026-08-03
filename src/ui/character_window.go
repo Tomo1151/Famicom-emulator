@@ -139,7 +139,7 @@ func (c *CharacterWindow) Update() {
 				ppuBase := uint16(tileIdx * 16)
 
 				// フレーム最初のマッパーを使用
-				mapper := c.ppu.MapperSnapshot()
+				mapper := c.ppu.Mapper()
 
 				for row := range int(ppu.TILE_SIZE) {
 					b0 := mapper.ReadCharacterRom(ppuBase + uint16(row))
@@ -152,9 +152,9 @@ func (c *CharacterWindow) Update() {
 						px := basePx + col
 						py := basePy + row
 						pos := (py*int(width) + px) * 3
-						c.buffer[pos+0] = color[0]
-						c.buffer[pos+1] = color[1]
-						c.buffer[pos+2] = color[2]
+						c.buffer[pos+0] = color.R
+						c.buffer[pos+1] = color.G
+						c.buffer[pos+2] = color.B
 					}
 				}
 			}
@@ -175,9 +175,9 @@ func (c *CharacterWindow) Update() {
 			for dx := range SWATCH {
 				px := px0 + dx
 				pos := (py*int(width) + px) * 3
-				c.buffer[pos+0] = color[0]
-				c.buffer[pos+1] = color[1]
-				c.buffer[pos+2] = color[2]
+				c.buffer[pos+0] = color.R
+				c.buffer[pos+1] = color.G
+				c.buffer[pos+2] = color.B
 			}
 		}
 	}

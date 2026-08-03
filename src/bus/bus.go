@@ -45,8 +45,6 @@ func (b *Bus) Init() {
 	for addr := range b.wram {
 		b.wram[addr] = 0x00
 	}
-	b.canvas = &ppu.Canvas{}
-	b.canvas.Init(*b.config)
 }
 
 // MARK: Canvasを取得
@@ -61,6 +59,7 @@ func (b *Bus) ConnectComponents(
 	cartridge *cartridge.Cartridge,
 	joypad1 *joypad.JoyPad,
 	joypad2 *joypad.JoyPad,
+	canvas *ppu.Canvas,
 	config *config.Config,
 ) {
 	// 設定を反映
@@ -72,9 +71,10 @@ func (b *Bus) ConnectComponents(
 	b.cartridge = cartridge
 	b.joypad1 = joypad1
 	b.joypad2 = joypad2
+	b.canvas = canvas
 
 	// 各コンポーネントを初期化
-	b.ppu.Init(b.cartridge.Mapper(), *b.config)
+	b.ppu.Init(b.cartridge.Mapper(), canvas, *b.config)
 	b.apu.Init(b.ReadByteFrom, *b.config)
 	b.joypad1.Init()
 	b.joypad2.Init()
@@ -82,12 +82,12 @@ func (b *Bus) ConnectComponents(
 
 // MARK: NMIを取得
 func (b *Bus) NMI() bool {
-	return b.ppu.PollNmiStatus()
+	return b.ppu.PollNMI()
 }
 
 // MARK: APUのIRQを取得
 func (b *Bus) APUIRQ() bool {
-	return b.apu.FrameIRQ()
+	return b.apu.IRQ()
 }
 
 // MARK: マッパーのIRQを取得
@@ -110,24 +110,21 @@ func (b *Bus) Shutdown() {
 func (b *Bus) Tick(cycles uint) {
 	b.cycles += cycles
 
-	nmiBefore := b.ppu.Nmi()
+	nmiBefore := b.ppu.NMI()
 
 	frameEnd := false
 
 	// PPUはCPUの3倍のクロック周波数
 	for range cycles * 3 {
-		if b.ppu.Tick(b.canvas, 1) {
+		if b.ppu.Tick(1) {
 			frameEnd = true
-
-			// Canvasをバッファを交換し，すぐにPPUが次のレンダリングを行っても混ざらないように
-			b.canvas.Swap()
 		}
 	}
 
 	// APUと同期
 	b.apu.Tick(cycles)
 
-	nmiAfter := b.ppu.Nmi()
+	nmiAfter := b.ppu.NMI()
 	if frameEnd || (!nmiBefore && nmiAfter) {
 		b.apu.EndFrame()
 	}
@@ -174,7 +171,7 @@ func (b *Bus) ReadByteFrom(address uint16) uint8 {
 	case address == 0x2006: // PPU_ADDR
 		return b.ppu.ReadOpenBus()
 	case address == 0x2007: // PPU_DATA
-		return b.ppu.ReadVRAM()
+		return b.ppu.ReadPPUData()
 	case 0x2008 <= address && address <= PPU_REG_END: // PPUレジスタのミラーリング
 		// $2000 ~ $2007 (8bytesを繰り返すようにマスク)
 		ptr := 0x2000 | (address & 0x07)
@@ -240,21 +237,19 @@ func (b *Bus) WriteByteAt(address uint16, data uint8) {
 		ptr := address & 0b00000111_11111111 // 11bitにマスク
 		b.wram[ptr] = data
 	case address == 0x2000: // PPU_CTRL
-		b.ppu.WriteToPPUControlRegister(data)
+		b.ppu.WritePPUControl(data)
 	case address == 0x2001: // PPU_MASK
-		b.ppu.WriteToPPUMaskRegister(data)
-	case address == 0x2002: // PPU_STATUS
-		b.ppu.WriteToPPUStatusRegister(data)
+		b.ppu.WritePPUMask(data)
 	case address == 0x2003: // OAM_ADDR
-		b.ppu.WriteToOAMAddressRegister(data)
+		b.ppu.WriteOAMAddress(data)
 	case address == 0x2004: // OAM_DATA
-		b.ppu.WriteToOAMDataRegister(data)
+		b.ppu.WriteOAMData(data)
 	case address == 0x2005: // PPU_SCROLL
-		b.ppu.WriteToPPUInternalRegister(address, data)
+		b.ppu.WritePPUScroll(data)
 	case address == 0x2006: // PPU_ADDR
-		b.ppu.WriteToPPUInternalRegister(address, data)
+		b.ppu.WritePPUAddress(data)
 	case address == 0x2007: // PPU_DATA
-		b.ppu.WriteVRAM(data)
+		b.ppu.WritePPUData(data)
 	case 0x2008 <= address && address <= PPU_REG_END: // PPUレジスタのミラーリング
 		// $2008 ~ $3FFF は $2000 ~ $2007 (8bytesを繰り返すようにマスク) へミラーリング
 		ptr := 0x2000 | (address & 0x07)
@@ -285,27 +280,14 @@ func (b *Bus) WriteByteAt(address uint16, data uint8) {
 			buffer[i] = b.ReadByteFrom(upper + uint16(i))
 		}
 
-		// OAM DMA は 513 / 514 CPU サイクル を消費する
-		var dmaCpuCycles uint
-		if b.cycles%2 == 0 {
-			dmaCpuCycles = 513
-		} else {
-			dmaCpuCycles = 514
-		}
-		b.cycles += dmaCpuCycles
-
-		// PPU のサイクルを進める
-		for range dmaCpuCycles * 3 {
-			b.ppu.Tick(b.canvas, 1)
-		}
-
-		// APU のサイクルを進める
-		for range dmaCpuCycles {
-			b.apu.Tick(1)
-		}
-
-		// 用意されたデータを転送
 		b.ppu.DMATransfer(&buffer)
+
+		// DMA転送は513/514サイクル消費
+		dmaCycles := uint(513)
+		if b.cycles%2 != 0 {
+			dmaCycles = 514
+		}
+		b.Tick(dmaCycles)
 	case address == 0x4015: // APU
 		b.apu.WriteStatus(data)
 	case address == 0x4016: // コントローラ (1P/2P)

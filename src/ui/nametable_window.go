@@ -111,7 +111,7 @@ func (n *NameTableWindow) Update() {
 	width := cols * 2 * ppu.TILE_SIZE
 
 	// フレーム最初のマッパーでミラーリングを判別
-	mapper := n.ppu.MapperSnapshot()
+	mapper := n.ppu.Mapper()
 	mirroring := mapper.Mirroring()
 	bankBase := n.ppu.BackgroundPatternTableAddress()
 
@@ -151,12 +151,12 @@ func (n *NameTableWindow) Update() {
 						colorIdx := palette[bit]
 						color := ppu.PALETTE[colorIdx]
 
-						px := xOffset + tx*ppu.TILE_SIZE + col
-						py := yOffset + ty*ppu.TILE_SIZE + row
+						px := xOffset + tx*ppu.TILE_SIZE + uint(col)
+						py := yOffset + ty*ppu.TILE_SIZE + uint(row)
 						pos := (py*width + px) * 3
-						n.buffer[pos+0] = color[0]
-						n.buffer[pos+1] = color[1]
-						n.buffer[pos+2] = color[2]
+						n.buffer[pos+0] = color.R
+						n.buffer[pos+1] = color.G
+						n.buffer[pos+2] = color.B
 					}
 				}
 			}

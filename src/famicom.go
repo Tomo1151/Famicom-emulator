@@ -63,6 +63,9 @@ func (f *Famicom) Init(cartridge cartridge.Cartridge, config *config.Config) {
 	err := f.cartridge.Load()
 	f.romLoaded = err == nil
 
+	// キャンバスの作成
+	canvas := &ppu.Canvas{}
+
 	// 各コンポーネントの接続
 	f.bus.ConnectComponents(
 		&f.ppu,
@@ -70,6 +73,7 @@ func (f *Famicom) Init(cartridge cartridge.Cartridge, config *config.Config) {
 		&f.cartridge,
 		&f.joypad1,
 		&f.joypad2,
+		canvas,
 		f.config,
 	)
 }
@@ -92,6 +96,7 @@ func (f *Famicom) loadDroppedFile(path string) {
 		&f.cartridge,
 		&f.joypad1,
 		&f.joypad2,
+		f.bus.Canvas(),
 		f.config,
 	)
 	f.cpu.Init(f.bus, *f.config)
@@ -288,9 +293,8 @@ func (f *Famicom) setupGamepads() {
 // MARK: ROM読み込み待機画面の描画メソッド
 func (f *Famicom) renderStartScreen() {
 	const prompt = "DROP ROM FILE HERE"
-	ui.ClearScreen(f.bus.Canvas(), [3]uint8{0, 0, 0})
+	ui.ClearScreen(f.bus.Canvas(), sdl.Color{R: 0, G: 0, B: 0})
 	ui.DrawText(f.bus.Canvas(), (int(ppu.SCREEN_WIDTH)-len(prompt)*int(ppu.TILE_SIZE))/2, int(ppu.SCREEN_HEIGHT-ppu.TILE_SIZE)/2, prompt)
-	f.bus.Canvas().Swap()
 }
 
 // MARK: ゲームの終了メソッド

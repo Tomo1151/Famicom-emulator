@@ -121,15 +121,15 @@ func (o *OAMWindow) Update() {
 	palette0 := [4]uint8{(*paletteTable)[16], (*paletteTable)[17], (*paletteTable)[18], (*paletteTable)[19]}
 
 	// フレーム最初のマッパーを使用
-	mapper := o.ppu.MapperSnapshot()
+	mapper := o.ppu.Mapper()
 
 	oam := o.ppu.Oam()
 
 	// クリア（前フレームの残りが見えないように）
 	for i := 0; i < len(o.buffer); i += 3 {
-		o.buffer[i+0] = bgColor[0]
-		o.buffer[i+1] = bgColor[1]
-		o.buffer[i+2] = bgColor[2]
+		o.buffer[i+0] = bgColor.R
+		o.buffer[i+1] = bgColor.G
+		o.buffer[i+2] = bgColor.B
 	}
 
 	// 64スプライトを一覧表示
@@ -194,9 +194,9 @@ func (o *OAMWindow) Update() {
 				px := basePx + col
 				py := basePy + row
 				pos := (py*width + px) * 3
-				o.buffer[pos+0] = color[0]
-				o.buffer[pos+1] = color[1]
-				o.buffer[pos+2] = color[2]
+				o.buffer[pos+0] = color.R
+				o.buffer[pos+1] = color.G
+				o.buffer[pos+2] = color.B
 			}
 		}
 	}

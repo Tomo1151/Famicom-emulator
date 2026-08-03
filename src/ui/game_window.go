@@ -112,8 +112,8 @@ func (g *GameWindow) setScale(s int) {
 // MARK: ウィンドウの更新メソッド
 func (g *GameWindow) Update() {
 	// 現在描画中のバッファを元に画面を更新
-	buf := g.canvas.FrontBuffer()
-	g.texture.Update(nil, unsafe.Pointer(&(*buf)[0]), int(g.canvas.Width*3))
+	buf := g.canvas.Buffer()
+	g.texture.Update(nil, unsafe.Pointer(&(buf[0])), int(ppu.SCREEN_WIDTH*3))
 }
 
 // MARK: 描画メソッド

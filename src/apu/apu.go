@@ -199,6 +199,9 @@ func (a *APU) Tick(cycles uint) {
 
 	// DMCタイマーを進める
 	a.channel5.tick(cycles)
+	if a.channel5.PollIRQ() {
+		a.status.SetDMCIRQ()
+	}
 
 	// 現在のレベルを計算
 	var currentLevel1, currentLevel2, currentLevel3, currentLevel4, currentLevel5 float32
@@ -274,12 +277,13 @@ func (a *APU) ReadStatus() uint8 {
 	if a.status.FrameIRQ() {
 		status |= 1 << STATUS_REG_ENABLE_FRAME_IRQ_POS
 	}
-	if a.status.EnableDMCIRQ() {
+	if a.status.DMCIRQ() {
 		status |= 1 << STATUS_REG_ENABLE_DMC_IRQ_POS
 	}
 
 	// $4015の読み込みはFrameIRQフラグをクリアする
 	a.status.ClearFrameIRQ()
+	a.status.ClearDMCIRQ()
 	return status
 }
 
@@ -318,6 +322,16 @@ func (a *APU) WriteStatus(data uint8) {
 // MARK: フレームIRQを取得
 func (a *APU) FrameIRQ() bool {
 	return a.status.FrameIRQ()
+}
+
+// MARK: DMC割り込みを取得
+func (a *APU) DMCIRQ() bool {
+	return a.status.DMCIRQ()
+}
+
+// MARK: APU IRQの取得
+func (a *APU) IRQ() bool {
+	return a.status.FrameIRQ() || a.status.DMCIRQ()
 }
 
 // MARK: フレームシーケンサの書き込みメソッド

@@ -1,6 +1,10 @@
 package ui
 
-import "Famicom-emulator/ppu"
+import (
+	"Famicom-emulator/ppu"
+
+	"github.com/veandco/go-sdl2/sdl"
+)
 
 // MARK: 変数定義
 var (
@@ -116,10 +120,10 @@ var (
 	}
 
 	fontPalette = FontPalette{
-		{0, 0, 0},
-		{50, 50, 50},
-		{100, 100, 100},
-		{255, 255, 255},
+		{R: 0, G: 0, B: 0},
+		{R: 50, G: 50, B: 50},
+		{R: 100, G: 100, B: 100},
+		{R: 255, G: 255, B: 255},
 	}
 )
 
@@ -127,7 +131,7 @@ var (
 type FontTile [ppu.TILE_SIZE * 2]uint8
 
 // MARK: FontPalette の定義
-type FontPalette [4][3]uint8
+type FontPalette [4]sdl.Color
 
 // MARK: 指定された座標にタイルを描画する関数
 func DrawTile(canvas *ppu.Canvas, x, y int, tile FontTile) {
@@ -140,7 +144,7 @@ func DrawTile(canvas *ppu.Canvas, x, y int, tile FontTile) {
 			index := ppu.TILE_SIZE - column - 1
 			value := (((lower >> uint8(index)) & 1) << 1) | ((upper >> index) & 1)
 			color := fontPalette[value]
-			canvas.SetPixelAt(uint(x)+column, uint(y)+row, color)
+			canvas.SetPixel(uint(x+column), uint(y+row), color)
 		}
 	}
 }
@@ -153,7 +157,7 @@ func DrawText(canvas *ppu.Canvas, x, y int, text string) {
 			DrawTile(canvas, x, y, tile)
 		}
 		x += int(ppu.TILE_SIZE)
-		if x > int(canvas.Width-ppu.TILE_SIZE) {
+		if x > int(ppu.SCREEN_WIDTH-ppu.TILE_SIZE) {
 			x = startX
 			y += int(ppu.TILE_SIZE)
 		}
@@ -161,10 +165,10 @@ func DrawText(canvas *ppu.Canvas, x, y int, text string) {
 }
 
 // MARK: 画面をクリアする関数
-func ClearScreen(canvas *ppu.Canvas, color [3]uint8) {
-	for y := range canvas.Height {
-		for x := range canvas.Width {
-			canvas.SetPixelAt(x, y, color)
+func ClearScreen(canvas *ppu.Canvas, color sdl.Color) {
+	for y := range ppu.SCREEN_HEIGHT {
+		for x := range ppu.SCREEN_WIDTH {
+			canvas.SetPixel(x, y, color)
 		}
 	}
 }

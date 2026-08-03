@@ -68,15 +68,6 @@ func (c *CPU) Init(bus bus.Bus, config config.Config) {
 
 // MARK:  命令の実行
 func (c *CPU) Step() {
-	// NMIの実行
-	if c.bus.NMI() {
-		c.interrupt(NMI)
-	}
-
-	// IRQの実行
-	if !c.registers.P.Interrupt && (c.bus.APUIRQ() || c.bus.MapperIRQ()) {
-		c.interrupt(IRQ)
-	}
 
 	// 実行ログのトレース
 	if c.config.Cpu.LOG_ENABLED {
@@ -93,11 +84,11 @@ func (c *CPU) Step() {
 		log.Fatalf("Error: Unknown opecode $%02X at PC=%04X", opecode, c.registers.PC)
 	}
 
-	_, isPageCrossed := c.calcOperandAddress(instruction.AddressingMode)
+	// _, isPageCrossed := c.calcOperandAddress(instruction.AddressingMode)
 	instruction.Handler(instruction.AddressingMode)
-	if isPageCrossed {
-		c.bus.Tick(uint(1))
-	}
+	// if isPageCrossed {
+	// c.bus.Tick(uint(1))
+	// }
 
 	if !instruction.Jump {
 		// オペランド分プログラムカウンタを進める (オペコードの分 -1)
@@ -105,6 +96,15 @@ func (c *CPU) Step() {
 	}
 
 	c.bus.Tick(uint(instruction.Cycles))
+	// NMIの実行
+	if c.bus.NMI() {
+		c.interrupt(NMI)
+	}
+
+	// IRQの実行
+	if !c.registers.P.Interrupt && (c.bus.APUIRQ() || c.bus.MapperIRQ()) {
+		c.interrupt(IRQ)
+	}
 }
 
 // MARK: ループ実行
@@ -1203,7 +1203,7 @@ func (c *CPU) Speed() float32 {
 // MARK: 実行速度をセットするメソッド
 func (c *CPU) SetSpeed(speed float32) {
 	current := c.config.Cpu.SPEED
-	if (current <= 0.0 && speed < current) {
+	if current <= 0.0 && speed < current {
 		return
 	}
 

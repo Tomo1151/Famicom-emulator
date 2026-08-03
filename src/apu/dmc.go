@@ -126,6 +126,15 @@ func (dwc *DMCWaveChannel) setEnabled(enabled bool) {
 	}
 }
 
+// MARK: IRQの取得メソッド
+func (d *DMCWaveChannel) PollIRQ() bool {
+	if d.irq {
+		d.irq = false
+		return true
+	}
+	return false
+}
+
 // MARK: デバッグ出力切り替え
 func (d *DMCWaveChannel) ToggleLog() {
 	d.buffer.ToggleLog()
