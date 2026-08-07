@@ -198,9 +198,9 @@ func (f *Famicom) Start() {
 						if f.romLoaded {
 							f.cpu.Reset()
 						}
-					case sdl.K_9:
+					case sdl.K_LEFT:
 						f.cpu.SetSpeed(f.cpu.Speed() - .05)
-					case sdl.K_0:
+					case sdl.K_RIGHT:
 						f.cpu.SetSpeed(f.cpu.Speed() + .05)
 					case sdl.K_UP:
 						f.apu.SetVolume(f.apu.Volume() + .05)

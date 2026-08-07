@@ -110,22 +110,13 @@ func (b *Bus) Shutdown() {
 func (b *Bus) Tick(cycles uint) {
 	b.cycles += cycles
 
-	nmiBefore := b.ppu.NMI()
-
-	frameEnd := false
-
-	// PPUはCPUの3倍のクロック周波数
-	for range cycles * 3 {
-		if b.ppu.Tick(1) {
-			frameEnd = true
-		}
-	}
-
 	// APUと同期
 	b.apu.Tick(cycles)
 
-	nmiAfter := b.ppu.NMI()
-	if frameEnd || (!nmiBefore && nmiAfter) {
+	// PPUはCPUの3倍のクロック周波数
+	b.ppu.Tick(cycles * 3)
+
+	if b.ppu.NMI() {
 		b.apu.EndFrame()
 	}
 }

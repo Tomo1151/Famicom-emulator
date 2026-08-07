@@ -386,6 +386,60 @@ func (dr *DMCRegister) write(address uint16, data uint8) {
 	}
 }
 
+// MARK: DMCシフトレジスタの定義
+type DMCShiftRegisteer struct {
+	value     uint8
+	remaining uint8
+}
+
+// MARK: DMCシフトレジスタのコンストラクタ
+func NewDMCShiftRegister() DMCShiftRegisteer {
+	return DMCShiftRegisteer{
+		value:     0x00,
+		remaining: 0x08,
+	}
+}
+
+// MARK: DMCシフトレジスタのシフト
+func (dsr *DMCShiftRegisteer) shift() uint8 {
+	value := dsr.value & 0x01
+
+	dsr.value >>= 1
+
+	if dsr.remaining > 0 {
+		dsr.remaining--
+	}
+
+	return value
+}
+
+// MARK: DMCシフトレジスタの出力値
+func (dsr *DMCShiftRegisteer) Value() uint8 {
+	return dsr.value
+}
+
+// MARK: DMCシフトレジスタの出力値をセット
+func (dsr *DMCShiftRegisteer) SetValue(value uint8) {
+	dsr.value = value
+	dsr.remaining = 8
+}
+
+// MARK: 残りビット数の取得
+func (dsr *DMCShiftRegisteer) Remaining() uint8 {
+	return dsr.remaining
+}
+
+// MARK: シフトレジスタが空かどうか
+func (dsr *DMCShiftRegisteer) isEmpty() bool {
+	return dsr.remaining == 0
+}
+
+// MARK: DMCシフトレジスタのリセット
+func (dsr *DMCShiftRegisteer) reset() {
+	dsr.value = 0x00
+	dsr.remaining = 8
+}
+
 // MARK: ステータスレジスタ
 type StatusRegister struct {
 	enable1ch      bool
@@ -505,7 +559,7 @@ type FrameCounter struct {
 }
 
 func (fc *FrameCounter) Init() {
-	fc.disableIRQ = false
+	fc.disableIRQ = true
 	fc.sequencerMode = false
 }
 

@@ -1,8 +1,8 @@
 package apu
 
-// MARK: 変数定義
+// MARK: DMC再生レートテーブル
 var (
-	dmcFrequencyTable = [16]uint16{
+	DMC_PITCH_TABLE = [16]uint16{
 		0x1AC, 0x17C, 0x154, 0x140,
 		0x11E, 0x0FE, 0x0E2, 0x0D6,
 		0x0BE, 0x0A0, 0x08E, 0x080,
@@ -10,132 +10,208 @@ var (
 	}
 )
 
-// MARK: DMCの定義
-type DMCWaveChannel struct {
-	register DMCRegister
-	cpuRead  CpuBusReader
-	enabled  bool
-	irq      bool
+// MARK: DeltaModulationChannelの定義
+type DeltaModulationChannel struct {
+	register      DMCRegister
+	readMemory    CpuBusReader
+	shiftRegister DMCShiftRegisteer
 
-	// DAC
-	deltaCounter uint8 // 7bit DAC (0-127)
+	silence           bool   // 無音フラグ
+	sampleBuffer      uint8  // サンプルバッファ
+	sampleBufferEmpty bool   // サンプルバッファの状態
+	timer             uint16 // タイマ
+	timerPeriod       uint16 // チャンネルの周期
+	deltaCounter      uint8  // デルタカウンタ初期値
+	sampleAddress     uint16 // サンプル開始アドレス
+	bytesLeft         uint   // 残りサンプル数
+	irqEnabled        bool   // IRQ有効フラグ
+	loop              bool   // ループフラグ
 
-	// タイマー
-	timerReload uint16
-	timer       uint16
-
-	// サンプル処理
-	byteCount   uint16
-	baseAddress uint16
-	sample      uint8
-	bitsLeft    uint8
-	bytesLeft   uint16
-
+	irq    bool // 割り込み待機状態
 	buffer BlipBuffer
+	output float32 // 出力値
 }
 
-// MARK: DMCの初期化メソッド
-func (dwc *DMCWaveChannel) Init(reader CpuBusReader, log bool) {
-	dwc.register = DMCRegister{}
-	dwc.register.Init()
-	dwc.cpuRead = reader
-	dwc.baseAddress = 0xC000
-	dwc.byteCount = 1
-	dwc.buffer.Init(log)
+// MARK: DeltaModulationChannelのコンストラクタ
+func (dmc *DeltaModulationChannel) Init(reader CpuBusReader, log bool) {
+	dmc.register = DMCRegister{}
+	dmc.shiftRegister = NewDMCShiftRegister()
+	dmc.readMemory = reader
+	dmc.silence = true
+	dmc.sampleBuffer = 0
+	dmc.sampleBufferEmpty = true
+	dmc.timer = 0
+	dmc.timerPeriod = 0
+	dmc.deltaCounter = 0
+	dmc.sampleAddress = 0xC000
+	dmc.bytesLeft = 0
+	dmc.irqEnabled = false
+	dmc.loop = false
+	dmc.irq = false
+	dmc.output = 0
+	dmc.buffer.Init(log)
 }
 
-// MARK: DMCのタイマーを進めるメソッド
-func (dwc *DMCWaveChannel) tick(cycles uint) {
-	if dwc.timer == 0 || !dwc.enabled {
+// MARK: DMCのクロック
+func (dmc *DeltaModulationChannel) tick() {
+	// バッファにデータがあり，シフトレジスタが空なら移動
+	dmc.reloadShiftRegister()
+
+	// バッファが空ならメモリから1バイト読み込み
+	dmc.tickMemoryReader()
+
+	// クロック毎にタイマを進める
+	if dmc.timer > 0 {
+		dmc.timer--
 		return
 	}
 
-	// タイマーが0になるまで待機
-	if dwc.timer <= uint16(cycles) {
-		dwc.timer = 0
-	} else {
-		dwc.timer -= uint16(cycles)
+	// 分周器の励起時にタイマをリロード
+	if dmc.timerPeriod > 0 {
+		dmc.timer = dmc.timerPeriod - 1
+	}
+
+	// 1ビット出力
+	dmc.tickOutputUnit()
+	dmc.output = float32(dmc.deltaCounter)
+}
+
+// MARK: Output Unitのクロック
+func (dmc *DeltaModulationChannel) tickOutputUnit() {
+	// シフトレジスタが空のときは何もしない
+	if dmc.shiftRegister.isEmpty() {
 		return
 	}
 
-	dwc.timer = dwc.timerReload
-	if dwc.bitsLeft == 0 {
-		// 次のサンプルをフェッチ
-		if dwc.bytesLeft > 0 {
-			dwc.sample = dwc.cpuRead(dwc.baseAddress)
-			dwc.baseAddress++
+	if !dmc.silence {
+		// サンプルバッファが空でない場合
+		bit := dmc.shiftRegister.shift()
 
-			// オーバーフロー
-			if dwc.baseAddress == 0 {
-				dwc.baseAddress = 0x8000
-			}
-			dwc.bytesLeft--
-			dwc.bitsLeft = 8
-
-			if dwc.bytesLeft == 0 {
-				// サンプル終了
-				if dwc.register.loop {
-					dwc.restart()
-				} else if dwc.register.irqEnabled {
-					dwc.irq = true
-				}
+		if bit != 0 {
+			if dmc.deltaCounter <= 125 {
+				dmc.deltaCounter += 2
 			}
 		} else {
-			// サンプルがない場合
-			return
-		}
-	}
-
-	// 1ビット処理
-	if (dwc.sample & 0x01) == 1 {
-		if dwc.deltaCounter < 127 {
-			dwc.deltaCounter += 2
+			if dmc.deltaCounter >= 2 {
+				dmc.deltaCounter -= 2
+			}
 		}
 	} else {
-		if dwc.deltaCounter > 1 {
-			dwc.deltaCounter -= 2
+		// サンプルバッファが空の場合
+		dmc.shiftRegister.shift()
+	}
+
+	// シフトレジスタが空になったら即座にサンプルのフェッチを行う
+	if dmc.shiftRegister.isEmpty() {
+		dmc.reloadShiftRegister()
+		dmc.tickMemoryReader()
+	}
+}
+
+// MARK: Shift Registerへのロード
+func (dmc *DeltaModulationChannel) reloadShiftRegister() {
+	// シフトレジスタが空でない場合は何もしない
+	if !dmc.shiftRegister.isEmpty() {
+		return
+	}
+
+	// サンプルバッファが空の時は無音フラグをセットする
+	if dmc.sampleBufferEmpty {
+		dmc.silence = true
+		return
+	}
+
+	// サンプルバッファからシフトレジスタにデータをロード
+	dmc.shiftRegister.reset()
+	dmc.shiftRegister.SetValue(dmc.sampleBuffer)
+
+	// サンプルバッファを空にし，無音フラグをクリア
+	dmc.sampleBufferEmpty = true
+	dmc.silence = false
+
+	// サンプルのフェッチ
+	dmc.tickMemoryReader()
+}
+
+// MARK: Memory Readerのクロック
+func (dmc *DeltaModulationChannel) tickMemoryReader() {
+	// サンプルバッファ，未再生のサンプルが残っている場合は何もしない
+	if !dmc.sampleBufferEmpty || dmc.bytesLeft == 0 {
+		return
+	}
+
+	// サンプルアドレスから1バイト分フェッチして空フラグをクリア
+	if dmc.readMemory != nil {
+		dmc.sampleBuffer = dmc.readMemory(dmc.sampleAddress)
+		dmc.sampleBufferEmpty = false
+	}
+
+	// フェッチ後にサンプルアドレスをインクリメントし，残りサンプル数をデクリメント
+	dmc.sampleAddress++
+	if dmc.sampleAddress == 0 {
+		dmc.sampleAddress = 0x8000 // オーバーフロー時には最初に戻す
+	}
+	dmc.bytesLeft--
+
+	// 残りサンプルが無くなったとき
+	if dmc.bytesLeft == 0 {
+		if dmc.loop {
+			// ループフラグが有効であればリロード
+			dmc.reload()
+		} else if dmc.irqEnabled {
+			// IRQが有効の場合はIRQを発生させる
+			dmc.irq = true
 		}
 	}
-	dwc.sample >>= 1
-	dwc.bitsLeft--
 }
 
-// MARK: DMCの出力メソッド
-func (dwc *DMCWaveChannel) output() float32 {
-	return float32(dwc.deltaCounter)
+// MARK: DMCのリロード
+func (dmc *DeltaModulationChannel) reload() {
+	// サンプルアドレスとサンプル長をレジスタからロード
+	dmc.sampleAddress = 0xC000 + (uint16(dmc.register.sampleStartAddress) << 6)
+	dmc.bytesLeft = (uint(dmc.register.byteCount) << 4) + 1
 }
 
-// MARK: DMCの再生再開メソッド
-func (dwc *DMCWaveChannel) restart() {
-	dwc.baseAddress = (uint16(dwc.register.sampleStartAddress) << 6) + 0xC000
-	dwc.bytesLeft = (uint16(dwc.register.byteCount) << 4) + 1
-}
-
-// チャンネルの有効/無効設定メソッド
-func (dwc *DMCWaveChannel) setEnabled(enabled bool) {
-	dwc.enabled = enabled
-	if !enabled {
-		// 無効化されたときに再生中のサンプルを止める
-		dwc.bytesLeft = 0
+// MARK: DMC有効/無効 ($4015書き込み時)
+func (dmc *DeltaModulationChannel) SetEnabled(enabled bool) {
+	if enabled {
+		// 有効にするとき，再生が終わっていたらリロードとフェッチを行う
+		if dmc.bytesLeft == 0 {
+			dmc.reload()
+			dmc.tickMemoryReader()
+		}
 	} else {
-		// 有効化されたときに再生が終わっていれば再開
-		if dwc.bytesLeft == 0 {
-			dwc.restart()
-			dwc.timer = dwc.timerReload
-		}
+		// 無効にするとき，再生を終えて全てをクリア
+		dmc.bytesLeft = 0
+		dmc.sampleBufferEmpty = true
+		dmc.shiftRegister.reset()
 	}
+
+	// ステータスレジスタ書き込みでIRQはクリアされる
+	dmc.irq = false
 }
 
-// MARK: IRQの取得メソッド
-func (d *DMCWaveChannel) PollIRQ() bool {
-	if d.irq {
-		d.irq = false
-		return true
-	}
-	return false
+// MARK: IRQの取得
+func (dmc *DeltaModulationChannel) IRQ() bool {
+	return dmc.irq
+}
+
+// MARK: IRQのセット
+func (dmc *DeltaModulationChannel) SetIRQ(value bool) {
+	dmc.irq = value
+}
+
+// MARK: 再生中フラグの取得
+func (dmc *DeltaModulationChannel) IsActive() bool {
+	return dmc.bytesLeft > 0 || !dmc.sampleBufferEmpty
+}
+
+// MARK: Memory Readerのセット
+func (dmc *DeltaModulationChannel) SetMemoryReader(reader CpuBusReader) {
+	dmc.readMemory = reader
 }
 
 // MARK: デバッグ出力切り替え
-func (d *DMCWaveChannel) ToggleLog() {
+func (d *DeltaModulationChannel) ToggleLog() {
 	d.buffer.ToggleLog()
 }

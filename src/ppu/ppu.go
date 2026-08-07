@@ -46,7 +46,8 @@ const (
 )
 
 const (
-	SPRITE_ZERO_NOT_FOUND = 0xFF
+	COLOR_EMPHASIZE_FACTOR = 0.75
+	SPRITE_ZERO_NOT_FOUND  = 0xFF
 )
 
 // MARK: PPUの定義
@@ -120,7 +121,7 @@ func (p *PPU) Init(mapper mappers.Mapper, canvas *Canvas, config config.Config) 
 }
 
 // MARK: PPUクロックの更新
-func (p *PPU) Tick(cycles uint) bool {
+func (p *PPU) Tick(cycles uint) {
 	for range cycles {
 		// 描画設定を取得
 		isRenderingEnabled := p.mask.backgroundEnable || p.mask.spriteEnable
@@ -144,8 +145,6 @@ func (p *PPU) Tick(cycles uint) bool {
 		// サイクル, スキャンラインを進める
 		p.incrementCycles()
 	}
-
-	return p.scanline > SCANLINE_PRERENDER
 }
 
 // MARK: PPUコントロールレジスタの読み取り (CPU: $2000)
@@ -632,6 +631,10 @@ func (p *PPU) renderPixel() {
 		}
 	}
 
+	// 描画設定の適用
+	bgOpaque = bgOpaque && p.config.Ppu.BACKGROUND_ENABLED
+	spOpaque = spOpaque && p.config.Ppu.SPRITE_ENABLED
+
 	// 優先順位に基づいて色を決定
 	var color sdl.Color
 	switch {
@@ -660,7 +663,7 @@ func (p *PPU) renderPixel() {
 	}
 
 	// 決定した色を描画
-	p.canvas.SetPixel(screenX, screenY, color)
+	p.canvas.SetPixel(screenX, screenY, p.getEmphasizedColor(color))
 }
 
 // MARK: VRAMアドレスをミラーリング
@@ -933,6 +936,29 @@ func (p *PPU) getSpriteColor(attributes uint8, pattern uint8) sdl.Color {
 	return PALETTE[paletteIndex]
 }
 
+// MARK: マスクレジスタの値から色強調を反映した色を取得するメソッド
+func (p *PPU) getEmphasizedColor(baseColor sdl.Color) sdl.Color {
+	if !p.mask.emphasizeRed && !p.mask.emphasizeGreen && !p.mask.emphasizeBlue {
+		return baseColor
+	}
+
+	r := baseColor.R
+	g := baseColor.G
+	b := baseColor.B
+
+	if !p.mask.emphasizeRed {
+		r = uint8(float32(r) * COLOR_EMPHASIZE_FACTOR)
+	}
+	if !p.mask.emphasizeGreen {
+		g = uint8(float32(g) * COLOR_EMPHASIZE_FACTOR)
+	}
+	if !p.mask.emphasizeBlue {
+		b = uint8(float32(b) * COLOR_EMPHASIZE_FACTOR)
+	}
+
+	return sdl.Color{R: r, G: g, B: b}
+}
+
 // MARK: 待機中のNMI状態をチェックするメソッド
 func (p *PPU) PollNMI() bool {
 	if p.nmi && p.nmiCounter == 0 {
@@ -957,7 +983,7 @@ func (p *PPU) refreshOpenBus(value uint8) {
 
 // MARK: NMIを取得するメソッド
 func (p *PPU) NMI() bool {
-	return p.nmi
+	return p.nmi && p.nmiCounter == 0
 }
 
 // MARK: 経過フレーム数を取得するメソッド

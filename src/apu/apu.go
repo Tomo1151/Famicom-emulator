@@ -47,7 +47,7 @@ type APU struct {
 	channel2 SquareWaveChannel
 	channel3 TriangleWaveChannel
 	channel4 NoiseWaveChannel
-	channel5 DMCWaveChannel
+	channel5 DeltaModulationChannel
 
 	frameCounter FrameCounter
 	status       StatusRegister
@@ -193,61 +193,63 @@ func AudioMixCallback(userdata unsafe.Pointer, stream *C.uint8_t, length C.int) 
 
 // MARK: APUのサイクルを進める
 func (a *APU) Tick(cycles uint) {
-	a.cycles += cycles
-	a.sampleClock += uint64(cycles)
-	a.clockFrameSequencer()
+	for range cycles {
+		a.cycles++
+		a.sampleClock++
+		a.clockFrameSequencer()
 
-	// DMCタイマーを進める
-	a.channel5.tick(cycles)
-	if a.channel5.PollIRQ() {
-		a.status.SetDMCIRQ()
-	}
+		// DMCタイマーを進める
+		a.channel5.tick()
+		if a.channel5.IRQ() {
+			a.status.SetDMCIRQ()
+		}
 
-	// 現在のレベルを計算
-	var currentLevel1, currentLevel2, currentLevel3, currentLevel4, currentLevel5 float32
-	// if a.status.is1chEnabled() {
-	currentLevel1 = a.channel1.output(cycles)
-	// }
-	// if a.status.is2chEnabled() {
-	currentLevel2 = a.channel2.output(cycles)
-	// }
-	if a.status.is3chEnabled() {
-		currentLevel3 = a.channel3.output(cycles)
-	}
-	if a.status.is4chEnabled() {
-		currentLevel4 = a.channel4.output(cycles)
-	}
+		// 現在のレベルを計算
+		var currentLevel1, currentLevel2, currentLevel3, currentLevel4, currentLevel5 float32
+		if a.status.is1chEnabled() {
+			currentLevel1 = a.channel1.output(1)
+		}
+		if a.status.is2chEnabled() {
+			currentLevel2 = a.channel2.output(1)
+		}
+		if a.status.is3chEnabled() {
+			currentLevel3 = a.channel3.output(1)
+		}
+		if a.status.is4chEnabled() {
+			currentLevel4 = a.channel4.output(1)
+		}
 
-	// 5chは書き込み以外でレベルが変化しないため，ミュートに関係なく出力値を拾う
-	currentLevel5 = a.channel5.output()
+		// 5chは書き込み以外でレベルが変化しないため，ミュートに関係なく出力値を拾う
+		currentLevel5 = a.channel5.output
 
-	// 前回レベルとの差分を計算
-	delta1 := currentLevel1 - a.prevLevel1
-	delta2 := currentLevel2 - a.prevLevel2
-	delta3 := currentLevel3 - a.prevLevel3
-	delta4 := currentLevel4 - a.prevLevel4
-	delta5 := currentLevel5 - a.prevLevel5
+		// 前回レベルとの差分を計算
+		delta1 := currentLevel1 - a.prevLevel1
+		delta2 := currentLevel2 - a.prevLevel2
+		delta3 := currentLevel3 - a.prevLevel3
+		delta4 := currentLevel4 - a.prevLevel4
+		delta5 := currentLevel5 - a.prevLevel5
 
-	// レベルが変化した場合のみ、差分をバッファに追加
-	if delta1 != 0 {
-		a.channel1.buffer.addDelta(a.sampleClock, delta1)
-		a.prevLevel1 = currentLevel1
-	}
-	if delta2 != 0 {
-		a.channel2.buffer.addDelta(a.sampleClock, delta2)
-		a.prevLevel2 = currentLevel2
-	}
-	if delta3 != 0 {
-		a.channel3.buffer.addDelta(a.sampleClock, delta3)
-		a.prevLevel3 = currentLevel3
-	}
-	if delta4 != 0 {
-		a.channel4.buffer.addDelta(a.sampleClock, delta4)
-		a.prevLevel4 = currentLevel4
-	}
-	if delta5 != 0 {
-		a.channel5.buffer.addDelta(a.sampleClock, delta5)
-		a.prevLevel5 = currentLevel5
+		// レベルが変化した場合のみ、差分をバッファに追加
+		if delta1 != 0 {
+			a.channel1.buffer.addDelta(a.sampleClock, delta1)
+			a.prevLevel1 = currentLevel1
+		}
+		if delta2 != 0 {
+			a.channel2.buffer.addDelta(a.sampleClock, delta2)
+			a.prevLevel2 = currentLevel2
+		}
+		if delta3 != 0 {
+			a.channel3.buffer.addDelta(a.sampleClock, delta3)
+			a.prevLevel3 = currentLevel3
+		}
+		if delta4 != 0 {
+			a.channel4.buffer.addDelta(a.sampleClock, delta4)
+			a.prevLevel4 = currentLevel4
+		}
+		if delta5 != 0 {
+			a.channel5.buffer.addDelta(a.sampleClock, delta5)
+			a.prevLevel5 = currentLevel5
+		}
 	}
 }
 
@@ -268,11 +270,10 @@ func (a *APU) ReadStatus() uint8 {
 	if a.channel4.lengthCounter.counter > 0 {
 		status |= 1 << STATUS_REG_ENABLE_4CH_POS
 	}
-
-	// @FIXME DMCの再生状態を正しく反映する
 	// 5ch: DMCが再生中かどうか
-	status |= 1 << STATUS_REG_ENABLE_5CH_POS // TODO: DMC 実装に合わせて
-
+	if a.channel5.IsActive() {
+		status |= 1 << STATUS_REG_ENABLE_5CH_POS // TODO: DMC 実装に合わせて
+	}
 	// FrameIRQ / DMCIRQ フラグの反映
 	if a.status.FrameIRQ() {
 		status |= 1 << STATUS_REG_ENABLE_FRAME_IRQ_POS
@@ -283,7 +284,7 @@ func (a *APU) ReadStatus() uint8 {
 
 	// $4015の読み込みはFrameIRQフラグをクリアする
 	a.status.ClearFrameIRQ()
-	a.status.ClearDMCIRQ()
+
 	return status
 }
 
@@ -309,14 +310,11 @@ func (a *APU) WriteStatus(data uint8) {
 	if (prev&(1<<STATUS_REG_ENABLE_4CH_POS)) != 0 && !a.status.is4chEnabled() {
 		a.channel4.lengthCounter.counter = 0
 	}
-	if (prev&(1<<STATUS_REG_ENABLE_5CH_POS)) != 0 && !a.status.is5chEnabled() {
-		a.channel5.setEnabled(false)
-	} else if (prev&(1<<STATUS_REG_ENABLE_5CH_POS)) == 0 && a.status.is5chEnabled() {
-		a.channel5.setEnabled(true)
-	}
+	a.channel5.SetEnabled(a.status.is5chEnabled())
 
-	// $4015への書き込みはFrameIRQフラグをクリアする
-	a.status.ClearFrameIRQ()
+	// $4015への書き込みはDMCIRQフラグをクリアする
+	a.status.ClearDMCIRQ()
+	a.channel5.SetIRQ(false)
 }
 
 // MARK: フレームIRQを取得
@@ -346,11 +344,14 @@ func (a *APU) WriteFrameSequencer(data uint8) {
 		a.clockEnvelopes()
 		a.clockLengthCounter()
 		a.clockSweepUnits()
-		a.status.ClearFrameIRQ()
 	}
 
 	a.step = 0
 	a.cycles = 0
+
+	if a.frameCounter.disableIRQ {
+		a.status.ClearFrameIRQ()
+	}
 }
 
 // MARK: 1chへの書き込みメソッド (矩形波)
@@ -593,33 +594,42 @@ func (a *APU) Write5ch(address uint16, data uint8) {
 	switch address {
 	case 0x4010:
 		/*
-			$4010    il-- ffff
-				7   i    割り込み有効フラグ
-				6   l    ループフラグ
-				3-0 f    周期インデックス
+			$4010 書き込み
+			- IRQフラグ
+			- ループフラグ
+			- 再生レート
 		*/
-		a.channel5.timerReload = dmcFrequencyTable[a.channel5.register.frequencyIndex]
-		a.channel5.timer = a.channel5.timerReload
+		a.channel5.irqEnabled = a.channel5.register.irqEnabled
+		a.channel5.loop = a.channel5.register.loop
+		a.channel5.timerPeriod = DMC_PITCH_TABLE[a.channel5.register.frequencyIndex]
+
+		// IRQ無効化時には待機中のIRQもクリアされる
+		if !a.channel5.irqEnabled {
+			a.status.ClearDMCIRQ()
+			a.channel5.SetIRQ(false)
+		}
 	case 0x4011:
 		/*
-			$4011    -ddd dddd
-				6-0 d    デルタカウンタ初期値
+			$4011 書き込み
+			- デルタカウンタ初期値
 		*/
 		a.channel5.deltaCounter = a.channel5.register.deltaCounter
 	case 0x4012:
 		/*
-			$4012    aaaa aaaa
-				7-0 a    サンプル開始アドレス
+			$4012 書き込み
+			- サンプルアドレス
+
+			※ 初期値をレジスタのみにロード
+			　 リロードのタイミングでセットされる
 		*/
-		// a.channel5.baseAddress = uint16(a.channel5.register.sampleStartAddress)*0x40 + 0xC000
 	case 0x4013:
 		/*
-			$4013    llll llll
-				7-0 l    サンプルバイト数
+			$4013 書き込み
+			- サンプル長
 
-				llll.llll0001 = (l * 16) + 1
+			※ 初期値をレジスタのみにロード
+			　 リロードのタイミングでセットされる
 		*/
-		// a.channel5.byteCount = (uint16(data) << 4) + 1
 	}
 }
 
@@ -845,7 +855,7 @@ func (a *APU) ToggleMute5ch() {
 		a.channel5.buffer.Sync(0.0, a.sampleClock)
 		a.prevLevel5 = 0.0
 	} else {
-		current := a.channel5.output()
+		current := a.channel5.output
 		a.prevLevel5 = current
 		a.channel5.buffer.Sync(current, a.sampleClock)
 	}

@@ -25,8 +25,8 @@ func TestStatusRegister_ToByte(t *testing.T) {
 		},
 		{
 			name: "interrupt",
-			sr:   statusRegister{Interrupt: true},
-			want: 1 << STATUS_REG_INTERRUPT_POS,
+			sr:   statusRegister{IrqDisabled: true},
+			want: 1 << STATUS_REG_IRQDISABLED_POS,
 		},
 		{
 			name: "decimal",
@@ -56,14 +56,14 @@ func TestStatusRegister_ToByte(t *testing.T) {
 		{
 			name: "all flags",
 			sr: statusRegister{
-				Carry:     true,
-				Zero:      true,
-				Interrupt: true,
-				Decimal:   true,
-				Break:     true,
-				Reserved:  true,
-				Overflow:  true,
-				Negative:  true,
+				Carry:       true,
+				Zero:        true,
+				IrqDisabled: true,
+				Decimal:     true,
+				Break:       true,
+				Reserved:    true,
+				Overflow:    true,
+				Negative:    true,
 			},
 			want: 0xFF,
 		},
@@ -103,8 +103,8 @@ func TestStatusRegister_FromByte(t *testing.T) {
 		},
 		{
 			name:  "interrupt only",
-			input: 1 << STATUS_REG_INTERRUPT_POS,
-			want:  statusRegister{Interrupt: true},
+			input: 1 << STATUS_REG_IRQDISABLED_POS,
+			want:  statusRegister{IrqDisabled: true},
 		},
 		{
 			name:  "decimal only",
@@ -139,8 +139,8 @@ func TestStatusRegister_FromByte(t *testing.T) {
 		},
 		{
 			name:  "carry, zero and interrupt",
-			input: (1 << STATUS_REG_CARRY_POS) | (1 << STATUS_REG_ZERO_POS) | (1 << STATUS_REG_INTERRUPT_POS),
-			want:  statusRegister{Carry: true, Zero: true, Interrupt: true},
+			input: (1 << STATUS_REG_CARRY_POS) | (1 << STATUS_REG_ZERO_POS) | (1 << STATUS_REG_IRQDISABLED_POS),
+			want:  statusRegister{Carry: true, Zero: true, IrqDisabled: true},
 		},
 		{
 			name:  "common arithmetic result (negative with carry)",
@@ -151,14 +151,14 @@ func TestStatusRegister_FromByte(t *testing.T) {
 			name:  "all flags",
 			input: 0xFF,
 			want: statusRegister{
-				Carry:     true,
-				Zero:      true,
-				Interrupt: true,
-				Decimal:   true,
-				Break:     true,
-				Reserved:  true,
-				Overflow:  true,
-				Negative:  true,
+				Carry:       true,
+				Zero:        true,
+				IrqDisabled: true,
+				Decimal:     true,
+				Break:       true,
+				Reserved:    true,
+				Overflow:    true,
+				Negative:    true,
 			},
 		},
 	}
@@ -184,8 +184,8 @@ func TestStatusRegister_FromByte(t *testing.T) {
 			if got.Decimal != tt.want.Decimal {
 				t.Errorf("FromByte(%#02x).Decimal = %v, want %v", tt.input, got.Decimal, tt.want.Decimal)
 			}
-			if got.Interrupt != tt.want.Interrupt {
-				t.Errorf("FromByte(%#02x).Interrupt = %v, want %v", tt.input, got.Interrupt, tt.want.Interrupt)
+			if got.IrqDisabled != tt.want.IrqDisabled {
+				t.Errorf("FromByte(%#02x).IrqDisabled = %v, want %v", tt.input, got.IrqDisabled, tt.want.IrqDisabled)
 			}
 			if got.Zero != tt.want.Zero {
 				t.Errorf("FromByte(%#02x).Zero = %v, want %v", tt.input, got.Zero, tt.want.Zero)
@@ -203,17 +203,17 @@ func TestStatusRegister_RoundTrip(t *testing.T) {
 		{}, // 全てfalse
 		{Carry: true},
 		{Zero: true, Carry: true},
-		{Interrupt: true, Break: true},
+		{IrqDisabled: true, Break: true},
 		{Decimal: true, Overflow: true, Negative: true},
 		{ // 全てtrue
-			Carry:     true,
-			Zero:      true,
-			Interrupt: true,
-			Decimal:   true,
-			Break:     true,
-			Reserved:  true,
-			Overflow:  true,
-			Negative:  true,
+			Carry:       true,
+			Zero:        true,
+			IrqDisabled: true,
+			Decimal:     true,
+			Break:       true,
+			Reserved:    true,
+			Overflow:    true,
+			Negative:    true,
 		},
 	}
 
@@ -228,7 +228,7 @@ func TestStatusRegister_RoundTrip(t *testing.T) {
 			original.Reserved != reconverted.Reserved ||
 			original.Break != reconverted.Break ||
 			original.Decimal != reconverted.Decimal ||
-			original.Interrupt != reconverted.Interrupt ||
+			original.IrqDisabled != reconverted.IrqDisabled ||
 			original.Zero != reconverted.Zero ||
 			original.Carry != reconverted.Carry {
 			t.Errorf("Case %d: Round trip conversion failed. Original: %+v, After: %+v, Byte: 0x%02X",

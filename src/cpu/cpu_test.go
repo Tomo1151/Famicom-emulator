@@ -138,7 +138,7 @@ func TestSEC(t *testing.T) {
 			addrMode: Implied,
 			setupCPU: func(c *CPU) {
 				c.registers.P.Carry = false
-				c.WriteByteAt(c.registers.PC, 0x38) // SEC命令
+				c.bus.WriteByteAt(c.registers.PC, 0x38) // SEC命令
 			},
 			expectedCarry: true,
 		},
@@ -148,7 +148,7 @@ func TestSEC(t *testing.T) {
 			addrMode: Implied,
 			setupCPU: func(c *CPU) {
 				c.registers.P.Carry = true
-				c.WriteByteAt(c.registers.PC, 0x38) // SEC命令
+				c.bus.WriteByteAt(c.registers.PC, 0x38) // SEC命令
 			},
 			expectedCarry: true,
 		},
@@ -183,7 +183,7 @@ func TestCLC(t *testing.T) {
 			addrMode: Implied,
 			setupCPU: func(c *CPU) {
 				c.registers.P.Carry = true
-				c.WriteByteAt(c.registers.PC, 0x18) // CLC命令
+				c.bus.WriteByteAt(c.registers.PC, 0x18) // CLC命令
 			},
 			expectedCarry: false,
 		},
@@ -193,7 +193,7 @@ func TestCLC(t *testing.T) {
 			addrMode: Implied,
 			setupCPU: func(c *CPU) {
 				c.registers.P.Carry = false
-				c.WriteByteAt(c.registers.PC, 0x18) // CLC命令
+				c.bus.WriteByteAt(c.registers.PC, 0x18) // CLC命令
 			},
 			expectedCarry: false,
 		},
@@ -228,7 +228,7 @@ func TestCLV(t *testing.T) {
 			addrMode: Implied,
 			setupCPU: func(c *CPU) {
 				c.registers.P.Overflow = true
-				c.WriteByteAt(c.registers.PC, 0xB8) // CLV命令
+				c.bus.WriteByteAt(c.registers.PC, 0xB8) // CLV命令
 			},
 			expectedOverflow: false,
 		},
@@ -238,7 +238,7 @@ func TestCLV(t *testing.T) {
 			addrMode: Implied,
 			setupCPU: func(c *CPU) {
 				c.registers.P.Overflow = false
-				c.WriteByteAt(c.registers.PC, 0xB8) // CLV命令
+				c.bus.WriteByteAt(c.registers.PC, 0xB8) // CLV命令
 			},
 			expectedOverflow: false,
 		},
@@ -272,8 +272,8 @@ func TestSEI(t *testing.T) {
 			opcode:   0x78,
 			addrMode: Implied,
 			setupCPU: func(c *CPU) {
-				c.registers.P.Interrupt = false
-				c.WriteByteAt(c.registers.PC, 0x78) // SEI命令
+				c.registers.P.IrqDisabled = false
+				c.bus.WriteByteAt(c.registers.PC, 0x78) // SEI命令
 			},
 			expectedInterrupt: true,
 		},
@@ -282,8 +282,8 @@ func TestSEI(t *testing.T) {
 			opcode:   0x78,
 			addrMode: Implied,
 			setupCPU: func(c *CPU) {
-				c.registers.P.Interrupt = true
-				c.WriteByteAt(c.registers.PC, 0x78) // SEI命令
+				c.registers.P.IrqDisabled = true
+				c.bus.WriteByteAt(c.registers.PC, 0x78) // SEI命令
 			},
 			expectedInterrupt: true,
 		},
@@ -298,7 +298,7 @@ func TestSEI(t *testing.T) {
 			c.Step()
 
 			// 結果を検証
-			checkFlag(t, "Interrupt", c.registers.P.Interrupt, tt.expectedInterrupt)
+			checkFlag(t, "Interrupt", c.registers.P.IrqDisabled, tt.expectedInterrupt)
 		})
 	}
 }
@@ -317,8 +317,8 @@ func TestCLI(t *testing.T) {
 			opcode:   0x58,
 			addrMode: Implied,
 			setupCPU: func(c *CPU) {
-				c.registers.P.Interrupt = true
-				c.WriteByteAt(c.registers.PC, 0x58) // CLI命令
+				c.registers.P.IrqDisabled = true
+				c.bus.WriteByteAt(c.registers.PC, 0x58) // CLI命令
 			},
 			expectedInterrupt: false,
 		},
@@ -327,8 +327,8 @@ func TestCLI(t *testing.T) {
 			opcode:   0x58,
 			addrMode: Implied,
 			setupCPU: func(c *CPU) {
-				c.registers.P.Interrupt = false
-				c.WriteByteAt(c.registers.PC, 0x58) // CLI命令
+				c.registers.P.IrqDisabled = false
+				c.bus.WriteByteAt(c.registers.PC, 0x58) // CLI命令
 			},
 			expectedInterrupt: false,
 		},
@@ -343,7 +343,7 @@ func TestCLI(t *testing.T) {
 			c.Step()
 
 			// 結果を検証
-			checkFlag(t, "Interrupt", c.registers.P.Interrupt, tt.expectedInterrupt)
+			checkFlag(t, "Interrupt", c.registers.P.IrqDisabled, tt.expectedInterrupt)
 		})
 	}
 }
@@ -363,7 +363,7 @@ func TestSED(t *testing.T) {
 			addrMode: Implied,
 			setupCPU: func(c *CPU) {
 				c.registers.P.Decimal = false
-				c.WriteByteAt(c.registers.PC, 0xF8) // SED命令
+				c.bus.WriteByteAt(c.registers.PC, 0xF8) // SED命令
 			},
 			expectedDecimal: true,
 		},
@@ -373,7 +373,7 @@ func TestSED(t *testing.T) {
 			addrMode: Implied,
 			setupCPU: func(c *CPU) {
 				c.registers.P.Decimal = true
-				c.WriteByteAt(c.registers.PC, 0xF8) // SED命令
+				c.bus.WriteByteAt(c.registers.PC, 0xF8) // SED命令
 			},
 			expectedDecimal: true,
 		},
@@ -408,7 +408,7 @@ func TestCLD(t *testing.T) {
 			addrMode: Implied,
 			setupCPU: func(c *CPU) {
 				c.registers.P.Decimal = true
-				c.WriteByteAt(c.registers.PC, 0xD8) // CLD命令
+				c.bus.WriteByteAt(c.registers.PC, 0xD8) // CLD命令
 			},
 			expectedDecimal: false,
 		},
@@ -418,7 +418,7 @@ func TestCLD(t *testing.T) {
 			addrMode: Implied,
 			setupCPU: func(c *CPU) {
 				c.registers.P.Decimal = false
-				c.WriteByteAt(c.registers.PC, 0xD8) // CLD命令
+				c.bus.WriteByteAt(c.registers.PC, 0xD8) // CLD命令
 			},
 			expectedDecimal: false,
 		},
@@ -455,8 +455,8 @@ func TestLDA(t *testing.T) {
 			opcode:   0xA9,
 			addrMode: Immediate,
 			setupMemory: func(c *CPU) {
-				c.WriteByteAt(c.registers.PC, 0xA9)   // LDA命令
-				c.WriteByteAt(c.registers.PC+1, 0x42) // オペランド: 0x42
+				c.bus.WriteByteAt(c.registers.PC, 0xA9)   // LDA命令
+				c.bus.WriteByteAt(c.registers.PC+1, 0x42) // オペランド: 0x42
 			},
 			expectedA:    0x42,
 			expectedZero: false,
@@ -467,8 +467,8 @@ func TestLDA(t *testing.T) {
 			opcode:   0xA9,
 			addrMode: Immediate,
 			setupMemory: func(c *CPU) {
-				c.WriteByteAt(c.registers.PC, 0xA9)   // LDA命令
-				c.WriteByteAt(c.registers.PC+1, 0x00) // オペランド: 0x00
+				c.bus.WriteByteAt(c.registers.PC, 0xA9)   // LDA命令
+				c.bus.WriteByteAt(c.registers.PC+1, 0x00) // オペランド: 0x00
 			},
 			expectedA:    0x00,
 			expectedZero: true,
@@ -479,8 +479,8 @@ func TestLDA(t *testing.T) {
 			opcode:   0xA9,
 			addrMode: Immediate,
 			setupMemory: func(c *CPU) {
-				c.WriteByteAt(c.registers.PC, 0xA9)   // LDA命令
-				c.WriteByteAt(c.registers.PC+1, 0x80) // オペランド: 0x80 (負の値)
+				c.bus.WriteByteAt(c.registers.PC, 0xA9)   // LDA命令
+				c.bus.WriteByteAt(c.registers.PC+1, 0x80) // オペランド: 0x80 (負の値)
 			},
 			expectedA:    0x80,
 			expectedZero: false,
@@ -491,9 +491,9 @@ func TestLDA(t *testing.T) {
 			opcode:   0xA5,
 			addrMode: ZeroPage,
 			setupMemory: func(c *CPU) {
-				c.WriteByteAt(c.registers.PC, 0xA5)   // LDA命令
-				c.WriteByteAt(c.registers.PC+1, 0x42) // オペランド: ZPアドレス0x42
-				c.WriteByteAt(0x42, 0x37)             // 0x42に値を設定
+				c.bus.WriteByteAt(c.registers.PC, 0xA5)   // LDA命令
+				c.bus.WriteByteAt(c.registers.PC+1, 0x42) // オペランド: ZPアドレス0x42
+				c.bus.WriteByteAt(0x42, 0x37)             // 0x42に値を設定
 			},
 			expectedA:    0x37,
 			expectedZero: false,
@@ -505,9 +505,9 @@ func TestLDA(t *testing.T) {
 			addrMode: ZeroPageXIndexed,
 			setupMemory: func(c *CPU) {
 				c.registers.X = 0x10
-				c.WriteByteAt(c.registers.PC, 0xB5)   // LDA命令
-				c.WriteByteAt(c.registers.PC+1, 0x42) // オペランド: ZPアドレス0x42
-				c.WriteByteAt(0x52, 0x37)             // 0x52 (0x42+0x10) に値を設定
+				c.bus.WriteByteAt(c.registers.PC, 0xB5)   // LDA命令
+				c.bus.WriteByteAt(c.registers.PC+1, 0x42) // オペランド: ZPアドレス0x42
+				c.bus.WriteByteAt(0x52, 0x37)             // 0x52 (0x42+0x10) に値を設定
 			},
 			expectedA:    0x37,
 			expectedZero: false,
@@ -518,10 +518,10 @@ func TestLDA(t *testing.T) {
 			opcode:   0xAD,
 			addrMode: Absolute,
 			setupMemory: func(c *CPU) {
-				c.WriteByteAt(c.registers.PC, 0xAD)   // LDA命令
-				c.WriteByteAt(c.registers.PC+1, 0x80) // オペランド: 低バイト
-				c.WriteByteAt(c.registers.PC+2, 0x04) // オペランド: 高バイト (0x0480)
-				c.WriteByteAt(0x0480, 0x37)           // 0x0480に値を設定
+				c.bus.WriteByteAt(c.registers.PC, 0xAD)   // LDA命令
+				c.bus.WriteByteAt(c.registers.PC+1, 0x80) // オペランド: 低バイト
+				c.bus.WriteByteAt(c.registers.PC+2, 0x04) // オペランド: 高バイト (0x0480)
+				c.bus.WriteByteAt(0x0480, 0x37)           // 0x0480に値を設定
 			},
 			expectedA:    0x37,
 			expectedZero: false,
@@ -533,10 +533,10 @@ func TestLDA(t *testing.T) {
 			addrMode: AbsoluteXIndexed,
 			setupMemory: func(c *CPU) {
 				c.registers.X = 0x10
-				c.WriteByteAt(c.registers.PC, 0xBD)   // LDA命令
-				c.WriteByteAt(c.registers.PC+1, 0x80) // オペランド: 低バイト
-				c.WriteByteAt(c.registers.PC+2, 0x04) // オペランド: 高バイト (0x0480)
-				c.WriteByteAt(0x0490, 0x37)           // 0x0490 (0x0480+0x10) に値を設定
+				c.bus.WriteByteAt(c.registers.PC, 0xBD)   // LDA命令
+				c.bus.WriteByteAt(c.registers.PC+1, 0x80) // オペランド: 低バイト
+				c.bus.WriteByteAt(c.registers.PC+2, 0x04) // オペランド: 高バイト (0x0480)
+				c.bus.WriteByteAt(0x0490, 0x37)           // 0x0490 (0x0480+0x10) に値を設定
 			},
 			expectedA:    0x37,
 			expectedZero: false,
@@ -548,10 +548,10 @@ func TestLDA(t *testing.T) {
 			addrMode: AbsoluteYIndexed,
 			setupMemory: func(c *CPU) {
 				c.registers.Y = 0x10
-				c.WriteByteAt(c.registers.PC, 0xB9)   // LDA命令
-				c.WriteByteAt(c.registers.PC+1, 0x80) // オペランド: 低バイト
-				c.WriteByteAt(c.registers.PC+2, 0x04) // オペランド: 高バイト (0x0480)
-				c.WriteByteAt(0x0490, 0x37)           // 0x0490 (0x0480+0x10) に値を設定
+				c.bus.WriteByteAt(c.registers.PC, 0xB9)   // LDA命令
+				c.bus.WriteByteAt(c.registers.PC+1, 0x80) // オペランド: 低バイト
+				c.bus.WriteByteAt(c.registers.PC+2, 0x04) // オペランド: 高バイト (0x0480)
+				c.bus.WriteByteAt(0x0490, 0x37)           // 0x0490 (0x0480+0x10) に値を設定
 			},
 			expectedA:    0x37,
 			expectedZero: false,
@@ -563,11 +563,11 @@ func TestLDA(t *testing.T) {
 			addrMode: IndexedIndirect,
 			setupMemory: func(c *CPU) {
 				c.registers.X = 0x04
-				c.WriteByteAt(c.registers.PC, 0xA1)   // LDA命令
-				c.WriteByteAt(c.registers.PC+1, 0x20) // オペランド: ZPアドレス0x20
-				c.WriteByteAt(0x24, 0x74)             // 0x24 (0x20+0x04) に低バイト
-				c.WriteByteAt(0x25, 0x00)             // 0x25 に高バイト (→ 0x0074)
-				c.WriteByteAt(0x0074, 0x37)           // 0x0074に値を設定
+				c.bus.WriteByteAt(c.registers.PC, 0xA1)   // LDA命令
+				c.bus.WriteByteAt(c.registers.PC+1, 0x20) // オペランド: ZPアドレス0x20
+				c.bus.WriteByteAt(0x24, 0x74)             // 0x24 (0x20+0x04) に低バイト
+				c.bus.WriteByteAt(0x25, 0x00)             // 0x25 に高バイト (→ 0x0074)
+				c.bus.WriteByteAt(0x0074, 0x37)           // 0x0074に値を設定
 			},
 			expectedA:    0x37,
 			expectedZero: false,
@@ -579,11 +579,11 @@ func TestLDA(t *testing.T) {
 			addrMode: IndirectIndexed,
 			setupMemory: func(c *CPU) {
 				c.registers.Y = 0x10
-				c.WriteByteAt(c.registers.PC, 0xB1)   // LDA命令
-				c.WriteByteAt(c.registers.PC+1, 0x20) // オペランド: ZPアドレス0x20
-				c.WriteByteAt(0x20, 0x74)             // 0x20に低バイト
-				c.WriteByteAt(0x21, 0x00)             // 0x21に高バイト (→ 0x0074)
-				c.WriteByteAt(0x0084, 0x37)           // 0x0084 (0x0074+0x10) に値を設定
+				c.bus.WriteByteAt(c.registers.PC, 0xB1)   // LDA命令
+				c.bus.WriteByteAt(c.registers.PC+1, 0x20) // オペランド: ZPアドレス0x20
+				c.bus.WriteByteAt(0x20, 0x74)             // 0x20に低バイト
+				c.bus.WriteByteAt(0x21, 0x00)             // 0x21に高バイト (→ 0x0074)
+				c.bus.WriteByteAt(0x0084, 0x37)           // 0x0084 (0x0074+0x10) に値を設定
 			},
 			expectedA:    0x37,
 			expectedZero: false,
@@ -623,8 +623,8 @@ func TestLDX(t *testing.T) {
 			opcode:   0xA2,
 			addrMode: Immediate,
 			setupMemory: func(c *CPU) {
-				c.WriteByteAt(c.registers.PC, 0xA2)   // LDX命令
-				c.WriteByteAt(c.registers.PC+1, 0x42) // オペランド: 0x42
+				c.bus.WriteByteAt(c.registers.PC, 0xA2)   // LDX命令
+				c.bus.WriteByteAt(c.registers.PC+1, 0x42) // オペランド: 0x42
 			},
 			expectedX:    0x42,
 			expectedZero: false,
@@ -635,9 +635,9 @@ func TestLDX(t *testing.T) {
 			opcode:   0xA6,
 			addrMode: ZeroPage,
 			setupMemory: func(c *CPU) {
-				c.WriteByteAt(c.registers.PC, 0xA6)   // LDX命令
-				c.WriteByteAt(c.registers.PC+1, 0x42) // オペランド: ZPアドレス0x42
-				c.WriteByteAt(0x42, 0x37)             // 0x42に値を設定
+				c.bus.WriteByteAt(c.registers.PC, 0xA6)   // LDX命令
+				c.bus.WriteByteAt(c.registers.PC+1, 0x42) // オペランド: ZPアドレス0x42
+				c.bus.WriteByteAt(0x42, 0x37)             // 0x42に値を設定
 			},
 			expectedX:    0x37,
 			expectedZero: false,
@@ -649,9 +649,9 @@ func TestLDX(t *testing.T) {
 			addrMode: ZeroPageYIndexed,
 			setupMemory: func(c *CPU) {
 				c.registers.Y = 0x10
-				c.WriteByteAt(c.registers.PC, 0xB6)   // LDX命令
-				c.WriteByteAt(c.registers.PC+1, 0x42) // オペランド: ZPアドレス0x42
-				c.WriteByteAt(0x52, 0x37)             // 0x52 (0x42+0x10) に値を設定
+				c.bus.WriteByteAt(c.registers.PC, 0xB6)   // LDX命令
+				c.bus.WriteByteAt(c.registers.PC+1, 0x42) // オペランド: ZPアドレス0x42
+				c.bus.WriteByteAt(0x52, 0x37)             // 0x52 (0x42+0x10) に値を設定
 			},
 			expectedX:    0x37,
 			expectedZero: false,
@@ -662,10 +662,10 @@ func TestLDX(t *testing.T) {
 			opcode:   0xAE,
 			addrMode: Absolute,
 			setupMemory: func(c *CPU) {
-				c.WriteByteAt(c.registers.PC, 0xAE)   // LDX命令
-				c.WriteByteAt(c.registers.PC+1, 0x80) // オペランド: 低バイト
-				c.WriteByteAt(c.registers.PC+2, 0x04) // オペランド: 高バイト (0x0480)
-				c.WriteByteAt(0x0480, 0x37)           // 0x0480に値を設定
+				c.bus.WriteByteAt(c.registers.PC, 0xAE)   // LDX命令
+				c.bus.WriteByteAt(c.registers.PC+1, 0x80) // オペランド: 低バイト
+				c.bus.WriteByteAt(c.registers.PC+2, 0x04) // オペランド: 高バイト (0x0480)
+				c.bus.WriteByteAt(0x0480, 0x37)           // 0x0480に値を設定
 			},
 			expectedX:    0x37,
 			expectedZero: false,
@@ -677,10 +677,10 @@ func TestLDX(t *testing.T) {
 			addrMode: AbsoluteYIndexed,
 			setupMemory: func(c *CPU) {
 				c.registers.Y = 0x10
-				c.WriteByteAt(c.registers.PC, 0xBE)   // LDX命令
-				c.WriteByteAt(c.registers.PC+1, 0x80) // オペランド: 低バイト
-				c.WriteByteAt(c.registers.PC+2, 0x04) // オペランド: 高バイト (0x0480)
-				c.WriteByteAt(0x0490, 0x37)           // 0x0490 (0x0480+0x10) に値を設定
+				c.bus.WriteByteAt(c.registers.PC, 0xBE)   // LDX命令
+				c.bus.WriteByteAt(c.registers.PC+1, 0x80) // オペランド: 低バイト
+				c.bus.WriteByteAt(c.registers.PC+2, 0x04) // オペランド: 高バイト (0x0480)
+				c.bus.WriteByteAt(0x0490, 0x37)           // 0x0490 (0x0480+0x10) に値を設定
 			},
 			expectedX:    0x37,
 			expectedZero: false,
@@ -721,8 +721,8 @@ func TestLDY(t *testing.T) {
 			opcode:   0xA0,
 			addrMode: Immediate,
 			setupMemory: func(c *CPU) {
-				c.WriteByteAt(c.registers.PC, 0xA0)   // LDY命令
-				c.WriteByteAt(c.registers.PC+1, 0x42) // オペランド: 0x42
+				c.bus.WriteByteAt(c.registers.PC, 0xA0)   // LDY命令
+				c.bus.WriteByteAt(c.registers.PC+1, 0x42) // オペランド: 0x42
 			},
 			expectedY:    0x42,
 			expectedZero: false,
@@ -733,9 +733,9 @@ func TestLDY(t *testing.T) {
 			opcode:   0xA4,
 			addrMode: ZeroPage,
 			setupMemory: func(c *CPU) {
-				c.WriteByteAt(c.registers.PC, 0xA4)   // LDY命令
-				c.WriteByteAt(c.registers.PC+1, 0x42) // オペランド: ZPアドレス0x42
-				c.WriteByteAt(0x42, 0x37)             // 0x42に値を設定
+				c.bus.WriteByteAt(c.registers.PC, 0xA4)   // LDY命令
+				c.bus.WriteByteAt(c.registers.PC+1, 0x42) // オペランド: ZPアドレス0x42
+				c.bus.WriteByteAt(0x42, 0x37)             // 0x42に値を設定
 			},
 			expectedY:    0x37,
 			expectedZero: false,
@@ -747,9 +747,9 @@ func TestLDY(t *testing.T) {
 			addrMode: ZeroPageXIndexed,
 			setupMemory: func(c *CPU) {
 				c.registers.X = 0x10
-				c.WriteByteAt(c.registers.PC, 0xB4)   // LDY命令
-				c.WriteByteAt(c.registers.PC+1, 0x42) // オペランド: ZPアドレス0x42
-				c.WriteByteAt(0x52, 0x37)             // 0x52 (0x42+0x10) に値を設定
+				c.bus.WriteByteAt(c.registers.PC, 0xB4)   // LDY命令
+				c.bus.WriteByteAt(c.registers.PC+1, 0x42) // オペランド: ZPアドレス0x42
+				c.bus.WriteByteAt(0x52, 0x37)             // 0x52 (0x42+0x10) に値を設定
 			},
 			expectedY:    0x37,
 			expectedZero: false,
@@ -760,10 +760,10 @@ func TestLDY(t *testing.T) {
 			opcode:   0xAC,
 			addrMode: Absolute,
 			setupMemory: func(c *CPU) {
-				c.WriteByteAt(c.registers.PC, 0xAC)   // LDY命令
-				c.WriteByteAt(c.registers.PC+1, 0x80) // オペランド: 低バイト
-				c.WriteByteAt(c.registers.PC+2, 0x04) // オペランド: 高バイト (0x0480)
-				c.WriteByteAt(0x0480, 0x37)           // 0x0480に値を設定
+				c.bus.WriteByteAt(c.registers.PC, 0xAC)   // LDY命令
+				c.bus.WriteByteAt(c.registers.PC+1, 0x80) // オペランド: 低バイト
+				c.bus.WriteByteAt(c.registers.PC+2, 0x04) // オペランド: 高バイト (0x0480)
+				c.bus.WriteByteAt(0x0480, 0x37)           // 0x0480に値を設定
 			},
 			expectedY:    0x37,
 			expectedZero: false,
@@ -775,10 +775,10 @@ func TestLDY(t *testing.T) {
 			addrMode: AbsoluteXIndexed,
 			setupMemory: func(c *CPU) {
 				c.registers.X = 0x10
-				c.WriteByteAt(c.registers.PC, 0xBC)   // LDY命令
-				c.WriteByteAt(c.registers.PC+1, 0x80) // オペランド: 低バイト
-				c.WriteByteAt(c.registers.PC+2, 0x04) // オペランド: 高バイト (0x0480)
-				c.WriteByteAt(0x0490, 0x37)           // 0x0490 (0x0480+0x10) に値を設定
+				c.bus.WriteByteAt(c.registers.PC, 0xBC)   // LDY命令
+				c.bus.WriteByteAt(c.registers.PC+1, 0x80) // オペランド: 低バイト
+				c.bus.WriteByteAt(c.registers.PC+2, 0x04) // オペランド: 高バイト (0x0480)
+				c.bus.WriteByteAt(0x0490, 0x37)           // 0x0490 (0x0480+0x10) に値を設定
 			},
 			expectedY:    0x37,
 			expectedZero: false,
@@ -817,12 +817,12 @@ func TestSTA(t *testing.T) {
 			addrMode: ZeroPage,
 			setupCPU: func(c *CPU) {
 				c.registers.A = 0x42
-				c.WriteByteAt(c.registers.PC, 0x85)   // STA命令
-				c.WriteByteAt(c.registers.PC+1, 0x20) // オペランド: ZPアドレス0x20
+				c.bus.WriteByteAt(c.registers.PC, 0x85)   // STA命令
+				c.bus.WriteByteAt(c.registers.PC+1, 0x20) // オペランド: ZPアドレス0x20
 			},
 			checkMemory: func(t *testing.T, c *CPU) {
-				if c.ReadByteFrom(0x20) != 0x42 {
-					t.Errorf("Memory at $20 = %#02x, want %#02x", c.ReadByteFrom(0x20), 0x42)
+				if c.bus.ReadByteFrom(0x20) != 0x42 {
+					t.Errorf("Memory at $20 = %#02x, want %#02x", c.bus.ReadByteFrom(0x20), 0x42)
 				}
 			},
 		},
@@ -833,12 +833,12 @@ func TestSTA(t *testing.T) {
 			setupCPU: func(c *CPU) {
 				c.registers.A = 0x42
 				c.registers.X = 0x08
-				c.WriteByteAt(c.registers.PC, 0x95)   // STA命令
-				c.WriteByteAt(c.registers.PC+1, 0x20) // オペランド: ZPアドレス0x20
+				c.bus.WriteByteAt(c.registers.PC, 0x95)   // STA命令
+				c.bus.WriteByteAt(c.registers.PC+1, 0x20) // オペランド: ZPアドレス0x20
 			},
 			checkMemory: func(t *testing.T, c *CPU) {
-				if c.ReadByteFrom(0x28) != 0x42 { // 0x20 + 0x08
-					t.Errorf("Memory at $28 = %#02x, want %#02x", c.ReadByteFrom(0x28), 0x42)
+				if c.bus.ReadByteFrom(0x28) != 0x42 { // 0x20 + 0x08
+					t.Errorf("Memory at $28 = %#02x, want %#02x", c.bus.ReadByteFrom(0x28), 0x42)
 				}
 			},
 		},
@@ -848,13 +848,13 @@ func TestSTA(t *testing.T) {
 			addrMode: Absolute,
 			setupCPU: func(c *CPU) {
 				c.registers.A = 0x42
-				c.WriteByteAt(c.registers.PC, 0x8D)   // STA命令
-				c.WriteByteAt(c.registers.PC+1, 0x00) // オペランド: 低バイト
-				c.WriteByteAt(c.registers.PC+2, 0x10) // オペランド: 高バイト (0x1000)
+				c.bus.WriteByteAt(c.registers.PC, 0x8D)   // STA命令
+				c.bus.WriteByteAt(c.registers.PC+1, 0x00) // オペランド: 低バイト
+				c.bus.WriteByteAt(c.registers.PC+2, 0x10) // オペランド: 高バイト (0x1000)
 			},
 			checkMemory: func(t *testing.T, c *CPU) {
-				if c.ReadByteFrom(0x1000) != 0x42 {
-					t.Errorf("Memory at $1000 = %#02x, want %#02x", c.ReadByteFrom(0x1000), 0x42)
+				if c.bus.ReadByteFrom(0x1000) != 0x42 {
+					t.Errorf("Memory at $1000 = %#02x, want %#02x", c.bus.ReadByteFrom(0x1000), 0x42)
 				}
 			},
 		},
@@ -865,13 +865,13 @@ func TestSTA(t *testing.T) {
 			setupCPU: func(c *CPU) {
 				c.registers.A = 0x42
 				c.registers.X = 0x10
-				c.WriteByteAt(c.registers.PC, 0x9D)   // STA命令
-				c.WriteByteAt(c.registers.PC+1, 0x00) // オペランド: 低バイト
-				c.WriteByteAt(c.registers.PC+2, 0x10) // オペランド: 高バイト (0x1000)
+				c.bus.WriteByteAt(c.registers.PC, 0x9D)   // STA命令
+				c.bus.WriteByteAt(c.registers.PC+1, 0x00) // オペランド: 低バイト
+				c.bus.WriteByteAt(c.registers.PC+2, 0x10) // オペランド: 高バイト (0x1000)
 			},
 			checkMemory: func(t *testing.T, c *CPU) {
-				if c.ReadByteFrom(0x1010) != 0x42 { // 0x1000 + 0x10
-					t.Errorf("Memory at $1010 = %#02x, want %#02x", c.ReadByteFrom(0x1010), 0x42)
+				if c.bus.ReadByteFrom(0x1010) != 0x42 { // 0x1000 + 0x10
+					t.Errorf("Memory at $1010 = %#02x, want %#02x", c.bus.ReadByteFrom(0x1010), 0x42)
 				}
 			},
 		},
@@ -882,13 +882,13 @@ func TestSTA(t *testing.T) {
 			setupCPU: func(c *CPU) {
 				c.registers.A = 0x42
 				c.registers.Y = 0x10
-				c.WriteByteAt(c.registers.PC, 0x99)   // STA命令
-				c.WriteByteAt(c.registers.PC+1, 0x00) // オペランド: 低バイト
-				c.WriteByteAt(c.registers.PC+2, 0x10) // オペランド: 高バイト (0x1000)
+				c.bus.WriteByteAt(c.registers.PC, 0x99)   // STA命令
+				c.bus.WriteByteAt(c.registers.PC+1, 0x00) // オペランド: 低バイト
+				c.bus.WriteByteAt(c.registers.PC+2, 0x10) // オペランド: 高バイト (0x1000)
 			},
 			checkMemory: func(t *testing.T, c *CPU) {
-				if c.ReadByteFrom(0x1010) != 0x42 { // 0x1000 + 0x10
-					t.Errorf("Memory at $1010 = %#02x, want %#02x", c.ReadByteFrom(0x1010), 0x42)
+				if c.bus.ReadByteFrom(0x1010) != 0x42 { // 0x1000 + 0x10
+					t.Errorf("Memory at $1010 = %#02x, want %#02x", c.bus.ReadByteFrom(0x1010), 0x42)
 				}
 			},
 		},
@@ -899,14 +899,14 @@ func TestSTA(t *testing.T) {
 			setupCPU: func(c *CPU) {
 				c.registers.A = 0x42
 				c.registers.X = 0x04
-				c.WriteByteAt(c.registers.PC, 0x81)   // STA命令
-				c.WriteByteAt(c.registers.PC+1, 0x20) // オペランド: ZPアドレス0x20
-				c.WriteByteAt(0x24, 0x00)             // 0x24 (0x20+0x04) に低バイト
-				c.WriteByteAt(0x25, 0x10)             // 0x25に高バイト (→ 0x1000)
+				c.bus.WriteByteAt(c.registers.PC, 0x81)   // STA命令
+				c.bus.WriteByteAt(c.registers.PC+1, 0x20) // オペランド: ZPアドレス0x20
+				c.bus.WriteByteAt(0x24, 0x00)             // 0x24 (0x20+0x04) に低バイト
+				c.bus.WriteByteAt(0x25, 0x10)             // 0x25に高バイト (→ 0x1000)
 			},
 			checkMemory: func(t *testing.T, c *CPU) {
-				if c.ReadByteFrom(0x1000) != 0x42 {
-					t.Errorf("Memory at $1000 = %#02x, want %#02x", c.ReadByteFrom(0x1000), 0x42)
+				if c.bus.ReadByteFrom(0x1000) != 0x42 {
+					t.Errorf("Memory at $1000 = %#02x, want %#02x", c.bus.ReadByteFrom(0x1000), 0x42)
 				}
 			},
 		},
@@ -917,14 +917,14 @@ func TestSTA(t *testing.T) {
 			setupCPU: func(c *CPU) {
 				c.registers.A = 0x42
 				c.registers.Y = 0x10
-				c.WriteByteAt(c.registers.PC, 0x91)   // STA命令
-				c.WriteByteAt(c.registers.PC+1, 0x20) // オペランド: ZPアドレス0x20
-				c.WriteByteAt(0x20, 0x00)             // 0x20に低バイト
-				c.WriteByteAt(0x21, 0x10)             // 0x21に高バイト (→ 0x1000)
+				c.bus.WriteByteAt(c.registers.PC, 0x91)   // STA命令
+				c.bus.WriteByteAt(c.registers.PC+1, 0x20) // オペランド: ZPアドレス0x20
+				c.bus.WriteByteAt(0x20, 0x00)             // 0x20に低バイト
+				c.bus.WriteByteAt(0x21, 0x10)             // 0x21に高バイト (→ 0x1000)
 			},
 			checkMemory: func(t *testing.T, c *CPU) {
-				if c.ReadByteFrom(0x1010) != 0x42 { // 0x1000 + 0x10
-					t.Errorf("Memory at $1010 = %#02x, want %#02x", c.ReadByteFrom(0x1010), 0x42)
+				if c.bus.ReadByteFrom(0x1010) != 0x42 { // 0x1000 + 0x10
+					t.Errorf("Memory at $1010 = %#02x, want %#02x", c.bus.ReadByteFrom(0x1010), 0x42)
 				}
 			},
 		},
@@ -960,12 +960,12 @@ func TestSTX(t *testing.T) {
 			addrMode: ZeroPage,
 			setupCPU: func(c *CPU) {
 				c.registers.X = 0x42
-				c.WriteByteAt(c.registers.PC, 0x86)   // STX命令
-				c.WriteByteAt(c.registers.PC+1, 0x20) // オペランド: ZPアドレス0x20
+				c.bus.WriteByteAt(c.registers.PC, 0x86)   // STX命令
+				c.bus.WriteByteAt(c.registers.PC+1, 0x20) // オペランド: ZPアドレス0x20
 			},
 			checkMemory: func(t *testing.T, c *CPU) {
-				if c.ReadByteFrom(0x20) != 0x42 {
-					t.Errorf("Memory at $20 = %#02x, want %#02x", c.ReadByteFrom(0x20), 0x42)
+				if c.bus.ReadByteFrom(0x20) != 0x42 {
+					t.Errorf("Memory at $20 = %#02x, want %#02x", c.bus.ReadByteFrom(0x20), 0x42)
 				}
 			},
 		},
@@ -976,12 +976,12 @@ func TestSTX(t *testing.T) {
 			setupCPU: func(c *CPU) {
 				c.registers.X = 0x42
 				c.registers.Y = 0x08
-				c.WriteByteAt(c.registers.PC, 0x96)   // STX命令
-				c.WriteByteAt(c.registers.PC+1, 0x20) // オペランド: ZPアドレス0x20
+				c.bus.WriteByteAt(c.registers.PC, 0x96)   // STX命令
+				c.bus.WriteByteAt(c.registers.PC+1, 0x20) // オペランド: ZPアドレス0x20
 			},
 			checkMemory: func(t *testing.T, c *CPU) {
-				if c.ReadByteFrom(0x28) != 0x42 { // 0x20 + 0x08
-					t.Errorf("Memory at $28 = %#02x, want %#02x", c.ReadByteFrom(0x28), 0x42)
+				if c.bus.ReadByteFrom(0x28) != 0x42 { // 0x20 + 0x08
+					t.Errorf("Memory at $28 = %#02x, want %#02x", c.bus.ReadByteFrom(0x28), 0x42)
 				}
 			},
 		},
@@ -991,13 +991,13 @@ func TestSTX(t *testing.T) {
 			addrMode: Absolute,
 			setupCPU: func(c *CPU) {
 				c.registers.X = 0x42
-				c.WriteByteAt(c.registers.PC, 0x8E)   // STX命令
-				c.WriteByteAt(c.registers.PC+1, 0x00) // オペランド: 低バイト
-				c.WriteByteAt(c.registers.PC+2, 0x10) // オペランド: 高バイト (0x1000)
+				c.bus.WriteByteAt(c.registers.PC, 0x8E)   // STX命令
+				c.bus.WriteByteAt(c.registers.PC+1, 0x00) // オペランド: 低バイト
+				c.bus.WriteByteAt(c.registers.PC+2, 0x10) // オペランド: 高バイト (0x1000)
 			},
 			checkMemory: func(t *testing.T, c *CPU) {
-				if c.ReadByteFrom(0x1000) != 0x42 {
-					t.Errorf("Memory at $1000 = %#02x, want %#02x", c.ReadByteFrom(0x1000), 0x42)
+				if c.bus.ReadByteFrom(0x1000) != 0x42 {
+					t.Errorf("Memory at $1000 = %#02x, want %#02x", c.bus.ReadByteFrom(0x1000), 0x42)
 				}
 			},
 		},
@@ -1032,12 +1032,12 @@ func TestSTY(t *testing.T) {
 			addrMode: ZeroPage,
 			setupCPU: func(c *CPU) {
 				c.registers.Y = 0x42
-				c.WriteByteAt(c.registers.PC, 0x84)   // STY命令
-				c.WriteByteAt(c.registers.PC+1, 0x20) // オペランド: ZPアドレス0x20
+				c.bus.WriteByteAt(c.registers.PC, 0x84)   // STY命令
+				c.bus.WriteByteAt(c.registers.PC+1, 0x20) // オペランド: ZPアドレス0x20
 			},
 			checkMemory: func(t *testing.T, c *CPU) {
-				if c.ReadByteFrom(0x20) != 0x42 {
-					t.Errorf("Memory at $20 = %#02x, want %#02x", c.ReadByteFrom(0x20), 0x42)
+				if c.bus.ReadByteFrom(0x20) != 0x42 {
+					t.Errorf("Memory at $20 = %#02x, want %#02x", c.bus.ReadByteFrom(0x20), 0x42)
 				}
 			},
 		},
@@ -1048,12 +1048,12 @@ func TestSTY(t *testing.T) {
 			setupCPU: func(c *CPU) {
 				c.registers.Y = 0x42
 				c.registers.X = 0x08
-				c.WriteByteAt(c.registers.PC, 0x94)   // STY命令
-				c.WriteByteAt(c.registers.PC+1, 0x20) // オペランド: ZPアドレス0x20
+				c.bus.WriteByteAt(c.registers.PC, 0x94)   // STY命令
+				c.bus.WriteByteAt(c.registers.PC+1, 0x20) // オペランド: ZPアドレス0x20
 			},
 			checkMemory: func(t *testing.T, c *CPU) {
-				if c.ReadByteFrom(0x28) != 0x42 { // 0x20 + 0x08
-					t.Errorf("Memory at $28 = %#02x, want %#02x", c.ReadByteFrom(0x28), 0x42)
+				if c.bus.ReadByteFrom(0x28) != 0x42 { // 0x20 + 0x08
+					t.Errorf("Memory at $28 = %#02x, want %#02x", c.bus.ReadByteFrom(0x28), 0x42)
 				}
 			},
 		},
@@ -1063,13 +1063,13 @@ func TestSTY(t *testing.T) {
 			addrMode: Absolute,
 			setupCPU: func(c *CPU) {
 				c.registers.Y = 0x42
-				c.WriteByteAt(c.registers.PC, 0x8C)   // STY命令
-				c.WriteByteAt(c.registers.PC+1, 0x00) // オペランド: 低バイト
-				c.WriteByteAt(c.registers.PC+2, 0x10) // オペランド: 高バイト (0x1000)
+				c.bus.WriteByteAt(c.registers.PC, 0x8C)   // STY命令
+				c.bus.WriteByteAt(c.registers.PC+1, 0x00) // オペランド: 低バイト
+				c.bus.WriteByteAt(c.registers.PC+2, 0x10) // オペランド: 高バイト (0x1000)
 			},
 			checkMemory: func(t *testing.T, c *CPU) {
-				if c.ReadByteFrom(0x1000) != 0x42 {
-					t.Errorf("Memory at $1000 = %#02x, want %#02x", c.ReadByteFrom(0x1000), 0x42)
+				if c.bus.ReadByteFrom(0x1000) != 0x42 {
+					t.Errorf("Memory at $1000 = %#02x, want %#02x", c.bus.ReadByteFrom(0x1000), 0x42)
 				}
 			},
 		},
@@ -1106,7 +1106,7 @@ func TestTAX(t *testing.T) {
 			addrMode: Implied,
 			setupCPU: func(c *CPU) {
 				c.registers.A = 0x42
-				c.WriteByteAt(c.registers.PC, 0xAA) // TAX命令
+				c.bus.WriteByteAt(c.registers.PC, 0xAA) // TAX命令
 			},
 			expectedX:    0x42,
 			expectedZero: false,
@@ -1118,7 +1118,7 @@ func TestTAX(t *testing.T) {
 			addrMode: Implied,
 			setupCPU: func(c *CPU) {
 				c.registers.A = 0x00
-				c.WriteByteAt(c.registers.PC, 0xAA) // TAX命令
+				c.bus.WriteByteAt(c.registers.PC, 0xAA) // TAX命令
 			},
 			expectedX:    0x00,
 			expectedZero: true,
@@ -1130,7 +1130,7 @@ func TestTAX(t *testing.T) {
 			addrMode: Implied,
 			setupCPU: func(c *CPU) {
 				c.registers.A = 0x80
-				c.WriteByteAt(c.registers.PC, 0xAA) // TAX命令
+				c.bus.WriteByteAt(c.registers.PC, 0xAA) // TAX命令
 			},
 			expectedX:    0x80,
 			expectedZero: false,
@@ -1171,7 +1171,7 @@ func TestTAY(t *testing.T) {
 			addrMode: Implied,
 			setupCPU: func(c *CPU) {
 				c.registers.A = 0x42
-				c.WriteByteAt(c.registers.PC, 0xA8) // TAY命令
+				c.bus.WriteByteAt(c.registers.PC, 0xA8) // TAY命令
 			},
 			expectedY:    0x42,
 			expectedZero: false,
@@ -1183,7 +1183,7 @@ func TestTAY(t *testing.T) {
 			addrMode: Implied,
 			setupCPU: func(c *CPU) {
 				c.registers.A = 0x00
-				c.WriteByteAt(c.registers.PC, 0xA8) // TAY命令
+				c.bus.WriteByteAt(c.registers.PC, 0xA8) // TAY命令
 			},
 			expectedY:    0x00,
 			expectedZero: true,
@@ -1195,7 +1195,7 @@ func TestTAY(t *testing.T) {
 			addrMode: Implied,
 			setupCPU: func(c *CPU) {
 				c.registers.A = 0x80
-				c.WriteByteAt(c.registers.PC, 0xA8) // TAY命令
+				c.bus.WriteByteAt(c.registers.PC, 0xA8) // TAY命令
 			},
 			expectedY:    0x80,
 			expectedZero: false,
@@ -1236,7 +1236,7 @@ func TestTXA(t *testing.T) {
 			addrMode: Implied,
 			setupCPU: func(c *CPU) {
 				c.registers.X = 0x42
-				c.WriteByteAt(c.registers.PC, 0x8A) // TXA命令
+				c.bus.WriteByteAt(c.registers.PC, 0x8A) // TXA命令
 			},
 			expectedA:    0x42,
 			expectedZero: false,
@@ -1248,7 +1248,7 @@ func TestTXA(t *testing.T) {
 			addrMode: Implied,
 			setupCPU: func(c *CPU) {
 				c.registers.X = 0x00
-				c.WriteByteAt(c.registers.PC, 0x8A) // TXA命令
+				c.bus.WriteByteAt(c.registers.PC, 0x8A) // TXA命令
 			},
 			expectedA:    0x00,
 			expectedZero: true,
@@ -1260,7 +1260,7 @@ func TestTXA(t *testing.T) {
 			addrMode: Implied,
 			setupCPU: func(c *CPU) {
 				c.registers.X = 0x80
-				c.WriteByteAt(c.registers.PC, 0x8A) // TXA命令
+				c.bus.WriteByteAt(c.registers.PC, 0x8A) // TXA命令
 			},
 			expectedA:    0x80,
 			expectedZero: false,
@@ -1301,7 +1301,7 @@ func TestTYA(t *testing.T) {
 			addrMode: Implied,
 			setupCPU: func(c *CPU) {
 				c.registers.Y = 0x42
-				c.WriteByteAt(c.registers.PC, 0x98) // TYA命令
+				c.bus.WriteByteAt(c.registers.PC, 0x98) // TYA命令
 			},
 			expectedA:    0x42,
 			expectedZero: false,
@@ -1313,7 +1313,7 @@ func TestTYA(t *testing.T) {
 			addrMode: Implied,
 			setupCPU: func(c *CPU) {
 				c.registers.Y = 0x00
-				c.WriteByteAt(c.registers.PC, 0x98) // TYA命令
+				c.bus.WriteByteAt(c.registers.PC, 0x98) // TYA命令
 			},
 			expectedA:    0x00,
 			expectedZero: true,
@@ -1325,7 +1325,7 @@ func TestTYA(t *testing.T) {
 			addrMode: Implied,
 			setupCPU: func(c *CPU) {
 				c.registers.Y = 0x80
-				c.WriteByteAt(c.registers.PC, 0x98) // TYA命令
+				c.bus.WriteByteAt(c.registers.PC, 0x98) // TYA命令
 			},
 			expectedA:    0x80,
 			expectedZero: false,
@@ -1365,7 +1365,7 @@ func TestTXS(t *testing.T) {
 			addrMode: Implied,
 			setupCPU: func(c *CPU) {
 				c.registers.X = 0x42
-				c.WriteByteAt(c.registers.PC, 0x9A) // TXS命令
+				c.bus.WriteByteAt(c.registers.PC, 0x9A) // TXS命令
 			},
 			expectedSP: 0x42,
 		},
@@ -1375,7 +1375,7 @@ func TestTXS(t *testing.T) {
 			addrMode: Implied,
 			setupCPU: func(c *CPU) {
 				c.registers.X = 0xFF
-				c.WriteByteAt(c.registers.PC, 0x9A) // TXS命令
+				c.bus.WriteByteAt(c.registers.PC, 0x9A) // TXS命令
 			},
 			expectedSP: 0xFF,
 		},
@@ -1385,7 +1385,7 @@ func TestTXS(t *testing.T) {
 			addrMode: Implied,
 			setupCPU: func(c *CPU) {
 				c.registers.X = 0x00
-				c.WriteByteAt(c.registers.PC, 0x9A) // TXS命令
+				c.bus.WriteByteAt(c.registers.PC, 0x9A) // TXS命令
 			},
 			expectedSP: 0x00,
 		},
@@ -1422,7 +1422,7 @@ func TestTSX(t *testing.T) {
 			addrMode: Implied,
 			setupCPU: func(c *CPU) {
 				c.registers.SP = 0x42
-				c.WriteByteAt(c.registers.PC, 0xBA) // TSX命令
+				c.bus.WriteByteAt(c.registers.PC, 0xBA) // TSX命令
 			},
 			expectedX:    0x42,
 			expectedZero: false,
@@ -1434,7 +1434,7 @@ func TestTSX(t *testing.T) {
 			addrMode: Implied,
 			setupCPU: func(c *CPU) {
 				c.registers.SP = 0x00
-				c.WriteByteAt(c.registers.PC, 0xBA) // TSX命令
+				c.bus.WriteByteAt(c.registers.PC, 0xBA) // TSX命令
 			},
 			expectedX:    0x00,
 			expectedZero: true,
@@ -1446,7 +1446,7 @@ func TestTSX(t *testing.T) {
 			addrMode: Implied,
 			setupCPU: func(c *CPU) {
 				c.registers.SP = 0x80
-				c.WriteByteAt(c.registers.PC, 0xBA) // TSX命令
+				c.bus.WriteByteAt(c.registers.PC, 0xBA) // TSX命令
 			},
 			expectedX:    0x80,
 			expectedZero: false,
@@ -1491,8 +1491,8 @@ func TestADC(t *testing.T) {
 			setupCPU: func(c *CPU) {
 				c.registers.A = 0x10
 				c.registers.P.Carry = false
-				c.WriteByteAt(c.registers.PC, 0x69)   // ADC命令
-				c.WriteByteAt(c.registers.PC+1, 0x15) // オペランド: 0x15
+				c.bus.WriteByteAt(c.registers.PC, 0x69)   // ADC命令
+				c.bus.WriteByteAt(c.registers.PC+1, 0x15) // オペランド: 0x15
 			},
 			expectedA:        0x25, // 0x10 + 0x15 = 0x25
 			expectedZero:     false,
@@ -1507,8 +1507,8 @@ func TestADC(t *testing.T) {
 			setupCPU: func(c *CPU) {
 				c.registers.A = 0x10
 				c.registers.P.Carry = true
-				c.WriteByteAt(c.registers.PC, 0x69)   // ADC命令
-				c.WriteByteAt(c.registers.PC+1, 0x15) // オペランド: 0x15
+				c.bus.WriteByteAt(c.registers.PC, 0x69)   // ADC命令
+				c.bus.WriteByteAt(c.registers.PC+1, 0x15) // オペランド: 0x15
 			},
 			expectedA:        0x26, // 0x10 + 0x15 + 1 (Carry) = 0x26
 			expectedZero:     false,
@@ -1523,8 +1523,8 @@ func TestADC(t *testing.T) {
 			setupCPU: func(c *CPU) {
 				c.registers.A = 0xFF
 				c.registers.P.Carry = false
-				c.WriteByteAt(c.registers.PC, 0x69)   // ADC命令
-				c.WriteByteAt(c.registers.PC+1, 0x01) // オペランド: 0x01
+				c.bus.WriteByteAt(c.registers.PC, 0x69)   // ADC命令
+				c.bus.WriteByteAt(c.registers.PC+1, 0x01) // オペランド: 0x01
 			},
 			expectedA:        0x00, // 0xFF + 0x01 = 0x100 (下位8bit = 0x00)
 			expectedZero:     true,
@@ -1539,8 +1539,8 @@ func TestADC(t *testing.T) {
 			setupCPU: func(c *CPU) {
 				c.registers.A = 0x7F // 01111111 (127)
 				c.registers.P.Carry = false
-				c.WriteByteAt(c.registers.PC, 0x69)   // ADC命令
-				c.WriteByteAt(c.registers.PC+1, 0x01) // オペランド: 0x01
+				c.bus.WriteByteAt(c.registers.PC, 0x69)   // ADC命令
+				c.bus.WriteByteAt(c.registers.PC+1, 0x01) // オペランド: 0x01
 			},
 			expectedA:        0x80, // 0x7F + 0x01 = 0x80 (-128 as signed)
 			expectedZero:     false,
@@ -1555,8 +1555,8 @@ func TestADC(t *testing.T) {
 			setupCPU: func(c *CPU) {
 				c.registers.A = 0x80 // 10000000 (-128)
 				c.registers.P.Carry = false
-				c.WriteByteAt(c.registers.PC, 0x69)   // ADC命令
-				c.WriteByteAt(c.registers.PC+1, 0x80) // オペランド: 0x80 (-128)
+				c.bus.WriteByteAt(c.registers.PC, 0x69)   // ADC命令
+				c.bus.WriteByteAt(c.registers.PC+1, 0x80) // オペランド: 0x80 (-128)
 			},
 			expectedA:        0x00, // 0x80 + 0x80 = 0x100 (下位8bit = 0x00)
 			expectedZero:     true,
@@ -1571,9 +1571,9 @@ func TestADC(t *testing.T) {
 			setupCPU: func(c *CPU) {
 				c.registers.A = 0x42
 				c.registers.P.Carry = false
-				c.WriteByteAt(c.registers.PC, 0x65)   // ADC命令
-				c.WriteByteAt(c.registers.PC+1, 0x20) // オペランド: ZPアドレス0x20
-				c.WriteByteAt(0x20, 0x13)             // 0x20に値を設定
+				c.bus.WriteByteAt(c.registers.PC, 0x65)   // ADC命令
+				c.bus.WriteByteAt(c.registers.PC+1, 0x20) // オペランド: ZPアドレス0x20
+				c.bus.WriteByteAt(0x20, 0x13)             // 0x20に値を設定
 			},
 			expectedA:        0x55, // 0x42 + 0x13 = 0x55
 			expectedZero:     false,
@@ -1589,9 +1589,9 @@ func TestADC(t *testing.T) {
 				c.registers.A = 0x42
 				c.registers.X = 0x10
 				c.registers.P.Carry = false
-				c.WriteByteAt(c.registers.PC, 0x75)   // ADC命令
-				c.WriteByteAt(c.registers.PC+1, 0x20) // オペランド: ZPアドレス0x20
-				c.WriteByteAt(0x30, 0x13)             // 0x30 (0x20+0x10) に値を設定
+				c.bus.WriteByteAt(c.registers.PC, 0x75)   // ADC命令
+				c.bus.WriteByteAt(c.registers.PC+1, 0x20) // オペランド: ZPアドレス0x20
+				c.bus.WriteByteAt(0x30, 0x13)             // 0x30 (0x20+0x10) に値を設定
 			},
 			expectedA:        0x55, // 0x42 + 0x13 = 0x55
 			expectedZero:     false,
@@ -1606,10 +1606,10 @@ func TestADC(t *testing.T) {
 			setupCPU: func(c *CPU) {
 				c.registers.A = 0x42
 				c.registers.P.Carry = false
-				c.WriteByteAt(c.registers.PC, 0x6D)   // ADC命令
-				c.WriteByteAt(c.registers.PC+1, 0x80) // オペランド: 低バイト
-				c.WriteByteAt(c.registers.PC+2, 0x01) // オペランド: 高バイト (0x0180)
-				c.WriteByteAt(0x0180, 0x13)           // 0x0180に値を設定
+				c.bus.WriteByteAt(c.registers.PC, 0x6D)   // ADC命令
+				c.bus.WriteByteAt(c.registers.PC+1, 0x80) // オペランド: 低バイト
+				c.bus.WriteByteAt(c.registers.PC+2, 0x01) // オペランド: 高バイト (0x0180)
+				c.bus.WriteByteAt(0x0180, 0x13)           // 0x0180に値を設定
 			},
 			expectedA:        0x55, // 0x42 + 0x13 = 0x55
 			expectedZero:     false,
@@ -1625,10 +1625,10 @@ func TestADC(t *testing.T) {
 				c.registers.A = 0x42
 				c.registers.X = 0x10
 				c.registers.P.Carry = false
-				c.WriteByteAt(c.registers.PC, 0x7D)   // ADC命令
-				c.WriteByteAt(c.registers.PC+1, 0x80) // オペランド: 低バイト
-				c.WriteByteAt(c.registers.PC+2, 0x01) // オペランド: 高バイト (0x0180)
-				c.WriteByteAt(0x0190, 0x13)           // 0x0190 (0x0180+0x10) に値を設定
+				c.bus.WriteByteAt(c.registers.PC, 0x7D)   // ADC命令
+				c.bus.WriteByteAt(c.registers.PC+1, 0x80) // オペランド: 低バイト
+				c.bus.WriteByteAt(c.registers.PC+2, 0x01) // オペランド: 高バイト (0x0180)
+				c.bus.WriteByteAt(0x0190, 0x13)           // 0x0190 (0x0180+0x10) に値を設定
 			},
 			expectedA:        0x55, // 0x42 + 0x13 = 0x55
 			expectedZero:     false,
@@ -1644,10 +1644,10 @@ func TestADC(t *testing.T) {
 				c.registers.A = 0x42
 				c.registers.Y = 0x10
 				c.registers.P.Carry = false
-				c.WriteByteAt(c.registers.PC, 0x79)   // ADC命令
-				c.WriteByteAt(c.registers.PC+1, 0x80) // オペランド: 低バイト
-				c.WriteByteAt(c.registers.PC+2, 0x01) // オペランド: 高バイト (0x0180)
-				c.WriteByteAt(0x0190, 0x13)           // 0x0190 (0x0180+0x10) に値を設定
+				c.bus.WriteByteAt(c.registers.PC, 0x79)   // ADC命令
+				c.bus.WriteByteAt(c.registers.PC+1, 0x80) // オペランド: 低バイト
+				c.bus.WriteByteAt(c.registers.PC+2, 0x01) // オペランド: 高バイト (0x0180)
+				c.bus.WriteByteAt(0x0190, 0x13)           // 0x0190 (0x0180+0x10) に値を設定
 			},
 			expectedA:        0x55, // 0x42 + 0x13 = 0x55
 			expectedZero:     false,
@@ -1663,11 +1663,11 @@ func TestADC(t *testing.T) {
 				c.registers.A = 0x42
 				c.registers.X = 0x04
 				c.registers.P.Carry = false
-				c.WriteByteAt(c.registers.PC, 0x61)   // ADC命令
-				c.WriteByteAt(c.registers.PC+1, 0x20) // オペランド: ZPアドレス0x20
-				c.WriteByteAt(0x24, 0x74)             // 0x24 (0x20+0x04) に低バイト
-				c.WriteByteAt(0x25, 0x00)             // 0x25 に高バイト (→ 0x0074)
-				c.WriteByteAt(0x0074, 0x13)           // 0x0074に値を設定
+				c.bus.WriteByteAt(c.registers.PC, 0x61)   // ADC命令
+				c.bus.WriteByteAt(c.registers.PC+1, 0x20) // オペランド: ZPアドレス0x20
+				c.bus.WriteByteAt(0x24, 0x74)             // 0x24 (0x20+0x04) に低バイト
+				c.bus.WriteByteAt(0x25, 0x00)             // 0x25 に高バイト (→ 0x0074)
+				c.bus.WriteByteAt(0x0074, 0x13)           // 0x0074に値を設定
 			},
 			expectedA:        0x55, // 0x42 + 0x13 = 0x55
 			expectedZero:     false,
@@ -1683,11 +1683,11 @@ func TestADC(t *testing.T) {
 				c.registers.A = 0x42
 				c.registers.Y = 0x10
 				c.registers.P.Carry = false
-				c.WriteByteAt(c.registers.PC, 0x71)   // ADC命令
-				c.WriteByteAt(c.registers.PC+1, 0x20) // オペランド: ZPアドレス0x20
-				c.WriteByteAt(0x20, 0x74)             // 0x20に低バイト
-				c.WriteByteAt(0x21, 0x00)             // 0x21に高バイト (→ 0x0074)
-				c.WriteByteAt(0x0084, 0x13)           // 0x0084 (0x0074+0x10) に値を設定
+				c.bus.WriteByteAt(c.registers.PC, 0x71)   // ADC命令
+				c.bus.WriteByteAt(c.registers.PC+1, 0x20) // オペランド: ZPアドレス0x20
+				c.bus.WriteByteAt(0x20, 0x74)             // 0x20に低バイト
+				c.bus.WriteByteAt(0x21, 0x00)             // 0x21に高バイト (→ 0x0074)
+				c.bus.WriteByteAt(0x0084, 0x13)           // 0x0084 (0x0074+0x10) に値を設定
 			},
 			expectedA:        0x55, // 0x42 + 0x13 = 0x55
 			expectedZero:     false,
@@ -1734,9 +1734,9 @@ func TestSBC(t *testing.T) {
 			addrMode: Immediate,
 			setupCPU: func(c *CPU) {
 				c.registers.A = 0x50
-				c.registers.P.Carry = true            // ボローなし（1 = 借りなし、0 = 借りあり）
-				c.WriteByteAt(c.registers.PC, 0xE9)   // SBC命令
-				c.WriteByteAt(c.registers.PC+1, 0x30) // オペランド: 0x30
+				c.registers.P.Carry = true                // ボローなし（1 = 借りなし、0 = 借りあり）
+				c.bus.WriteByteAt(c.registers.PC, 0xE9)   // SBC命令
+				c.bus.WriteByteAt(c.registers.PC+1, 0x30) // オペランド: 0x30
 			},
 			expectedA:        0x20, // 0x50 - 0x30 = 0x20
 			expectedZero:     false,
@@ -1750,9 +1750,9 @@ func TestSBC(t *testing.T) {
 			addrMode: Immediate,
 			setupCPU: func(c *CPU) {
 				c.registers.A = 0x50
-				c.registers.P.Carry = false           // ボローあり（0 = 借りあり）
-				c.WriteByteAt(c.registers.PC, 0xE9)   // SBC命令
-				c.WriteByteAt(c.registers.PC+1, 0x30) // オペランド: 0x30
+				c.registers.P.Carry = false               // ボローあり（0 = 借りあり）
+				c.bus.WriteByteAt(c.registers.PC, 0xE9)   // SBC命令
+				c.bus.WriteByteAt(c.registers.PC+1, 0x30) // オペランド: 0x30
 			},
 			expectedA:        0x1F, // 0x50 - 0x30 - 1 (ボロー) = 0x1F
 			expectedZero:     false,
@@ -1766,9 +1766,9 @@ func TestSBC(t *testing.T) {
 			addrMode: Immediate,
 			setupCPU: func(c *CPU) {
 				c.registers.A = 0x30
-				c.registers.P.Carry = true            // ボローなし
-				c.WriteByteAt(c.registers.PC, 0xE9)   // SBC命令
-				c.WriteByteAt(c.registers.PC+1, 0x40) // オペランド: 0x40
+				c.registers.P.Carry = true                // ボローなし
+				c.bus.WriteByteAt(c.registers.PC, 0xE9)   // SBC命令
+				c.bus.WriteByteAt(c.registers.PC+1, 0x40) // オペランド: 0x40
 			},
 			expectedA:        0xF0, // 0x30 - 0x40 = 0xF0 (下位8bit)
 			expectedZero:     false,
@@ -1781,10 +1781,10 @@ func TestSBC(t *testing.T) {
 			opcode:   0xE9,
 			addrMode: Immediate,
 			setupCPU: func(c *CPU) {
-				c.registers.A = 0x50                  // 01010000 (正数)
-				c.registers.P.Carry = true            // ボローなし
-				c.WriteByteAt(c.registers.PC, 0xE9)   // SBC命令
-				c.WriteByteAt(c.registers.PC+1, 0xB0) // オペランド: 0xB0 (負数)
+				c.registers.A = 0x50                      // 01010000 (正数)
+				c.registers.P.Carry = true                // ボローなし
+				c.bus.WriteByteAt(c.registers.PC, 0xE9)   // SBC命令
+				c.bus.WriteByteAt(c.registers.PC+1, 0xB0) // オペランド: 0xB0 (負数)
 			},
 			expectedA:        0xA0, // 0x50 - 0xB0 = 0xA0 (下位8bit)
 			expectedZero:     false,
@@ -1797,10 +1797,10 @@ func TestSBC(t *testing.T) {
 			opcode:   0xE9,
 			addrMode: Immediate,
 			setupCPU: func(c *CPU) {
-				c.registers.A = 0x90                  // 10010000 (負数)
-				c.registers.P.Carry = true            // ボローなし
-				c.WriteByteAt(c.registers.PC, 0xE9)   // SBC命令
-				c.WriteByteAt(c.registers.PC+1, 0x10) // オペランド: 0x10 (正数)
+				c.registers.A = 0x90                      // 10010000 (負数)
+				c.registers.P.Carry = true                // ボローなし
+				c.bus.WriteByteAt(c.registers.PC, 0xE9)   // SBC命令
+				c.bus.WriteByteAt(c.registers.PC+1, 0x10) // オペランド: 0x10 (正数)
 			},
 			expectedA:        0x80, // 0x90 - 0x10 = 0x80 (下位8bit)
 			expectedZero:     false,
@@ -1814,10 +1814,10 @@ func TestSBC(t *testing.T) {
 			addrMode: ZeroPage,
 			setupCPU: func(c *CPU) {
 				c.registers.A = 0x50
-				c.registers.P.Carry = true            // ボローなし
-				c.WriteByteAt(c.registers.PC, 0xE5)   // SBC命令
-				c.WriteByteAt(c.registers.PC+1, 0x20) // オペランド: ZPアドレス0x20
-				c.WriteByteAt(0x20, 0x30)             // 0x20に値を設定
+				c.registers.P.Carry = true                // ボローなし
+				c.bus.WriteByteAt(c.registers.PC, 0xE5)   // SBC命令
+				c.bus.WriteByteAt(c.registers.PC+1, 0x20) // オペランド: ZPアドレス0x20
+				c.bus.WriteByteAt(0x20, 0x30)             // 0x20に値を設定
 			},
 			expectedA:        0x20, // 0x50 - 0x30 = 0x20
 			expectedZero:     false,
@@ -1832,10 +1832,10 @@ func TestSBC(t *testing.T) {
 			setupCPU: func(c *CPU) {
 				c.registers.A = 0x50
 				c.registers.X = 0x10
-				c.registers.P.Carry = true            // ボローなし
-				c.WriteByteAt(c.registers.PC, 0xF5)   // SBC命令
-				c.WriteByteAt(c.registers.PC+1, 0x20) // オペランド: ZPアドレス0x20
-				c.WriteByteAt(0x30, 0x30)             // 0x30 (0x20+0x10) に値を設定
+				c.registers.P.Carry = true                // ボローなし
+				c.bus.WriteByteAt(c.registers.PC, 0xF5)   // SBC命令
+				c.bus.WriteByteAt(c.registers.PC+1, 0x20) // オペランド: ZPアドレス0x20
+				c.bus.WriteByteAt(0x30, 0x30)             // 0x30 (0x20+0x10) に値を設定
 			},
 			expectedA:        0x20, // 0x50 - 0x30 = 0x20
 			expectedZero:     false,
@@ -1849,11 +1849,11 @@ func TestSBC(t *testing.T) {
 			addrMode: Absolute,
 			setupCPU: func(c *CPU) {
 				c.registers.A = 0x50
-				c.registers.P.Carry = true            // ボローなし
-				c.WriteByteAt(c.registers.PC, 0xED)   // SBC命令
-				c.WriteByteAt(c.registers.PC+1, 0x80) // オペランド: 低バイト
-				c.WriteByteAt(c.registers.PC+2, 0x01) // オペランド: 高バイト (0x0180)
-				c.WriteByteAt(0x0180, 0x30)           // 0x0180に値を設定
+				c.registers.P.Carry = true                // ボローなし
+				c.bus.WriteByteAt(c.registers.PC, 0xED)   // SBC命令
+				c.bus.WriteByteAt(c.registers.PC+1, 0x80) // オペランド: 低バイト
+				c.bus.WriteByteAt(c.registers.PC+2, 0x01) // オペランド: 高バイト (0x0180)
+				c.bus.WriteByteAt(0x0180, 0x30)           // 0x0180に値を設定
 			},
 			expectedA:        0x20, // 0x50 - 0x30 = 0x20
 			expectedZero:     false,
@@ -1868,11 +1868,11 @@ func TestSBC(t *testing.T) {
 			setupCPU: func(c *CPU) {
 				c.registers.A = 0x50
 				c.registers.X = 0x10
-				c.registers.P.Carry = true            // ボローなし
-				c.WriteByteAt(c.registers.PC, 0xFD)   // SBC命令
-				c.WriteByteAt(c.registers.PC+1, 0x80) // オペランド: 低バイト
-				c.WriteByteAt(c.registers.PC+2, 0x01) // オペランド: 高バイト (0x0180)
-				c.WriteByteAt(0x0190, 0x30)           // 0x0190 (0x0180+0x10) に値を設定
+				c.registers.P.Carry = true                // ボローなし
+				c.bus.WriteByteAt(c.registers.PC, 0xFD)   // SBC命令
+				c.bus.WriteByteAt(c.registers.PC+1, 0x80) // オペランド: 低バイト
+				c.bus.WriteByteAt(c.registers.PC+2, 0x01) // オペランド: 高バイト (0x0180)
+				c.bus.WriteByteAt(0x0190, 0x30)           // 0x0190 (0x0180+0x10) に値を設定
 			},
 			expectedA:        0x20, // 0x50 - 0x30 = 0x20
 			expectedZero:     false,
@@ -1887,11 +1887,11 @@ func TestSBC(t *testing.T) {
 			setupCPU: func(c *CPU) {
 				c.registers.A = 0x50
 				c.registers.Y = 0x10
-				c.registers.P.Carry = true            // ボローなし
-				c.WriteByteAt(c.registers.PC, 0xF9)   // SBC命令
-				c.WriteByteAt(c.registers.PC+1, 0x80) // オペランド: 低バイト
-				c.WriteByteAt(c.registers.PC+2, 0x01) // オペランド: 高バイト (0x0180)
-				c.WriteByteAt(0x0190, 0x30)           // 0x0190 (0x0180+0x10) に値を設定
+				c.registers.P.Carry = true                // ボローなし
+				c.bus.WriteByteAt(c.registers.PC, 0xF9)   // SBC命令
+				c.bus.WriteByteAt(c.registers.PC+1, 0x80) // オペランド: 低バイト
+				c.bus.WriteByteAt(c.registers.PC+2, 0x01) // オペランド: 高バイト (0x0180)
+				c.bus.WriteByteAt(0x0190, 0x30)           // 0x0190 (0x0180+0x10) に値を設定
 			},
 			expectedA:        0x20, // 0x50 - 0x30 = 0x20
 			expectedZero:     false,
@@ -1906,12 +1906,12 @@ func TestSBC(t *testing.T) {
 			setupCPU: func(c *CPU) {
 				c.registers.A = 0x50
 				c.registers.X = 0x04
-				c.registers.P.Carry = true            // ボローなし
-				c.WriteByteAt(c.registers.PC, 0xE1)   // SBC命令
-				c.WriteByteAt(c.registers.PC+1, 0x20) // オペランド: ZPアドレス0x20
-				c.WriteByteAt(0x24, 0x74)             // 0x24 (0x20+0x04) に低バイト
-				c.WriteByteAt(0x25, 0x00)             // 0x25 に高バイト (→ 0x0074)
-				c.WriteByteAt(0x0074, 0x30)           // 0x0074に値を設定
+				c.registers.P.Carry = true                // ボローなし
+				c.bus.WriteByteAt(c.registers.PC, 0xE1)   // SBC命令
+				c.bus.WriteByteAt(c.registers.PC+1, 0x20) // オペランド: ZPアドレス0x20
+				c.bus.WriteByteAt(0x24, 0x74)             // 0x24 (0x20+0x04) に低バイト
+				c.bus.WriteByteAt(0x25, 0x00)             // 0x25 に高バイト (→ 0x0074)
+				c.bus.WriteByteAt(0x0074, 0x30)           // 0x0074に値を設定
 			},
 			expectedA:        0x20, // 0x50 - 0x30 = 0x20
 			expectedZero:     false,
@@ -1926,12 +1926,12 @@ func TestSBC(t *testing.T) {
 			setupCPU: func(c *CPU) {
 				c.registers.A = 0x50
 				c.registers.Y = 0x10
-				c.registers.P.Carry = true            // ボローなし
-				c.WriteByteAt(c.registers.PC, 0xF1)   // SBC命令
-				c.WriteByteAt(c.registers.PC+1, 0x20) // オペランド: ZPアドレス0x20
-				c.WriteByteAt(0x20, 0x74)             // 0x20に低バイト
-				c.WriteByteAt(0x21, 0x00)             // 0x21に高バイト (→ 0x0074)
-				c.WriteByteAt(0x0084, 0x30)           // 0x0084 (0x0074+0x10) に値を設定
+				c.registers.P.Carry = true                // ボローなし
+				c.bus.WriteByteAt(c.registers.PC, 0xF1)   // SBC命令
+				c.bus.WriteByteAt(c.registers.PC+1, 0x20) // オペランド: ZPアドレス0x20
+				c.bus.WriteByteAt(0x20, 0x74)             // 0x20に低バイト
+				c.bus.WriteByteAt(0x21, 0x00)             // 0x21に高バイト (→ 0x0074)
+				c.bus.WriteByteAt(0x0084, 0x30)           // 0x0084 (0x0074+0x10) に値を設定
 			},
 			expectedA:        0x20, // 0x50 - 0x30 = 0x20
 			expectedZero:     false,
@@ -1976,9 +1976,9 @@ func TestAND(t *testing.T) {
 			opcode:   0x29,
 			addrMode: Immediate,
 			setupCPU: func(c *CPU) {
-				c.registers.A = 0xF0                  // 11110000
-				c.WriteByteAt(c.registers.PC, 0x29)   // AND命令
-				c.WriteByteAt(c.registers.PC+1, 0x0F) // オペランド: 0x0F (00001111)
+				c.registers.A = 0xF0                      // 11110000
+				c.bus.WriteByteAt(c.registers.PC, 0x29)   // AND命令
+				c.bus.WriteByteAt(c.registers.PC+1, 0x0F) // オペランド: 0x0F (00001111)
 			},
 			expectedA:    0x00,
 			expectedZero: true,
@@ -1990,8 +1990,8 @@ func TestAND(t *testing.T) {
 			addrMode: Immediate,
 			setupCPU: func(c *CPU) {
 				c.registers.A = 0xFF
-				c.WriteByteAt(c.registers.PC, 0x29)
-				c.WriteByteAt(c.registers.PC+1, 0xAA)
+				c.bus.WriteByteAt(c.registers.PC, 0x29)
+				c.bus.WriteByteAt(c.registers.PC+1, 0xAA)
 			},
 			expectedA:    0xAA,
 			expectedZero: false,
@@ -2003,9 +2003,9 @@ func TestAND(t *testing.T) {
 			addrMode: ZeroPage,
 			setupCPU: func(c *CPU) {
 				c.registers.A = 0xF0
-				c.WriteByteAt(c.registers.PC, 0x25)
-				c.WriteByteAt(c.registers.PC+1, 0x20)
-				c.WriteByteAt(0x20, 0x0F)
+				c.bus.WriteByteAt(c.registers.PC, 0x25)
+				c.bus.WriteByteAt(c.registers.PC+1, 0x20)
+				c.bus.WriteByteAt(0x20, 0x0F)
 			},
 			expectedA:    0x00,
 			expectedZero: true,
@@ -2018,9 +2018,9 @@ func TestAND(t *testing.T) {
 			setupCPU: func(c *CPU) {
 				c.registers.A = 0xF0
 				c.registers.X = 0x10
-				c.WriteByteAt(c.registers.PC, 0x35)
-				c.WriteByteAt(c.registers.PC+1, 0x20)
-				c.WriteByteAt(0x30, 0x0F)
+				c.bus.WriteByteAt(c.registers.PC, 0x35)
+				c.bus.WriteByteAt(c.registers.PC+1, 0x20)
+				c.bus.WriteByteAt(0x30, 0x0F)
 			},
 			expectedA:    0x00,
 			expectedZero: true,
@@ -2032,10 +2032,10 @@ func TestAND(t *testing.T) {
 			addrMode: Absolute,
 			setupCPU: func(c *CPU) {
 				c.registers.A = 0xF0
-				c.WriteByteAt(c.registers.PC, 0x2D)
-				c.WriteByteAt(c.registers.PC+1, 0x80)
-				c.WriteByteAt(c.registers.PC+2, 0x01) // 0x0180
-				c.WriteByteAt(0x0180, 0x0F)
+				c.bus.WriteByteAt(c.registers.PC, 0x2D)
+				c.bus.WriteByteAt(c.registers.PC+1, 0x80)
+				c.bus.WriteByteAt(c.registers.PC+2, 0x01) // 0x0180
+				c.bus.WriteByteAt(0x0180, 0x0F)
 			},
 			expectedA:    0x00,
 			expectedZero: true,
@@ -2048,10 +2048,10 @@ func TestAND(t *testing.T) {
 			setupCPU: func(c *CPU) {
 				c.registers.A = 0xF0
 				c.registers.X = 0x10
-				c.WriteByteAt(c.registers.PC, 0x3D)
-				c.WriteByteAt(c.registers.PC+1, 0x80)
-				c.WriteByteAt(c.registers.PC+2, 0x01) // 0x0180
-				c.WriteByteAt(0x0190, 0x0F)
+				c.bus.WriteByteAt(c.registers.PC, 0x3D)
+				c.bus.WriteByteAt(c.registers.PC+1, 0x80)
+				c.bus.WriteByteAt(c.registers.PC+2, 0x01) // 0x0180
+				c.bus.WriteByteAt(0x0190, 0x0F)
 			},
 			expectedA:    0x00,
 			expectedZero: true,
@@ -2064,10 +2064,10 @@ func TestAND(t *testing.T) {
 			setupCPU: func(c *CPU) {
 				c.registers.A = 0xF0
 				c.registers.Y = 0x10
-				c.WriteByteAt(c.registers.PC, 0x39)
-				c.WriteByteAt(c.registers.PC+1, 0x80)
-				c.WriteByteAt(c.registers.PC+2, 0x01) // 0x0180
-				c.WriteByteAt(0x0190, 0x0F)
+				c.bus.WriteByteAt(c.registers.PC, 0x39)
+				c.bus.WriteByteAt(c.registers.PC+1, 0x80)
+				c.bus.WriteByteAt(c.registers.PC+2, 0x01) // 0x0180
+				c.bus.WriteByteAt(0x0190, 0x0F)
 			},
 			expectedA:    0x00,
 			expectedZero: true,
@@ -2080,11 +2080,11 @@ func TestAND(t *testing.T) {
 			setupCPU: func(c *CPU) {
 				c.registers.A = 0xF0
 				c.registers.X = 0x04
-				c.WriteByteAt(c.registers.PC, 0x21)
-				c.WriteByteAt(c.registers.PC+1, 0x20)
-				c.WriteByteAt(0x24, 0x74) // low of 0x0074
-				c.WriteByteAt(0x25, 0x00) // high of 0x0074
-				c.WriteByteAt(0x0074, 0x0F)
+				c.bus.WriteByteAt(c.registers.PC, 0x21)
+				c.bus.WriteByteAt(c.registers.PC+1, 0x20)
+				c.bus.WriteByteAt(0x24, 0x74) // low of 0x0074
+				c.bus.WriteByteAt(0x25, 0x00) // high of 0x0074
+				c.bus.WriteByteAt(0x0074, 0x0F)
 			},
 			expectedA:    0x00,
 			expectedZero: true,
@@ -2097,11 +2097,11 @@ func TestAND(t *testing.T) {
 			setupCPU: func(c *CPU) {
 				c.registers.A = 0xF0
 				c.registers.Y = 0x10
-				c.WriteByteAt(c.registers.PC, 0x31)
-				c.WriteByteAt(c.registers.PC+1, 0x20)
-				c.WriteByteAt(0x20, 0x74) // low of 0x0074
-				c.WriteByteAt(0x21, 0x00) // high of 0x0074
-				c.WriteByteAt(0x0084, 0x0F)
+				c.bus.WriteByteAt(c.registers.PC, 0x31)
+				c.bus.WriteByteAt(c.registers.PC+1, 0x20)
+				c.bus.WriteByteAt(0x20, 0x74) // low of 0x0074
+				c.bus.WriteByteAt(0x21, 0x00) // high of 0x0074
+				c.bus.WriteByteAt(0x0084, 0x0F)
 			},
 			expectedA:    0x00,
 			expectedZero: true,
@@ -2137,8 +2137,8 @@ func TestORA(t *testing.T) {
 			addrMode: Immediate,
 			setupCPU: func(c *CPU) {
 				c.registers.A = 0xF0
-				c.WriteByteAt(c.registers.PC, 0x09)
-				c.WriteByteAt(c.registers.PC+1, 0x0F)
+				c.bus.WriteByteAt(c.registers.PC, 0x09)
+				c.bus.WriteByteAt(c.registers.PC+1, 0x0F)
 			},
 			expectedA:    0xFF,
 			expectedZero: false,
@@ -2150,8 +2150,8 @@ func TestORA(t *testing.T) {
 			addrMode: Immediate,
 			setupCPU: func(c *CPU) {
 				c.registers.A = 0x00
-				c.WriteByteAt(c.registers.PC, 0x09)
-				c.WriteByteAt(c.registers.PC+1, 0x00)
+				c.bus.WriteByteAt(c.registers.PC, 0x09)
+				c.bus.WriteByteAt(c.registers.PC+1, 0x00)
 			},
 			expectedA:    0x00,
 			expectedZero: true,
@@ -2163,9 +2163,9 @@ func TestORA(t *testing.T) {
 			addrMode: ZeroPage,
 			setupCPU: func(c *CPU) {
 				c.registers.A = 0xF0
-				c.WriteByteAt(c.registers.PC, 0x05)
-				c.WriteByteAt(c.registers.PC+1, 0x20)
-				c.WriteByteAt(0x20, 0x0F)
+				c.bus.WriteByteAt(c.registers.PC, 0x05)
+				c.bus.WriteByteAt(c.registers.PC+1, 0x20)
+				c.bus.WriteByteAt(0x20, 0x0F)
 			},
 			expectedA:    0xFF,
 			expectedZero: false,
@@ -2178,9 +2178,9 @@ func TestORA(t *testing.T) {
 			setupCPU: func(c *CPU) {
 				c.registers.A = 0xF0
 				c.registers.X = 0x10
-				c.WriteByteAt(c.registers.PC, 0x15)
-				c.WriteByteAt(c.registers.PC+1, 0x20)
-				c.WriteByteAt(0x30, 0x0F)
+				c.bus.WriteByteAt(c.registers.PC, 0x15)
+				c.bus.WriteByteAt(c.registers.PC+1, 0x20)
+				c.bus.WriteByteAt(0x30, 0x0F)
 			},
 			expectedA:    0xFF,
 			expectedZero: false,
@@ -2192,10 +2192,10 @@ func TestORA(t *testing.T) {
 			addrMode: Absolute,
 			setupCPU: func(c *CPU) {
 				c.registers.A = 0xF0
-				c.WriteByteAt(c.registers.PC, 0x0D)
-				c.WriteByteAt(c.registers.PC+1, 0x80)
-				c.WriteByteAt(c.registers.PC+2, 0x01) // 0x0180
-				c.WriteByteAt(0x0180, 0x0F)
+				c.bus.WriteByteAt(c.registers.PC, 0x0D)
+				c.bus.WriteByteAt(c.registers.PC+1, 0x80)
+				c.bus.WriteByteAt(c.registers.PC+2, 0x01) // 0x0180
+				c.bus.WriteByteAt(0x0180, 0x0F)
 			},
 			expectedA:    0xFF,
 			expectedZero: false,
@@ -2208,10 +2208,10 @@ func TestORA(t *testing.T) {
 			setupCPU: func(c *CPU) {
 				c.registers.A = 0xF0
 				c.registers.X = 0x10
-				c.WriteByteAt(c.registers.PC, 0x1D)
-				c.WriteByteAt(c.registers.PC+1, 0x80)
-				c.WriteByteAt(c.registers.PC+2, 0x01) // 0x0180
-				c.WriteByteAt(0x0190, 0x0F)
+				c.bus.WriteByteAt(c.registers.PC, 0x1D)
+				c.bus.WriteByteAt(c.registers.PC+1, 0x80)
+				c.bus.WriteByteAt(c.registers.PC+2, 0x01) // 0x0180
+				c.bus.WriteByteAt(0x0190, 0x0F)
 			},
 			expectedA:    0xFF,
 			expectedZero: false,
@@ -2224,10 +2224,10 @@ func TestORA(t *testing.T) {
 			setupCPU: func(c *CPU) {
 				c.registers.A = 0xF0
 				c.registers.Y = 0x10
-				c.WriteByteAt(c.registers.PC, 0x19)
-				c.WriteByteAt(c.registers.PC+1, 0x80)
-				c.WriteByteAt(c.registers.PC+2, 0x01) // 0x0180
-				c.WriteByteAt(0x0190, 0x0F)
+				c.bus.WriteByteAt(c.registers.PC, 0x19)
+				c.bus.WriteByteAt(c.registers.PC+1, 0x80)
+				c.bus.WriteByteAt(c.registers.PC+2, 0x01) // 0x0180
+				c.bus.WriteByteAt(0x0190, 0x0F)
 			},
 			expectedA:    0xFF,
 			expectedZero: false,
@@ -2240,11 +2240,11 @@ func TestORA(t *testing.T) {
 			setupCPU: func(c *CPU) {
 				c.registers.A = 0xF0
 				c.registers.X = 0x04
-				c.WriteByteAt(c.registers.PC, 0x01)
-				c.WriteByteAt(c.registers.PC+1, 0x20)
-				c.WriteByteAt(0x24, 0x74)
-				c.WriteByteAt(0x25, 0x00) // 0x0074
-				c.WriteByteAt(0x0074, 0x0F)
+				c.bus.WriteByteAt(c.registers.PC, 0x01)
+				c.bus.WriteByteAt(c.registers.PC+1, 0x20)
+				c.bus.WriteByteAt(0x24, 0x74)
+				c.bus.WriteByteAt(0x25, 0x00) // 0x0074
+				c.bus.WriteByteAt(0x0074, 0x0F)
 			},
 			expectedA:    0xFF,
 			expectedZero: false,
@@ -2257,11 +2257,11 @@ func TestORA(t *testing.T) {
 			setupCPU: func(c *CPU) {
 				c.registers.A = 0xF0
 				c.registers.Y = 0x10
-				c.WriteByteAt(c.registers.PC, 0x11)
-				c.WriteByteAt(c.registers.PC+1, 0x20)
-				c.WriteByteAt(0x20, 0x74)
-				c.WriteByteAt(0x21, 0x00) // 0x0074
-				c.WriteByteAt(0x0084, 0x0F)
+				c.bus.WriteByteAt(c.registers.PC, 0x11)
+				c.bus.WriteByteAt(c.registers.PC+1, 0x20)
+				c.bus.WriteByteAt(0x20, 0x74)
+				c.bus.WriteByteAt(0x21, 0x00) // 0x0074
+				c.bus.WriteByteAt(0x0084, 0x0F)
 			},
 			expectedA:    0xFF,
 			expectedZero: false,
@@ -2297,8 +2297,8 @@ func TestEOR(t *testing.T) {
 			addrMode: Immediate,
 			setupCPU: func(c *CPU) {
 				c.registers.A = 0xF0
-				c.WriteByteAt(c.registers.PC, 0x49)
-				c.WriteByteAt(c.registers.PC+1, 0xFF)
+				c.bus.WriteByteAt(c.registers.PC, 0x49)
+				c.bus.WriteByteAt(c.registers.PC+1, 0xFF)
 			},
 			expectedA:    0x0F,
 			expectedZero: false,
@@ -2310,8 +2310,8 @@ func TestEOR(t *testing.T) {
 			addrMode: Immediate,
 			setupCPU: func(c *CPU) {
 				c.registers.A = 0xFF
-				c.WriteByteAt(c.registers.PC, 0x49)
-				c.WriteByteAt(c.registers.PC+1, 0xFF)
+				c.bus.WriteByteAt(c.registers.PC, 0x49)
+				c.bus.WriteByteAt(c.registers.PC+1, 0xFF)
 			},
 			expectedA:    0x00,
 			expectedZero: true,
@@ -2323,9 +2323,9 @@ func TestEOR(t *testing.T) {
 			addrMode: ZeroPage,
 			setupCPU: func(c *CPU) {
 				c.registers.A = 0xF0
-				c.WriteByteAt(c.registers.PC, 0x45)
-				c.WriteByteAt(c.registers.PC+1, 0x20)
-				c.WriteByteAt(0x20, 0xFF)
+				c.bus.WriteByteAt(c.registers.PC, 0x45)
+				c.bus.WriteByteAt(c.registers.PC+1, 0x20)
+				c.bus.WriteByteAt(0x20, 0xFF)
 			},
 			expectedA:    0x0F,
 			expectedZero: false,
@@ -2338,9 +2338,9 @@ func TestEOR(t *testing.T) {
 			setupCPU: func(c *CPU) {
 				c.registers.A = 0xF0
 				c.registers.X = 0x10
-				c.WriteByteAt(c.registers.PC, 0x55)
-				c.WriteByteAt(c.registers.PC+1, 0x20)
-				c.WriteByteAt(0x30, 0xFF)
+				c.bus.WriteByteAt(c.registers.PC, 0x55)
+				c.bus.WriteByteAt(c.registers.PC+1, 0x20)
+				c.bus.WriteByteAt(0x30, 0xFF)
 			},
 			expectedA:    0x0F,
 			expectedZero: false,
@@ -2352,10 +2352,10 @@ func TestEOR(t *testing.T) {
 			addrMode: Absolute,
 			setupCPU: func(c *CPU) {
 				c.registers.A = 0xF0
-				c.WriteByteAt(c.registers.PC, 0x4D)
-				c.WriteByteAt(c.registers.PC+1, 0x80)
-				c.WriteByteAt(c.registers.PC+2, 0x01) // 0x0180
-				c.WriteByteAt(0x0180, 0xFF)
+				c.bus.WriteByteAt(c.registers.PC, 0x4D)
+				c.bus.WriteByteAt(c.registers.PC+1, 0x80)
+				c.bus.WriteByteAt(c.registers.PC+2, 0x01) // 0x0180
+				c.bus.WriteByteAt(0x0180, 0xFF)
 			},
 			expectedA:    0x0F,
 			expectedZero: false,
@@ -2368,10 +2368,10 @@ func TestEOR(t *testing.T) {
 			setupCPU: func(c *CPU) {
 				c.registers.A = 0xF0
 				c.registers.X = 0x10
-				c.WriteByteAt(c.registers.PC, 0x5D)
-				c.WriteByteAt(c.registers.PC+1, 0x80)
-				c.WriteByteAt(c.registers.PC+2, 0x01)
-				c.WriteByteAt(0x0190, 0xFF)
+				c.bus.WriteByteAt(c.registers.PC, 0x5D)
+				c.bus.WriteByteAt(c.registers.PC+1, 0x80)
+				c.bus.WriteByteAt(c.registers.PC+2, 0x01)
+				c.bus.WriteByteAt(0x0190, 0xFF)
 			},
 			expectedA:    0x0F,
 			expectedZero: false,
@@ -2384,10 +2384,10 @@ func TestEOR(t *testing.T) {
 			setupCPU: func(c *CPU) {
 				c.registers.A = 0xF0
 				c.registers.Y = 0x10
-				c.WriteByteAt(c.registers.PC, 0x59)
-				c.WriteByteAt(c.registers.PC+1, 0x80)
-				c.WriteByteAt(c.registers.PC+2, 0x01)
-				c.WriteByteAt(0x0190, 0xFF)
+				c.bus.WriteByteAt(c.registers.PC, 0x59)
+				c.bus.WriteByteAt(c.registers.PC+1, 0x80)
+				c.bus.WriteByteAt(c.registers.PC+2, 0x01)
+				c.bus.WriteByteAt(0x0190, 0xFF)
 			},
 			expectedA:    0x0F,
 			expectedZero: false,
@@ -2400,11 +2400,11 @@ func TestEOR(t *testing.T) {
 			setupCPU: func(c *CPU) {
 				c.registers.A = 0xF0
 				c.registers.X = 0x04
-				c.WriteByteAt(c.registers.PC, 0x41)
-				c.WriteByteAt(c.registers.PC+1, 0x20)
-				c.WriteByteAt(0x24, 0x74)
-				c.WriteByteAt(0x25, 0x00)
-				c.WriteByteAt(0x0074, 0xFF)
+				c.bus.WriteByteAt(c.registers.PC, 0x41)
+				c.bus.WriteByteAt(c.registers.PC+1, 0x20)
+				c.bus.WriteByteAt(0x24, 0x74)
+				c.bus.WriteByteAt(0x25, 0x00)
+				c.bus.WriteByteAt(0x0074, 0xFF)
 			},
 			expectedA:    0x0F,
 			expectedZero: false,
@@ -2417,11 +2417,11 @@ func TestEOR(t *testing.T) {
 			setupCPU: func(c *CPU) {
 				c.registers.A = 0xF0
 				c.registers.Y = 0x10
-				c.WriteByteAt(c.registers.PC, 0x51)
-				c.WriteByteAt(c.registers.PC+1, 0x20)
-				c.WriteByteAt(0x20, 0x74)
-				c.WriteByteAt(0x21, 0x00)
-				c.WriteByteAt(0x0084, 0xFF)
+				c.bus.WriteByteAt(c.registers.PC, 0x51)
+				c.bus.WriteByteAt(c.registers.PC+1, 0x20)
+				c.bus.WriteByteAt(0x20, 0x74)
+				c.bus.WriteByteAt(0x21, 0x00)
+				c.bus.WriteByteAt(0x0084, 0xFF)
 			},
 			expectedA:    0x0F,
 			expectedZero: false,
@@ -2458,9 +2458,9 @@ func TestBIT(t *testing.T) {
 			addrMode: ZeroPage,
 			setupCPU: func(c *CPU) {
 				c.registers.A = 0x0F
-				c.WriteByteAt(c.registers.PC, 0x24)
-				c.WriteByteAt(c.registers.PC+1, 0x20)
-				c.WriteByteAt(0x20, 0xF0)
+				c.bus.WriteByteAt(c.registers.PC, 0x24)
+				c.bus.WriteByteAt(c.registers.PC+1, 0x20)
+				c.bus.WriteByteAt(0x20, 0xF0)
 			},
 			expectedA:        0x0F,
 			expectedZero:     true,
@@ -2473,9 +2473,9 @@ func TestBIT(t *testing.T) {
 			addrMode: ZeroPage,
 			setupCPU: func(c *CPU) {
 				c.registers.A = 0xFF
-				c.WriteByteAt(c.registers.PC, 0x24)
-				c.WriteByteAt(c.registers.PC+1, 0x20)
-				c.WriteByteAt(0x20, 0x0C)
+				c.bus.WriteByteAt(c.registers.PC, 0x24)
+				c.bus.WriteByteAt(c.registers.PC+1, 0x20)
+				c.bus.WriteByteAt(0x20, 0x0C)
 			},
 			expectedA:        0xFF,
 			expectedZero:     false,
@@ -2488,10 +2488,10 @@ func TestBIT(t *testing.T) {
 			addrMode: Absolute,
 			setupCPU: func(c *CPU) {
 				c.registers.A = 0x0F
-				c.WriteByteAt(c.registers.PC, 0x2C)
-				c.WriteByteAt(c.registers.PC+1, 0x80) // low
-				c.WriteByteAt(c.registers.PC+2, 0x01) // high → 0x0180
-				c.WriteByteAt(0x0180, 0x40)
+				c.bus.WriteByteAt(c.registers.PC, 0x2C)
+				c.bus.WriteByteAt(c.registers.PC+1, 0x80) // low
+				c.bus.WriteByteAt(c.registers.PC+2, 0x01) // high → 0x0180
+				c.bus.WriteByteAt(0x0180, 0x40)
 			},
 			expectedA:        0x0F,
 			expectedZero:     true,
@@ -2530,14 +2530,14 @@ func TestLSR(t *testing.T) {
 			opcode:   0x4E,
 			addrMode: Absolute,
 			setupCPU: func(c *CPU) {
-				c.WriteByteAt(c.registers.PC, 0x4E)
-				c.WriteByteAt(c.registers.PC+1, 0x80)
-				c.WriteByteAt(c.registers.PC+2, 0x01) // 0x0180
-				c.WriteByteAt(0x0180, 0x82)
+				c.bus.WriteByteAt(c.registers.PC, 0x4E)
+				c.bus.WriteByteAt(c.registers.PC+1, 0x80)
+				c.bus.WriteByteAt(c.registers.PC+2, 0x01) // 0x0180
+				c.bus.WriteByteAt(0x0180, 0x82)
 			},
 			checkResult: func(t *testing.T, c *CPU) {
-				if c.ReadByteFrom(0x0180) != 0x41 {
-					t.Errorf("Memory at $0180 = %#02x, want %#02x", c.ReadByteFrom(0x0180), 0x41)
+				if c.bus.ReadByteFrom(0x0180) != 0x41 {
+					t.Errorf("Memory at $0180 = %#02x, want %#02x", c.bus.ReadByteFrom(0x0180), 0x41)
 				}
 			},
 			expectedCarry: false,
@@ -2550,14 +2550,14 @@ func TestLSR(t *testing.T) {
 			addrMode: AbsoluteXIndexed,
 			setupCPU: func(c *CPU) {
 				c.registers.X = 0x10
-				c.WriteByteAt(c.registers.PC, 0x5E)
-				c.WriteByteAt(c.registers.PC+1, 0x80)
-				c.WriteByteAt(c.registers.PC+2, 0x01) // 0x0180
-				c.WriteByteAt(0x0190, 0x82)
+				c.bus.WriteByteAt(c.registers.PC, 0x5E)
+				c.bus.WriteByteAt(c.registers.PC+1, 0x80)
+				c.bus.WriteByteAt(c.registers.PC+2, 0x01) // 0x0180
+				c.bus.WriteByteAt(0x0190, 0x82)
 			},
 			checkResult: func(t *testing.T, c *CPU) {
-				if c.ReadByteFrom(0x0190) != 0x41 {
-					t.Errorf("Memory at $0190 = %#02x, want %#02x", c.ReadByteFrom(0x0190), 0x41)
+				if c.bus.ReadByteFrom(0x0190) != 0x41 {
+					t.Errorf("Memory at $0190 = %#02x, want %#02x", c.bus.ReadByteFrom(0x0190), 0x41)
 				}
 			},
 			expectedCarry: false,
@@ -2596,14 +2596,14 @@ func TestASL(t *testing.T) {
 			opcode:   0x0E,
 			addrMode: Absolute,
 			setupCPU: func(c *CPU) {
-				c.WriteByteAt(c.registers.PC, 0x0E)
-				c.WriteByteAt(c.registers.PC+1, 0x80)
-				c.WriteByteAt(c.registers.PC+2, 0x01) // 0x0180
-				c.WriteByteAt(0x0180, 0x41)
+				c.bus.WriteByteAt(c.registers.PC, 0x0E)
+				c.bus.WriteByteAt(c.registers.PC+1, 0x80)
+				c.bus.WriteByteAt(c.registers.PC+2, 0x01) // 0x0180
+				c.bus.WriteByteAt(0x0180, 0x41)
 			},
 			checkResult: func(t *testing.T, c *CPU) {
-				if c.ReadByteFrom(0x0180) != 0x82 {
-					t.Errorf("Memory at $0180 = %#02x, want %#02x", c.ReadByteFrom(0x0180), 0x82)
+				if c.bus.ReadByteFrom(0x0180) != 0x82 {
+					t.Errorf("Memory at $0180 = %#02x, want %#02x", c.bus.ReadByteFrom(0x0180), 0x82)
 				}
 			},
 			expectedCarry: false,
@@ -2616,14 +2616,14 @@ func TestASL(t *testing.T) {
 			addrMode: AbsoluteXIndexed,
 			setupCPU: func(c *CPU) {
 				c.registers.X = 0x10
-				c.WriteByteAt(c.registers.PC, 0x1E)
-				c.WriteByteAt(c.registers.PC+1, 0x80)
-				c.WriteByteAt(c.registers.PC+2, 0x01) // 0x0180
-				c.WriteByteAt(0x0190, 0x41)
+				c.bus.WriteByteAt(c.registers.PC, 0x1E)
+				c.bus.WriteByteAt(c.registers.PC+1, 0x80)
+				c.bus.WriteByteAt(c.registers.PC+2, 0x01) // 0x0180
+				c.bus.WriteByteAt(0x0190, 0x41)
 			},
 			checkResult: func(t *testing.T, c *CPU) {
-				if c.ReadByteFrom(0x0190) != 0x82 {
-					t.Errorf("Memory at $0190 = %#02x, want %#02x", c.ReadByteFrom(0x0190), 0x82)
+				if c.bus.ReadByteFrom(0x0190) != 0x82 {
+					t.Errorf("Memory at $0190 = %#02x, want %#02x", c.bus.ReadByteFrom(0x0190), 0x82)
 				}
 			},
 			expectedCarry: false,
@@ -2663,14 +2663,14 @@ func TestROL(t *testing.T) {
 			addrMode: Absolute,
 			setupCPU: func(c *CPU) {
 				c.registers.P.Carry = true
-				c.WriteByteAt(c.registers.PC, 0x2E)
-				c.WriteByteAt(c.registers.PC+1, 0x80)
-				c.WriteByteAt(c.registers.PC+2, 0x01) // 0x0180
-				c.WriteByteAt(0x0180, 0x41)
+				c.bus.WriteByteAt(c.registers.PC, 0x2E)
+				c.bus.WriteByteAt(c.registers.PC+1, 0x80)
+				c.bus.WriteByteAt(c.registers.PC+2, 0x01) // 0x0180
+				c.bus.WriteByteAt(0x0180, 0x41)
 			},
 			checkResult: func(t *testing.T, c *CPU) {
-				if c.ReadByteFrom(0x0180) != 0x83 {
-					t.Errorf("Memory at $0180 = %#02x, want %#02x", c.ReadByteFrom(0x0180), 0x83)
+				if c.bus.ReadByteFrom(0x0180) != 0x83 {
+					t.Errorf("Memory at $0180 = %#02x, want %#02x", c.bus.ReadByteFrom(0x0180), 0x83)
 				}
 			},
 			expectedCarry: false,
@@ -2684,14 +2684,14 @@ func TestROL(t *testing.T) {
 			setupCPU: func(c *CPU) {
 				c.registers.X = 0x10
 				c.registers.P.Carry = true
-				c.WriteByteAt(c.registers.PC, 0x3E)
-				c.WriteByteAt(c.registers.PC+1, 0x80)
-				c.WriteByteAt(c.registers.PC+2, 0x01) // 0x0180
-				c.WriteByteAt(0x0190, 0x41)
+				c.bus.WriteByteAt(c.registers.PC, 0x3E)
+				c.bus.WriteByteAt(c.registers.PC+1, 0x80)
+				c.bus.WriteByteAt(c.registers.PC+2, 0x01) // 0x0180
+				c.bus.WriteByteAt(0x0190, 0x41)
 			},
 			checkResult: func(t *testing.T, c *CPU) {
-				if c.ReadByteFrom(0x0190) != 0x83 {
-					t.Errorf("Memory at $0190 = %#02x, want %#02x", c.ReadByteFrom(0x0190), 0x83)
+				if c.bus.ReadByteFrom(0x0190) != 0x83 {
+					t.Errorf("Memory at $0190 = %#02x, want %#02x", c.bus.ReadByteFrom(0x0190), 0x83)
 				}
 			},
 			expectedCarry: false,
@@ -2731,14 +2731,14 @@ func TestROR(t *testing.T) {
 			addrMode: Absolute,
 			setupCPU: func(c *CPU) {
 				c.registers.P.Carry = true
-				c.WriteByteAt(c.registers.PC, 0x6E)
-				c.WriteByteAt(c.registers.PC+1, 0x80)
-				c.WriteByteAt(c.registers.PC+2, 0x01) // 0x0180
-				c.WriteByteAt(0x0180, 0x41)
+				c.bus.WriteByteAt(c.registers.PC, 0x6E)
+				c.bus.WriteByteAt(c.registers.PC+1, 0x80)
+				c.bus.WriteByteAt(c.registers.PC+2, 0x01) // 0x0180
+				c.bus.WriteByteAt(0x0180, 0x41)
 			},
 			checkResult: func(t *testing.T, c *CPU) {
-				if c.ReadByteFrom(0x0180) != 0xA0 {
-					t.Errorf("Memory at $0180 = %#02x, want %#02x", c.ReadByteFrom(0x0180), 0xA0)
+				if c.bus.ReadByteFrom(0x0180) != 0xA0 {
+					t.Errorf("Memory at $0180 = %#02x, want %#02x", c.bus.ReadByteFrom(0x0180), 0xA0)
 				}
 			},
 			expectedCarry: true,
@@ -2752,14 +2752,14 @@ func TestROR(t *testing.T) {
 			setupCPU: func(c *CPU) {
 				c.registers.X = 0x10
 				c.registers.P.Carry = true
-				c.WriteByteAt(c.registers.PC, 0x7E)
-				c.WriteByteAt(c.registers.PC+1, 0x80)
-				c.WriteByteAt(c.registers.PC+2, 0x01) // 0x0180
-				c.WriteByteAt(0x0190, 0x41)
+				c.bus.WriteByteAt(c.registers.PC, 0x7E)
+				c.bus.WriteByteAt(c.registers.PC+1, 0x80)
+				c.bus.WriteByteAt(c.registers.PC+2, 0x01) // 0x0180
+				c.bus.WriteByteAt(0x0190, 0x41)
 			},
 			checkResult: func(t *testing.T, c *CPU) {
-				if c.ReadByteFrom(0x0190) != 0xA0 {
-					t.Errorf("Memory at $0190 = %#02x, want %#02x", c.ReadByteFrom(0x0190), 0xA0)
+				if c.bus.ReadByteFrom(0x0190) != 0xA0 {
+					t.Errorf("Memory at $0190 = %#02x, want %#02x", c.bus.ReadByteFrom(0x0190), 0xA0)
 				}
 			},
 			expectedCarry: true,
@@ -2799,8 +2799,8 @@ func TestCMP(t *testing.T) {
 			addrMode: Immediate,
 			setupCPU: func(c *CPU) {
 				c.registers.A = 0x42
-				c.WriteByteAt(c.registers.PC, 0xC9)
-				c.WriteByteAt(c.registers.PC+1, 0x30)
+				c.bus.WriteByteAt(c.registers.PC, 0xC9)
+				c.bus.WriteByteAt(c.registers.PC+1, 0x30)
 			},
 			expectedCarry: true,
 			expectedZero:  false,
@@ -2812,8 +2812,8 @@ func TestCMP(t *testing.T) {
 			addrMode: Immediate,
 			setupCPU: func(c *CPU) {
 				c.registers.A = 0x42
-				c.WriteByteAt(c.registers.PC, 0xC9)
-				c.WriteByteAt(c.registers.PC+1, 0x42)
+				c.bus.WriteByteAt(c.registers.PC, 0xC9)
+				c.bus.WriteByteAt(c.registers.PC+1, 0x42)
 			},
 			expectedCarry: true,
 			expectedZero:  true,
@@ -2825,8 +2825,8 @@ func TestCMP(t *testing.T) {
 			addrMode: Immediate,
 			setupCPU: func(c *CPU) {
 				c.registers.A = 0x30
-				c.WriteByteAt(c.registers.PC, 0xC9)
-				c.WriteByteAt(c.registers.PC+1, 0x42)
+				c.bus.WriteByteAt(c.registers.PC, 0xC9)
+				c.bus.WriteByteAt(c.registers.PC+1, 0x42)
 			},
 			expectedCarry: false,
 			expectedZero:  false,
@@ -2838,9 +2838,9 @@ func TestCMP(t *testing.T) {
 			addrMode: ZeroPage,
 			setupCPU: func(c *CPU) {
 				c.registers.A = 0x42
-				c.WriteByteAt(c.registers.PC, 0xC5)
-				c.WriteByteAt(c.registers.PC+1, 0x20)
-				c.WriteByteAt(0x20, 0x30)
+				c.bus.WriteByteAt(c.registers.PC, 0xC5)
+				c.bus.WriteByteAt(c.registers.PC+1, 0x20)
+				c.bus.WriteByteAt(0x20, 0x30)
 			},
 			expectedCarry: true,
 			expectedZero:  false,
@@ -2853,9 +2853,9 @@ func TestCMP(t *testing.T) {
 			setupCPU: func(c *CPU) {
 				c.registers.A = 0x42
 				c.registers.X = 0x10
-				c.WriteByteAt(c.registers.PC, 0xD5)
-				c.WriteByteAt(c.registers.PC+1, 0x20)
-				c.WriteByteAt(0x30, 0x42)
+				c.bus.WriteByteAt(c.registers.PC, 0xD5)
+				c.bus.WriteByteAt(c.registers.PC+1, 0x20)
+				c.bus.WriteByteAt(0x30, 0x42)
 			},
 			expectedCarry: true,
 			expectedZero:  true,
@@ -2867,10 +2867,10 @@ func TestCMP(t *testing.T) {
 			addrMode: Absolute,
 			setupCPU: func(c *CPU) {
 				c.registers.A = 0x30
-				c.WriteByteAt(c.registers.PC, 0xCD)
-				c.WriteByteAt(c.registers.PC+1, 0x80)
-				c.WriteByteAt(c.registers.PC+2, 0x01) // → 0x0180
-				c.WriteByteAt(0x0180, 0x42)
+				c.bus.WriteByteAt(c.registers.PC, 0xCD)
+				c.bus.WriteByteAt(c.registers.PC+1, 0x80)
+				c.bus.WriteByteAt(c.registers.PC+2, 0x01) // → 0x0180
+				c.bus.WriteByteAt(0x0180, 0x42)
 			},
 			expectedCarry: false,
 			expectedZero:  false,
@@ -2883,10 +2883,10 @@ func TestCMP(t *testing.T) {
 			setupCPU: func(c *CPU) {
 				c.registers.A = 0x42
 				c.registers.X = 0x10
-				c.WriteByteAt(c.registers.PC, 0xDD)
-				c.WriteByteAt(c.registers.PC+1, 0x80)
-				c.WriteByteAt(c.registers.PC+2, 0x01) // → 0x0180
-				c.WriteByteAt(0x0190, 0x30)
+				c.bus.WriteByteAt(c.registers.PC, 0xDD)
+				c.bus.WriteByteAt(c.registers.PC+1, 0x80)
+				c.bus.WriteByteAt(c.registers.PC+2, 0x01) // → 0x0180
+				c.bus.WriteByteAt(0x0190, 0x30)
 			},
 			expectedCarry: true,
 			expectedZero:  false,
@@ -2899,10 +2899,10 @@ func TestCMP(t *testing.T) {
 			setupCPU: func(c *CPU) {
 				c.registers.A = 0x42
 				c.registers.Y = 0x10
-				c.WriteByteAt(c.registers.PC, 0xD9)
-				c.WriteByteAt(c.registers.PC+1, 0x80)
-				c.WriteByteAt(c.registers.PC+2, 0x01) // → 0x0180
-				c.WriteByteAt(0x0190, 0x30)
+				c.bus.WriteByteAt(c.registers.PC, 0xD9)
+				c.bus.WriteByteAt(c.registers.PC+1, 0x80)
+				c.bus.WriteByteAt(c.registers.PC+2, 0x01) // → 0x0180
+				c.bus.WriteByteAt(0x0190, 0x30)
 			},
 			expectedCarry: true,
 			expectedZero:  false,
@@ -2915,11 +2915,11 @@ func TestCMP(t *testing.T) {
 			setupCPU: func(c *CPU) {
 				c.registers.A = 0x42
 				c.registers.X = 0x04
-				c.WriteByteAt(c.registers.PC, 0xC1)
-				c.WriteByteAt(c.registers.PC+1, 0x20)
-				c.WriteByteAt(0x24, 0x74) // low of 0x0074
-				c.WriteByteAt(0x25, 0x00) // high of 0x0074
-				c.WriteByteAt(0x0074, 0x42)
+				c.bus.WriteByteAt(c.registers.PC, 0xC1)
+				c.bus.WriteByteAt(c.registers.PC+1, 0x20)
+				c.bus.WriteByteAt(0x24, 0x74) // low of 0x0074
+				c.bus.WriteByteAt(0x25, 0x00) // high of 0x0074
+				c.bus.WriteByteAt(0x0074, 0x42)
 			},
 			expectedCarry: true,
 			expectedZero:  true,
@@ -2932,11 +2932,11 @@ func TestCMP(t *testing.T) {
 			setupCPU: func(c *CPU) {
 				c.registers.A = 0x42
 				c.registers.Y = 0x10
-				c.WriteByteAt(c.registers.PC, 0xD1)
-				c.WriteByteAt(c.registers.PC+1, 0x20)
-				c.WriteByteAt(0x20, 0x74) // low of 0x0074
-				c.WriteByteAt(0x21, 0x00) // high of 0x0074
-				c.WriteByteAt(0x0084, 0x30)
+				c.bus.WriteByteAt(c.registers.PC, 0xD1)
+				c.bus.WriteByteAt(c.registers.PC+1, 0x20)
+				c.bus.WriteByteAt(0x20, 0x74) // low of 0x0074
+				c.bus.WriteByteAt(0x21, 0x00) // high of 0x0074
+				c.bus.WriteByteAt(0x0084, 0x30)
 			},
 			expectedCarry: true,
 			expectedZero:  false,
@@ -2973,8 +2973,8 @@ func TestCPX(t *testing.T) {
 			addrMode: Immediate,
 			setupCPU: func(c *CPU) {
 				c.registers.X = 0x42
-				c.WriteByteAt(c.registers.PC, 0xE0)
-				c.WriteByteAt(c.registers.PC+1, 0x30)
+				c.bus.WriteByteAt(c.registers.PC, 0xE0)
+				c.bus.WriteByteAt(c.registers.PC+1, 0x30)
 			},
 			expectedCarry: true,
 			expectedZero:  false,
@@ -2986,8 +2986,8 @@ func TestCPX(t *testing.T) {
 			addrMode: Immediate,
 			setupCPU: func(c *CPU) {
 				c.registers.X = 0x42
-				c.WriteByteAt(c.registers.PC, 0xE0)
-				c.WriteByteAt(c.registers.PC+1, 0x42)
+				c.bus.WriteByteAt(c.registers.PC, 0xE0)
+				c.bus.WriteByteAt(c.registers.PC+1, 0x42)
 			},
 			expectedCarry: true,
 			expectedZero:  true,
@@ -2999,8 +2999,8 @@ func TestCPX(t *testing.T) {
 			addrMode: Immediate,
 			setupCPU: func(c *CPU) {
 				c.registers.X = 0x30
-				c.WriteByteAt(c.registers.PC, 0xE0)
-				c.WriteByteAt(c.registers.PC+1, 0x42)
+				c.bus.WriteByteAt(c.registers.PC, 0xE0)
+				c.bus.WriteByteAt(c.registers.PC+1, 0x42)
 			},
 			expectedCarry: false,
 			expectedZero:  false,
@@ -3012,9 +3012,9 @@ func TestCPX(t *testing.T) {
 			addrMode: ZeroPage,
 			setupCPU: func(c *CPU) {
 				c.registers.X = 0x42
-				c.WriteByteAt(c.registers.PC, 0xE4)
-				c.WriteByteAt(c.registers.PC+1, 0x20)
-				c.WriteByteAt(0x20, 0x30)
+				c.bus.WriteByteAt(c.registers.PC, 0xE4)
+				c.bus.WriteByteAt(c.registers.PC+1, 0x20)
+				c.bus.WriteByteAt(0x20, 0x30)
 			},
 			expectedCarry: true,
 			expectedZero:  false,
@@ -3026,10 +3026,10 @@ func TestCPX(t *testing.T) {
 			addrMode: Absolute,
 			setupCPU: func(c *CPU) {
 				c.registers.X = 0x30
-				c.WriteByteAt(c.registers.PC, 0xEC)
-				c.WriteByteAt(c.registers.PC+1, 0x80)
-				c.WriteByteAt(c.registers.PC+2, 0x01) // → 0x0180
-				c.WriteByteAt(0x0180, 0x30)
+				c.bus.WriteByteAt(c.registers.PC, 0xEC)
+				c.bus.WriteByteAt(c.registers.PC+1, 0x80)
+				c.bus.WriteByteAt(c.registers.PC+2, 0x01) // → 0x0180
+				c.bus.WriteByteAt(0x0180, 0x30)
 			},
 			expectedCarry: true,
 			expectedZero:  true,
@@ -3066,8 +3066,8 @@ func TestCPY(t *testing.T) {
 			addrMode: Immediate,
 			setupCPU: func(c *CPU) {
 				c.registers.Y = 0x42
-				c.WriteByteAt(c.registers.PC, 0xC0)
-				c.WriteByteAt(c.registers.PC+1, 0x30)
+				c.bus.WriteByteAt(c.registers.PC, 0xC0)
+				c.bus.WriteByteAt(c.registers.PC+1, 0x30)
 			},
 			expectedCarry: true,
 			expectedZero:  false,
@@ -3079,8 +3079,8 @@ func TestCPY(t *testing.T) {
 			addrMode: Immediate,
 			setupCPU: func(c *CPU) {
 				c.registers.Y = 0x42
-				c.WriteByteAt(c.registers.PC, 0xC0)
-				c.WriteByteAt(c.registers.PC+1, 0x42)
+				c.bus.WriteByteAt(c.registers.PC, 0xC0)
+				c.bus.WriteByteAt(c.registers.PC+1, 0x42)
 			},
 			expectedCarry: true,
 			expectedZero:  true,
@@ -3092,8 +3092,8 @@ func TestCPY(t *testing.T) {
 			addrMode: Immediate,
 			setupCPU: func(c *CPU) {
 				c.registers.Y = 0x30
-				c.WriteByteAt(c.registers.PC, 0xC0)
-				c.WriteByteAt(c.registers.PC+1, 0x42)
+				c.bus.WriteByteAt(c.registers.PC, 0xC0)
+				c.bus.WriteByteAt(c.registers.PC+1, 0x42)
 			},
 			expectedCarry: false,
 			expectedZero:  false,
@@ -3105,9 +3105,9 @@ func TestCPY(t *testing.T) {
 			addrMode: ZeroPage,
 			setupCPU: func(c *CPU) {
 				c.registers.Y = 0x42
-				c.WriteByteAt(c.registers.PC, 0xC4)
-				c.WriteByteAt(c.registers.PC+1, 0x20)
-				c.WriteByteAt(0x20, 0x30)
+				c.bus.WriteByteAt(c.registers.PC, 0xC4)
+				c.bus.WriteByteAt(c.registers.PC+1, 0x20)
+				c.bus.WriteByteAt(0x20, 0x30)
 			},
 			expectedCarry: true,
 			expectedZero:  false,
@@ -3119,10 +3119,10 @@ func TestCPY(t *testing.T) {
 			addrMode: Absolute,
 			setupCPU: func(c *CPU) {
 				c.registers.Y = 0x30
-				c.WriteByteAt(c.registers.PC, 0xCC)
-				c.WriteByteAt(c.registers.PC+1, 0x80)
-				c.WriteByteAt(c.registers.PC+2, 0x01) // → 0x0180
-				c.WriteByteAt(0x0180, 0x30)
+				c.bus.WriteByteAt(c.registers.PC, 0xCC)
+				c.bus.WriteByteAt(c.registers.PC+1, 0x80)
+				c.bus.WriteByteAt(c.registers.PC+2, 0x01) // → 0x0180
+				c.bus.WriteByteAt(0x0180, 0x30)
 			},
 			expectedCarry: true,
 			expectedZero:  true,
@@ -3158,9 +3158,9 @@ func TestPHA(t *testing.T) {
 			opcode:   0x48,
 			addrMode: Implied,
 			setupCPU: func(c *CPU) {
-				c.registers.A = 0x42                // テスト用の値
-				c.registers.SP = 0xFF               // スタックポインタを初期化
-				c.WriteByteAt(c.registers.PC, 0x48) // PHA命令
+				c.registers.A = 0x42                    // テスト用の値
+				c.registers.SP = 0xFF                   // スタックポインタを初期化
+				c.bus.WriteByteAt(c.registers.PC, 0x48) // PHA命令
 			},
 			expectedSP: 0xFE, // スタックポインタが1つ減少
 			stackValue: 0x42, // スタックに格納される値
@@ -3170,9 +3170,9 @@ func TestPHA(t *testing.T) {
 			opcode:   0x48,
 			addrMode: Implied,
 			setupCPU: func(c *CPU) {
-				c.registers.A = 0x80                // 負の値
-				c.registers.SP = 0xFF               // スタックポインタを初期化
-				c.WriteByteAt(c.registers.PC, 0x48) // PHA命令
+				c.registers.A = 0x80                    // 負の値
+				c.registers.SP = 0xFF                   // スタックポインタを初期化
+				c.bus.WriteByteAt(c.registers.PC, 0x48) // PHA命令
 			},
 			expectedSP: 0xFE, // スタックポインタが1つ減少
 			stackValue: 0x80, // スタックに格納される値
@@ -3192,7 +3192,7 @@ func TestPHA(t *testing.T) {
 
 			// スタックの内容を検証（最後にプッシュした値）
 			stackAddr := 0x0100 | uint16(c.registers.SP+1)
-			stackValue := c.ReadByteFrom(stackAddr)
+			stackValue := c.bus.ReadByteFrom(stackAddr)
 			if stackValue != tt.stackValue {
 				t.Errorf("Stack value at $%04X = %#02x, want %#02x", stackAddr, stackValue, tt.stackValue)
 			}
@@ -3220,9 +3220,9 @@ func TestPHP(t *testing.T) {
 				c.registers.P.Negative = false
 				c.registers.P.Overflow = false
 				c.registers.P.Decimal = false
-				c.registers.P.Interrupt = false
-				c.registers.SP = 0xFF               // スタックポインタを初期化
-				c.WriteByteAt(c.registers.PC, 0x08) // PHP命令
+				c.registers.P.IrqDisabled = false
+				c.registers.SP = 0xFF                   // スタックポインタを初期化
+				c.bus.WriteByteAt(c.registers.PC, 0x08) // PHP命令
 			},
 			expectedSP: 0xFE, // スタックポインタが1つ減少
 		},
@@ -3234,13 +3234,13 @@ func TestPHP(t *testing.T) {
 				// すべてのフラグをセット
 				c.registers.P.Carry = true
 				c.registers.P.Zero = true
-				c.registers.P.Interrupt = true
+				c.registers.P.IrqDisabled = true
 				c.registers.P.Decimal = true
 				c.registers.P.Break = true
 				c.registers.P.Overflow = true
 				c.registers.P.Negative = true
-				c.registers.SP = 0xFF               // スタックポインタを初期化
-				c.WriteByteAt(c.registers.PC, 0x08) // PHP命令
+				c.registers.SP = 0xFF                   // スタックポインタを初期化
+				c.bus.WriteByteAt(c.registers.PC, 0x08) // PHP命令
 			},
 			expectedSP: 0xFE, // スタックポインタが1つ減少
 		},
@@ -3262,7 +3262,7 @@ func TestPHP(t *testing.T) {
 
 			// スタックの内容を検証（最後にプッシュしたステータス）
 			stackAddr := 0x0100 | uint16(c.registers.SP+1)
-			stackValue := c.ReadByteFrom(stackAddr)
+			stackValue := c.bus.ReadByteFrom(stackAddr)
 			if stackValue != expectedStatus {
 				t.Errorf("Stack status at $%04X = %#02x, want %#02x", stackAddr, stackValue, expectedStatus)
 			}
@@ -3287,9 +3287,9 @@ func TestPLA(t *testing.T) {
 			opcode:   0x68,
 			addrMode: Implied,
 			setupCPU: func(c *CPU) {
-				c.registers.SP = 0xFE               // スタックポインタを設定
-				c.WriteByteAt(0x01FF, 0x42)         // スタックの次の位置に値を配置
-				c.WriteByteAt(c.registers.PC, 0x68) // PLA命令
+				c.registers.SP = 0xFE                   // スタックポインタを設定
+				c.bus.WriteByteAt(0x01FF, 0x42)         // スタックの次の位置に値を配置
+				c.bus.WriteByteAt(c.registers.PC, 0x68) // PLA命令
 			},
 			expectedA:    0x42, // 取得した値
 			expectedSP:   0xFF, // スタックポインタが1つ増加
@@ -3301,9 +3301,9 @@ func TestPLA(t *testing.T) {
 			opcode:   0x68,
 			addrMode: Implied,
 			setupCPU: func(c *CPU) {
-				c.registers.SP = 0xFE               // スタックポインタを設定
-				c.WriteByteAt(0x01FF, 0x00)         // スタックの次の位置にゼロを配置
-				c.WriteByteAt(c.registers.PC, 0x68) // PLA命令
+				c.registers.SP = 0xFE                   // スタックポインタを設定
+				c.bus.WriteByteAt(0x01FF, 0x00)         // スタックの次の位置にゼロを配置
+				c.bus.WriteByteAt(c.registers.PC, 0x68) // PLA命令
 			},
 			expectedA:    0x00, // 取得した値
 			expectedSP:   0xFF, // スタックポインタが1つ増加
@@ -3315,9 +3315,9 @@ func TestPLA(t *testing.T) {
 			opcode:   0x68,
 			addrMode: Implied,
 			setupCPU: func(c *CPU) {
-				c.registers.SP = 0xFE               // スタックポインタを設定
-				c.WriteByteAt(0x01FF, 0x80)         // スタックの次の位置に負の値を配置
-				c.WriteByteAt(c.registers.PC, 0x68) // PLA命令
+				c.registers.SP = 0xFE                   // スタックポインタを設定
+				c.bus.WriteByteAt(0x01FF, 0x80)         // スタックの次の位置に負の値を配置
+				c.bus.WriteByteAt(c.registers.PC, 0x68) // PLA命令
 			},
 			expectedA:    0x80, // 取得した値
 			expectedSP:   0xFF, // スタックポインタが1つ増加
@@ -3366,8 +3366,8 @@ func TestPLP(t *testing.T) {
 			setupCPU: func(c *CPU) {
 				c.registers.SP = 0xFE // スタックポインタを設定
 				// ステータスレジスタのバイト表現: Carry=1, Zero=1, 他=0 (0x03)
-				c.WriteByteAt(0x01FF, 0x03)
-				c.WriteByteAt(c.registers.PC, 0x28) // PLP命令
+				c.bus.WriteByteAt(0x01FF, 0x03)
+				c.bus.WriteByteAt(c.registers.PC, 0x28) // PLP命令
 			},
 			expectedSP:       0xFF, // スタックポインタが1つ増加
 			expectedCarry:    true,
@@ -3385,8 +3385,8 @@ func TestPLP(t *testing.T) {
 			setupCPU: func(c *CPU) {
 				c.registers.SP = 0xFE // スタックポインタを設定
 				// すべてのフラグがセット (0xFF)
-				c.WriteByteAt(0x01FF, 0xFF)
-				c.WriteByteAt(c.registers.PC, 0x28) // PLP命令
+				c.bus.WriteByteAt(0x01FF, 0xFF)
+				c.bus.WriteByteAt(c.registers.PC, 0x28) // PLP命令
 			},
 			expectedSP:       0xFF, // スタックポインタが1つ増加
 			expectedCarry:    true,
@@ -3411,7 +3411,7 @@ func TestPLP(t *testing.T) {
 			checkRegister(t, "SP", c.registers.SP, tt.expectedSP)
 			checkFlag(t, "Carry", c.registers.P.Carry, tt.expectedCarry)
 			checkFlag(t, "Zero", c.registers.P.Zero, tt.expectedZero)
-			checkFlag(t, "Interrupt", c.registers.P.Interrupt, tt.expectedInt)
+			checkFlag(t, "Interrupt", c.registers.P.IrqDisabled, tt.expectedInt)
 			checkFlag(t, "Decimal", c.registers.P.Decimal, tt.expectedDecimal)
 			checkFlag(t, "Break", c.registers.P.Break, tt.expectedBreak)
 			checkFlag(t, "Overflow", c.registers.P.Overflow, tt.expectedOverflow)
@@ -3438,7 +3438,7 @@ func TestINX(t *testing.T) {
 			addrMode: Implied,
 			setupCPU: func(c *CPU) {
 				c.registers.X = 0x42
-				c.WriteByteAt(c.registers.PC, 0xE8) // INX命令
+				c.bus.WriteByteAt(c.registers.PC, 0xE8) // INX命令
 			},
 			expectedX:    0x43,
 			expectedZero: false,
@@ -3450,7 +3450,7 @@ func TestINX(t *testing.T) {
 			addrMode: Implied,
 			setupCPU: func(c *CPU) {
 				c.registers.X = 0xFF
-				c.WriteByteAt(c.registers.PC, 0xE8) // INX命令
+				c.bus.WriteByteAt(c.registers.PC, 0xE8) // INX命令
 			},
 			expectedX:    0x00,
 			expectedZero: true,
@@ -3462,7 +3462,7 @@ func TestINX(t *testing.T) {
 			addrMode: Implied,
 			setupCPU: func(c *CPU) {
 				c.registers.X = 0x7F
-				c.WriteByteAt(c.registers.PC, 0xE8) // INX命令
+				c.bus.WriteByteAt(c.registers.PC, 0xE8) // INX命令
 			},
 			expectedX:    0x80,
 			expectedZero: false,
@@ -3503,7 +3503,7 @@ func TestINY(t *testing.T) {
 			addrMode: Implied,
 			setupCPU: func(c *CPU) {
 				c.registers.Y = 0x42
-				c.WriteByteAt(c.registers.PC, 0xC8) // INY命令
+				c.bus.WriteByteAt(c.registers.PC, 0xC8) // INY命令
 			},
 			expectedY:    0x43,
 			expectedZero: false,
@@ -3515,7 +3515,7 @@ func TestINY(t *testing.T) {
 			addrMode: Implied,
 			setupCPU: func(c *CPU) {
 				c.registers.Y = 0xFF
-				c.WriteByteAt(c.registers.PC, 0xC8) // INY命令
+				c.bus.WriteByteAt(c.registers.PC, 0xC8) // INY命令
 			},
 			expectedY:    0x00,
 			expectedZero: true,
@@ -3527,7 +3527,7 @@ func TestINY(t *testing.T) {
 			addrMode: Implied,
 			setupCPU: func(c *CPU) {
 				c.registers.Y = 0x7F
-				c.WriteByteAt(c.registers.PC, 0xC8) // INY命令
+				c.bus.WriteByteAt(c.registers.PC, 0xC8) // INY命令
 			},
 			expectedY:    0x80,
 			expectedZero: false,
@@ -3568,7 +3568,7 @@ func TestDEX(t *testing.T) {
 			addrMode: Implied,
 			setupCPU: func(c *CPU) {
 				c.registers.X = 0x42
-				c.WriteByteAt(c.registers.PC, 0xCA) // DEX命令
+				c.bus.WriteByteAt(c.registers.PC, 0xCA) // DEX命令
 			},
 			expectedX:    0x41,
 			expectedZero: false,
@@ -3580,7 +3580,7 @@ func TestDEX(t *testing.T) {
 			addrMode: Implied,
 			setupCPU: func(c *CPU) {
 				c.registers.X = 0x00
-				c.WriteByteAt(c.registers.PC, 0xCA) // DEX命令
+				c.bus.WriteByteAt(c.registers.PC, 0xCA) // DEX命令
 			},
 			expectedX:    0xFF,
 			expectedZero: false,
@@ -3592,7 +3592,7 @@ func TestDEX(t *testing.T) {
 			addrMode: Implied,
 			setupCPU: func(c *CPU) {
 				c.registers.X = 0x01
-				c.WriteByteAt(c.registers.PC, 0xCA) // DEX命令
+				c.bus.WriteByteAt(c.registers.PC, 0xCA) // DEX命令
 			},
 			expectedX:    0x00,
 			expectedZero: true,
@@ -3633,7 +3633,7 @@ func TestDEY(t *testing.T) {
 			addrMode: Implied,
 			setupCPU: func(c *CPU) {
 				c.registers.Y = 0x42
-				c.WriteByteAt(c.registers.PC, 0x88) // DEY命令
+				c.bus.WriteByteAt(c.registers.PC, 0x88) // DEY命令
 			},
 			expectedY:    0x41,
 			expectedZero: false,
@@ -3645,7 +3645,7 @@ func TestDEY(t *testing.T) {
 			addrMode: Implied,
 			setupCPU: func(c *CPU) {
 				c.registers.Y = 0x00
-				c.WriteByteAt(c.registers.PC, 0x88) // DEY命令
+				c.bus.WriteByteAt(c.registers.PC, 0x88) // DEY命令
 			},
 			expectedY:    0xFF,
 			expectedZero: false,
@@ -3657,7 +3657,7 @@ func TestDEY(t *testing.T) {
 			addrMode: Implied,
 			setupCPU: func(c *CPU) {
 				c.registers.Y = 0x01
-				c.WriteByteAt(c.registers.PC, 0x88) // DEY命令
+				c.bus.WriteByteAt(c.registers.PC, 0x88) // DEY命令
 			},
 			expectedY:    0x00,
 			expectedZero: true,
@@ -3697,12 +3697,12 @@ func TestINC(t *testing.T) {
 			opcode:   0xE6,
 			addrMode: ZeroPage,
 			setupCPU: func(c *CPU) {
-				c.WriteByteAt(c.registers.PC, 0xE6)   // INC命令
-				c.WriteByteAt(c.registers.PC+1, 0x20) // ZPアドレス0x20
-				c.WriteByteAt(0x20, 0x42)             // 0x20に初期値設定
+				c.bus.WriteByteAt(c.registers.PC, 0xE6)   // INC命令
+				c.bus.WriteByteAt(c.registers.PC+1, 0x20) // ZPアドレス0x20
+				c.bus.WriteByteAt(0x20, 0x42)             // 0x20に初期値設定
 			},
 			checkResult: func(t *testing.T, c *CPU) {
-				value := c.ReadByteFrom(0x20)
+				value := c.bus.ReadByteFrom(0x20)
 				if value != 0x43 {
 					t.Errorf("Memory at $20 = %#02x, want %#02x", value, 0x43)
 				}
@@ -3715,12 +3715,12 @@ func TestINC(t *testing.T) {
 			opcode:   0xE6,
 			addrMode: ZeroPage,
 			setupCPU: func(c *CPU) {
-				c.WriteByteAt(c.registers.PC, 0xE6)   // INC命令
-				c.WriteByteAt(c.registers.PC+1, 0x20) // ZPアドレス0x20
-				c.WriteByteAt(0x20, 0xFF)             // 0x20に初期値設定
+				c.bus.WriteByteAt(c.registers.PC, 0xE6)   // INC命令
+				c.bus.WriteByteAt(c.registers.PC+1, 0x20) // ZPアドレス0x20
+				c.bus.WriteByteAt(0x20, 0xFF)             // 0x20に初期値設定
 			},
 			checkResult: func(t *testing.T, c *CPU) {
-				value := c.ReadByteFrom(0x20)
+				value := c.bus.ReadByteFrom(0x20)
 				if value != 0x00 {
 					t.Errorf("Memory at $20 = %#02x, want %#02x", value, 0x00)
 				}
@@ -3734,12 +3734,12 @@ func TestINC(t *testing.T) {
 			addrMode: ZeroPageXIndexed,
 			setupCPU: func(c *CPU) {
 				c.registers.X = 0x10
-				c.WriteByteAt(c.registers.PC, 0xF6)   // INC命令
-				c.WriteByteAt(c.registers.PC+1, 0x20) // ZPアドレス0x20
-				c.WriteByteAt(0x30, 0x7F)             // 0x30 (0x20+0x10) に初期値設定
+				c.bus.WriteByteAt(c.registers.PC, 0xF6)   // INC命令
+				c.bus.WriteByteAt(c.registers.PC+1, 0x20) // ZPアドレス0x20
+				c.bus.WriteByteAt(0x30, 0x7F)             // 0x30 (0x20+0x10) に初期値設定
 			},
 			checkResult: func(t *testing.T, c *CPU) {
-				value := c.ReadByteFrom(0x30)
+				value := c.bus.ReadByteFrom(0x30)
 				if value != 0x80 {
 					t.Errorf("Memory at $30 = %#02x, want %#02x", value, 0x80)
 				}
@@ -3752,13 +3752,13 @@ func TestINC(t *testing.T) {
 			opcode:   0xEE,
 			addrMode: Absolute,
 			setupCPU: func(c *CPU) {
-				c.WriteByteAt(c.registers.PC, 0xEE)   // INC命令
-				c.WriteByteAt(c.registers.PC+1, 0x80) // 低バイト
-				c.WriteByteAt(c.registers.PC+2, 0x01) // 高バイト → 0x0180
-				c.WriteByteAt(0x0180, 0x42)           // 0x0180に初期値設定
+				c.bus.WriteByteAt(c.registers.PC, 0xEE)   // INC命令
+				c.bus.WriteByteAt(c.registers.PC+1, 0x80) // 低バイト
+				c.bus.WriteByteAt(c.registers.PC+2, 0x01) // 高バイト → 0x0180
+				c.bus.WriteByteAt(0x0180, 0x42)           // 0x0180に初期値設定
 			},
 			checkResult: func(t *testing.T, c *CPU) {
-				value := c.ReadByteFrom(0x0180)
+				value := c.bus.ReadByteFrom(0x0180)
 				if value != 0x43 {
 					t.Errorf("Memory at $0180 = %#02x, want %#02x", value, 0x43)
 				}
@@ -3772,13 +3772,13 @@ func TestINC(t *testing.T) {
 			addrMode: AbsoluteXIndexed,
 			setupCPU: func(c *CPU) {
 				c.registers.X = 0x10
-				c.WriteByteAt(c.registers.PC, 0xFE)   // INC命令
-				c.WriteByteAt(c.registers.PC+1, 0x80) // 低バイト
-				c.WriteByteAt(c.registers.PC+2, 0x01) // 高バイト → 0x0180
-				c.WriteByteAt(0x0190, 0x42)           // 0x0190 (0x0180+0x10) に初期値設定
+				c.bus.WriteByteAt(c.registers.PC, 0xFE)   // INC命令
+				c.bus.WriteByteAt(c.registers.PC+1, 0x80) // 低バイト
+				c.bus.WriteByteAt(c.registers.PC+2, 0x01) // 高バイト → 0x0180
+				c.bus.WriteByteAt(0x0190, 0x42)           // 0x0190 (0x0180+0x10) に初期値設定
 			},
 			checkResult: func(t *testing.T, c *CPU) {
-				value := c.ReadByteFrom(0x0190)
+				value := c.bus.ReadByteFrom(0x0190)
 				if value != 0x43 {
 					t.Errorf("Memory at $0190 = %#02x, want %#02x", value, 0x43)
 				}
@@ -3820,12 +3820,12 @@ func TestDEC(t *testing.T) {
 			opcode:   0xC6,
 			addrMode: ZeroPage,
 			setupCPU: func(c *CPU) {
-				c.WriteByteAt(c.registers.PC, 0xC6)   // DEC命令
-				c.WriteByteAt(c.registers.PC+1, 0x20) // ZPアドレス0x20
-				c.WriteByteAt(0x20, 0x42)             // 0x20に初期値設定
+				c.bus.WriteByteAt(c.registers.PC, 0xC6)   // DEC命令
+				c.bus.WriteByteAt(c.registers.PC+1, 0x20) // ZPアドレス0x20
+				c.bus.WriteByteAt(0x20, 0x42)             // 0x20に初期値設定
 			},
 			checkResult: func(t *testing.T, c *CPU) {
-				value := c.ReadByteFrom(0x20)
+				value := c.bus.ReadByteFrom(0x20)
 				if value != 0x41 {
 					t.Errorf("Memory at $20 = %#02x, want %#02x", value, 0x41)
 				}
@@ -3838,12 +3838,12 @@ func TestDEC(t *testing.T) {
 			opcode:   0xC6,
 			addrMode: ZeroPage,
 			setupCPU: func(c *CPU) {
-				c.WriteByteAt(c.registers.PC, 0xC6)   // DEC命令
-				c.WriteByteAt(c.registers.PC+1, 0x20) // ZPアドレス0x20
-				c.WriteByteAt(0x20, 0x00)             // 0x20に初期値設定
+				c.bus.WriteByteAt(c.registers.PC, 0xC6)   // DEC命令
+				c.bus.WriteByteAt(c.registers.PC+1, 0x20) // ZPアドレス0x20
+				c.bus.WriteByteAt(0x20, 0x00)             // 0x20に初期値設定
 			},
 			checkResult: func(t *testing.T, c *CPU) {
-				value := c.ReadByteFrom(0x20)
+				value := c.bus.ReadByteFrom(0x20)
 				if value != 0xFF {
 					t.Errorf("Memory at $20 = %#02x, want %#02x", value, 0xFF)
 				}
@@ -3857,12 +3857,12 @@ func TestDEC(t *testing.T) {
 			addrMode: ZeroPageXIndexed,
 			setupCPU: func(c *CPU) {
 				c.registers.X = 0x10
-				c.WriteByteAt(c.registers.PC, 0xD6)   // DEC命令
-				c.WriteByteAt(c.registers.PC+1, 0x20) // ZPアドレス0x20
-				c.WriteByteAt(0x30, 0x01)             // 0x30 (0x20+0x10) に初期値設定
+				c.bus.WriteByteAt(c.registers.PC, 0xD6)   // DEC命令
+				c.bus.WriteByteAt(c.registers.PC+1, 0x20) // ZPアドレス0x20
+				c.bus.WriteByteAt(0x30, 0x01)             // 0x30 (0x20+0x10) に初期値設定
 			},
 			checkResult: func(t *testing.T, c *CPU) {
-				value := c.ReadByteFrom(0x30)
+				value := c.bus.ReadByteFrom(0x30)
 				if value != 0x00 {
 					t.Errorf("Memory at $30 = %#02x, want %#02x", value, 0x00)
 				}
@@ -3875,13 +3875,13 @@ func TestDEC(t *testing.T) {
 			opcode:   0xCE,
 			addrMode: Absolute,
 			setupCPU: func(c *CPU) {
-				c.WriteByteAt(c.registers.PC, 0xCE)   // DEC命令
-				c.WriteByteAt(c.registers.PC+1, 0x80) // 低バイト
-				c.WriteByteAt(c.registers.PC+2, 0x01) // 高バイト → 0x0180
-				c.WriteByteAt(0x0180, 0x42)           // 0x0180に初期値設定
+				c.bus.WriteByteAt(c.registers.PC, 0xCE)   // DEC命令
+				c.bus.WriteByteAt(c.registers.PC+1, 0x80) // 低バイト
+				c.bus.WriteByteAt(c.registers.PC+2, 0x01) // 高バイト → 0x0180
+				c.bus.WriteByteAt(0x0180, 0x42)           // 0x0180に初期値設定
 			},
 			checkResult: func(t *testing.T, c *CPU) {
-				value := c.ReadByteFrom(0x0180)
+				value := c.bus.ReadByteFrom(0x0180)
 				if value != 0x41 {
 					t.Errorf("Memory at $0180 = %#02x, want %#02x", value, 0x41)
 				}
@@ -3895,13 +3895,13 @@ func TestDEC(t *testing.T) {
 			addrMode: AbsoluteXIndexed,
 			setupCPU: func(c *CPU) {
 				c.registers.X = 0x10
-				c.WriteByteAt(c.registers.PC, 0xDE)   // DEC命令
-				c.WriteByteAt(c.registers.PC+1, 0x80) // 低バイト
-				c.WriteByteAt(c.registers.PC+2, 0x01) // 高バイト → 0x0180
-				c.WriteByteAt(0x0190, 0x42)           // 0x0190 (0x0180+0x10) に初期値設定
+				c.bus.WriteByteAt(c.registers.PC, 0xDE)   // DEC命令
+				c.bus.WriteByteAt(c.registers.PC+1, 0x80) // 低バイト
+				c.bus.WriteByteAt(c.registers.PC+2, 0x01) // 高バイト → 0x0180
+				c.bus.WriteByteAt(0x0190, 0x42)           // 0x0190 (0x0180+0x10) に初期値設定
 			},
 			checkResult: func(t *testing.T, c *CPU) {
-				value := c.ReadByteFrom(0x0190)
+				value := c.bus.ReadByteFrom(0x0190)
 				if value != 0x41 {
 					t.Errorf("Memory at $0190 = %#02x, want %#02x", value, 0x41)
 				}
@@ -3942,9 +3942,9 @@ func TestJMP(t *testing.T) {
 			opcode:   0x4C,
 			addrMode: Absolute,
 			setupCPU: func(c *CPU) {
-				c.WriteByteAt(c.registers.PC, 0x4C)   // JMP命令
-				c.WriteByteAt(c.registers.PC+1, 0x34) // 低バイト
-				c.WriteByteAt(c.registers.PC+2, 0x12) // 高バイト (0x1234)
+				c.bus.WriteByteAt(c.registers.PC, 0x4C)   // JMP命令
+				c.bus.WriteByteAt(c.registers.PC+1, 0x34) // 低バイト
+				c.bus.WriteByteAt(c.registers.PC+2, 0x12) // 高バイト (0x1234)
 			},
 			expectedPC: 0x1234, // 指定されたアドレスに変更
 		},
@@ -3953,13 +3953,13 @@ func TestJMP(t *testing.T) {
 			opcode:   0x6C,
 			addrMode: Indirect,
 			setupCPU: func(c *CPU) {
-				c.WriteByteAt(c.registers.PC, 0x6C)   // JMP命令
-				c.WriteByteAt(c.registers.PC+1, 0x80) // 低バイト
-				c.WriteByteAt(c.registers.PC+2, 0x01) // 高バイト → 0x0180
+				c.bus.WriteByteAt(c.registers.PC, 0x6C)   // JMP命令
+				c.bus.WriteByteAt(c.registers.PC+1, 0x80) // 低バイト
+				c.bus.WriteByteAt(c.registers.PC+2, 0x01) // 高バイト → 0x0180
 
 				// 間接アドレス先のジャンプ先
-				c.WriteByteAt(0x0180, 0x34) // 低バイト
-				c.WriteByteAt(0x0181, 0x12) // 高バイト (0x1234)
+				c.bus.WriteByteAt(0x0180, 0x34) // 低バイト
+				c.bus.WriteByteAt(0x0181, 0x12) // 高バイト (0x1234)
 			},
 			expectedPC: 0x1234,
 		},
@@ -3968,13 +3968,13 @@ func TestJMP(t *testing.T) {
 			opcode:   0x6C,
 			addrMode: Indirect,
 			setupCPU: func(c *CPU) {
-				c.WriteByteAt(c.registers.PC, 0x6C)   // JMP命令
-				c.WriteByteAt(c.registers.PC+1, 0xFF) // 低バイト
-				c.WriteByteAt(c.registers.PC+2, 0x01) // 高バイト → 0x01FF
+				c.bus.WriteByteAt(c.registers.PC, 0x6C)   // JMP命令
+				c.bus.WriteByteAt(c.registers.PC+1, 0xFF) // 低バイト
+				c.bus.WriteByteAt(c.registers.PC+2, 0x01) // 高バイト → 0x01FF
 
 				// 間接アドレス先（ページ境界）
-				c.WriteByteAt(0x01FF, 0x34) // low
-				c.WriteByteAt(0x0100, 0x12) // high (ページ内ワープバグ)
+				c.bus.WriteByteAt(0x01FF, 0x34) // low
+				c.bus.WriteByteAt(0x0100, 0x12) // high (ページ内ワープバグ)
 			},
 			expectedPC: 0x1234,
 		},
@@ -4013,17 +4013,17 @@ func TestJSR(t *testing.T) {
 			addrMode: Absolute,
 			setupCPU: func(c *CPU) {
 				c.registers.PC = 0x0200
-				c.registers.SP = 0xFF       // スタックポインタ初期化
-				c.WriteByteAt(0x0200, 0x20) // JSR命令
-				c.WriteByteAt(0x0201, 0x34) // 低バイト
-				c.WriteByteAt(0x0202, 0x12) // 高バイト (0x1234)
+				c.registers.SP = 0xFF           // スタックポインタ初期化
+				c.bus.WriteByteAt(0x0200, 0x20) // JSR命令
+				c.bus.WriteByteAt(0x0201, 0x34) // 低バイト
+				c.bus.WriteByteAt(0x0202, 0x12) // 高バイト (0x1234)
 			},
 			expectedPC: 0x1234, // ジャンプ先アドレス
 			expectedSP: 0xFD,   // スタックポインタが2バイト分減少
 			checkStack: func(t *testing.T, c *CPU) {
 				// スタックにはPC-1の値（0x0202-1 = 0x0201）が格納されている
-				highByte := c.ReadByteFrom(0x01FF) // SP+2の位置
-				lowByte := c.ReadByteFrom(0x01FE)  // SP+1の位置
+				highByte := c.bus.ReadByteFrom(0x01FF) // SP+2の位置
+				lowByte := c.bus.ReadByteFrom(0x01FE)  // SP+1の位置
 				returnAddr := uint16(highByte)<<8 | uint16(lowByte)
 				if returnAddr != 0x0202 {
 					t.Errorf("Return address on stack = %#04x, want %#04x", returnAddr, 0x0202)
@@ -4070,10 +4070,10 @@ func TestRTS(t *testing.T) {
 				c.registers.SP = 0xFD // スタックポインタ設定
 
 				// スタックに復帰先アドレス-1 (0x1234-1 = 0x1233) を設定
-				c.WriteByteAt(0x01FE, 0x33) // 低バイト
-				c.WriteByteAt(0x01FF, 0x12) // 高バイト
+				c.bus.WriteByteAt(0x01FE, 0x33) // 低バイト
+				c.bus.WriteByteAt(0x01FF, 0x12) // 高バイト
 
-				c.WriteByteAt(c.registers.PC, 0x60) // RTS命令
+				c.bus.WriteByteAt(c.registers.PC, 0x60) // RTS命令
 			},
 			expectedPC: 0x1234, // 復帰先アドレス（スタック値+1）
 			expectedSP: 0xFF,   // スタックポインタが2バイト分復元
@@ -4123,12 +4123,12 @@ func TestRTI(t *testing.T) {
 
 				// スタックに処理状態とアドレスを設定
 				// ステータスレジスタ（Carry=1, Zero=1, 他=0）
-				c.WriteByteAt(0x01FD, 0x03)
+				c.bus.WriteByteAt(0x01FD, 0x03)
 				// 復帰先アドレス (0x1234)
-				c.WriteByteAt(0x01FE, 0x34) // 低バイト
-				c.WriteByteAt(0x01FF, 0x12) // 高バイト
+				c.bus.WriteByteAt(0x01FE, 0x34) // 低バイト
+				c.bus.WriteByteAt(0x01FF, 0x12) // 高バイト
 
-				c.WriteByteAt(c.registers.PC, 0x40) // RTI命令
+				c.bus.WriteByteAt(c.registers.PC, 0x40) // RTI命令
 			},
 			expectedPC:       0x1234, // 復帰先アドレス
 			expectedSP:       0xFF,   // スタックポインタが3バイト分復元
@@ -4149,12 +4149,12 @@ func TestRTI(t *testing.T) {
 
 				// スタックに処理状態とアドレスを設定
 				// すべてのフラグセット（但しBreakとReservedは無視される）
-				c.WriteByteAt(0x01FD, 0xFF)
+				c.bus.WriteByteAt(0x01FD, 0xFF)
 				// 復帰先アドレス (0x4321)
-				c.WriteByteAt(0x01FE, 0x21) // 低バイト
-				c.WriteByteAt(0x01FF, 0x43) // 高バイト
+				c.bus.WriteByteAt(0x01FE, 0x21) // 低バイト
+				c.bus.WriteByteAt(0x01FF, 0x43) // 高バイト
 
-				c.WriteByteAt(c.registers.PC, 0x40) // RTI命令
+				c.bus.WriteByteAt(c.registers.PC, 0x40) // RTI命令
 			},
 			expectedPC:       0x4321, // 復帰先アドレス
 			expectedSP:       0xFF,   // スタックポインタが3バイト分復元
@@ -4183,7 +4183,7 @@ func TestRTI(t *testing.T) {
 			checkRegister(t, "SP", c.registers.SP, tt.expectedSP)
 			checkFlag(t, "Carry", c.registers.P.Carry, tt.expectedCarry)
 			checkFlag(t, "Zero", c.registers.P.Zero, tt.expectedZero)
-			checkFlag(t, "Interrupt", c.registers.P.Interrupt, tt.expectedInt)
+			checkFlag(t, "Interrupt", c.registers.P.IrqDisabled, tt.expectedInt)
 			checkFlag(t, "Decimal", c.registers.P.Decimal, tt.expectedDec)
 			checkFlag(t, "Break", c.registers.P.Break, tt.expectedBreak)
 			checkFlag(t, "Overflow", c.registers.P.Overflow, tt.expectedOverflow)
@@ -4212,18 +4212,18 @@ func TestBRK(t *testing.T) {
 				c.registers.SP = 0xFF // スタックポインタ初期化
 
 				// 割り込みベクタを WRAM 内に設定
-				c.WriteByteAt(0xFFFE, 0x34) // low (IRQ/BRK vector)
-				c.WriteByteAt(0xFFF, 0x12)  // high (→ 0x1234)
+				c.bus.WriteByteAt(0xFFFE, 0x34) // low (IRQ/BRK vector)
+				c.bus.WriteByteAt(0xFFF, 0x12)  // high (→ 0x1234)
 
-				c.WriteByteAt(0x0200, 0x00) // BRK命令
+				c.bus.WriteByteAt(0x0200, 0x00) // BRK命令
 			},
 			expectedPC: 0x1234,
 			expectedSP: 0xFC,
 			checkStack: func(t *testing.T, c *CPU) {
 				// スタックには PC+2 とステータスがプッシュされている
-				status := c.ReadByteFrom(0x01FD)
-				lo := c.ReadByteFrom(0x01FE)
-				hi := c.ReadByteFrom(0x01FF)
+				status := c.bus.ReadByteFrom(0x01FD)
+				lo := c.bus.ReadByteFrom(0x01FE)
+				hi := c.bus.ReadByteFrom(0x01FF)
 				ret := uint16(hi)<<8 | uint16(lo)
 				if ret != 0x0202 {
 					t.Errorf("Return address on stack = %#04x, want %#04x", ret, 0x0202)
@@ -4248,7 +4248,7 @@ func TestBRK(t *testing.T) {
 				t.Errorf("PC = %#04x, want %#04x", c.registers.PC, tt.expectedPC)
 			}
 			checkRegister(t, "SP", c.registers.SP, tt.expectedSP)
-			checkFlag(t, "Interrupt", c.registers.P.Interrupt, true) // BRK後は割り込み禁止になる
+			checkFlag(t, "Interrupt", c.registers.P.IrqDisabled, true) // BRK後は割り込み禁止になる
 
 			if tt.checkStack != nil {
 				tt.checkStack(t, c)
@@ -4272,7 +4272,7 @@ func TestNOP(t *testing.T) {
 			addrMode: Implied,
 			setupCPU: func(c *CPU) {
 				c.registers.PC = 0x0200
-				c.WriteByteAt(0x0200, 0xEA) // NOP命令
+				c.bus.WriteByteAt(0x0200, 0xEA) // NOP命令
 			},
 			expectedPC: 0x0201, // PCが1バイト進むだけ
 		},
@@ -4290,7 +4290,7 @@ func TestNOP(t *testing.T) {
 			oldSP := c.registers.SP
 			oldCarry := c.registers.P.Carry
 			oldZero := c.registers.P.Zero
-			oldInterrupt := c.registers.P.Interrupt
+			oldInterrupt := c.registers.P.IrqDisabled
 			oldDecimal := c.registers.P.Decimal
 			oldBreak := c.registers.P.Break
 			oldOverflow := c.registers.P.Overflow
@@ -4306,7 +4306,7 @@ func TestNOP(t *testing.T) {
 			checkRegister(t, "SP", c.registers.SP, oldSP)
 			checkFlag(t, "Carry", c.registers.P.Carry, oldCarry)
 			checkFlag(t, "Zero", c.registers.P.Zero, oldZero)
-			checkFlag(t, "Interrupt", c.registers.P.Interrupt, oldInterrupt)
+			checkFlag(t, "Interrupt", c.registers.P.IrqDisabled, oldInterrupt)
 			checkFlag(t, "Decimal", c.registers.P.Decimal, oldDecimal)
 			checkFlag(t, "Break", c.registers.P.Break, oldBreak)
 			checkFlag(t, "Overflow", c.registers.P.Overflow, oldOverflow)
@@ -4336,9 +4336,9 @@ func TestBMI(t *testing.T) {
 			addrMode: Relative,
 			setupCPU: func(c *CPU) {
 				c.registers.PC = 0x0200
-				c.registers.P.Negative = true // 負数フラグをセット
-				c.WriteByteAt(0x0200, 0x30)   // BMI命令
-				c.WriteByteAt(0x0201, 0x10)   // オフセット: +16
+				c.registers.P.Negative = true   // 負数フラグをセット
+				c.bus.WriteByteAt(0x0200, 0x30) // BMI命令
+				c.bus.WriteByteAt(0x0201, 0x10) // オフセット: +16
 			},
 			expectedPC: 0x0212, // 0x0202 + 0x10 = 0x0212
 		},
@@ -4348,9 +4348,9 @@ func TestBMI(t *testing.T) {
 			addrMode: Relative,
 			setupCPU: func(c *CPU) {
 				c.registers.PC = 0x0200
-				c.registers.P.Negative = true // 負数フラグをセット
-				c.WriteByteAt(0x0200, 0x30)   // BMI命令
-				c.WriteByteAt(0x0201, 0xF0)   // オフセット: -16 (2の補数表現)
+				c.registers.P.Negative = true   // 負数フラグをセット
+				c.bus.WriteByteAt(0x0200, 0x30) // BMI命令
+				c.bus.WriteByteAt(0x0201, 0xF0) // オフセット: -16 (2の補数表現)
 			},
 			expectedPC: 0x01F2, // 0x0202 + 0xF0 (符号拡張で-16) = 0x01F2
 		},
@@ -4360,9 +4360,9 @@ func TestBMI(t *testing.T) {
 			addrMode: Relative,
 			setupCPU: func(c *CPU) {
 				c.registers.PC = 0x0200
-				c.registers.P.Negative = false // 負数フラグをクリア
-				c.WriteByteAt(0x0200, 0x30)    // BMI命令
-				c.WriteByteAt(0x0201, 0x10)    // オフセット: +16
+				c.registers.P.Negative = false  // 負数フラグをクリア
+				c.bus.WriteByteAt(0x0200, 0x30) // BMI命令
+				c.bus.WriteByteAt(0x0201, 0x10) // オフセット: +16
 			},
 			expectedPC: 0x0202, // 分岐が行われないので、PC+2のみ
 		},
@@ -4399,9 +4399,9 @@ func TestBPL(t *testing.T) {
 			addrMode: Relative,
 			setupCPU: func(c *CPU) {
 				c.registers.PC = 0x0200
-				c.registers.P.Negative = false // 負数フラグをクリア
-				c.WriteByteAt(0x0200, 0x10)    // BPL命令
-				c.WriteByteAt(0x0201, 0x10)    // オフセット: +16
+				c.registers.P.Negative = false  // 負数フラグをクリア
+				c.bus.WriteByteAt(0x0200, 0x10) // BPL命令
+				c.bus.WriteByteAt(0x0201, 0x10) // オフセット: +16
 			},
 			expectedPC: 0x0212, // 0x0202 + 0x10 = 0x0212
 		},
@@ -4411,9 +4411,9 @@ func TestBPL(t *testing.T) {
 			addrMode: Relative,
 			setupCPU: func(c *CPU) {
 				c.registers.PC = 0x0200
-				c.registers.P.Negative = false // 負数フラグをクリア
-				c.WriteByteAt(0x0200, 0x10)    // BPL命令
-				c.WriteByteAt(0x0201, 0xF0)    // オフセット: -16 (2の補数表現)
+				c.registers.P.Negative = false  // 負数フラグをクリア
+				c.bus.WriteByteAt(0x0200, 0x10) // BPL命令
+				c.bus.WriteByteAt(0x0201, 0xF0) // オフセット: -16 (2の補数表現)
 			},
 			expectedPC: 0x01F2, // 0x0202 + 0xF0 (符号拡張で-16) = 0x01F2
 		},
@@ -4423,9 +4423,9 @@ func TestBPL(t *testing.T) {
 			addrMode: Relative,
 			setupCPU: func(c *CPU) {
 				c.registers.PC = 0x0200
-				c.registers.P.Negative = true // 負数フラグをセット
-				c.WriteByteAt(0x0200, 0x10)   // BPL命令
-				c.WriteByteAt(0x0201, 0x10)   // オフセット: +16
+				c.registers.P.Negative = true   // 負数フラグをセット
+				c.bus.WriteByteAt(0x0200, 0x10) // BPL命令
+				c.bus.WriteByteAt(0x0201, 0x10) // オフセット: +16
 			},
 			expectedPC: 0x0202, // 分岐が行われないので、PC+2のみ
 		},
@@ -4462,9 +4462,9 @@ func TestBVS(t *testing.T) {
 			addrMode: Relative,
 			setupCPU: func(c *CPU) {
 				c.registers.PC = 0x0200
-				c.registers.P.Overflow = true // オーバーフローフラグをセット
-				c.WriteByteAt(0x0200, 0x70)   // BVS命令
-				c.WriteByteAt(0x0201, 0x10)   // オフセット: +16
+				c.registers.P.Overflow = true   // オーバーフローフラグをセット
+				c.bus.WriteByteAt(0x0200, 0x70) // BVS命令
+				c.bus.WriteByteAt(0x0201, 0x10) // オフセット: +16
 			},
 			expectedPC: 0x0212, // 0x0202 + 0x10 = 0x0212
 		},
@@ -4474,9 +4474,9 @@ func TestBVS(t *testing.T) {
 			addrMode: Relative,
 			setupCPU: func(c *CPU) {
 				c.registers.PC = 0x0200
-				c.registers.P.Overflow = true // オーバーフローフラグをセット
-				c.WriteByteAt(0x0200, 0x70)   // BVS命令
-				c.WriteByteAt(0x0201, 0xF0)   // オフセット: -16 (2の補数表現)
+				c.registers.P.Overflow = true   // オーバーフローフラグをセット
+				c.bus.WriteByteAt(0x0200, 0x70) // BVS命令
+				c.bus.WriteByteAt(0x0201, 0xF0) // オフセット: -16 (2の補数表現)
 			},
 			expectedPC: 0x01F2, // 0x0202 + 0xF0 (符号拡張で-16) = 0x01F2
 		},
@@ -4486,9 +4486,9 @@ func TestBVS(t *testing.T) {
 			addrMode: Relative,
 			setupCPU: func(c *CPU) {
 				c.registers.PC = 0x0200
-				c.registers.P.Overflow = false // オーバーフローフラグをクリア
-				c.WriteByteAt(0x0200, 0x70)    // BVS命令
-				c.WriteByteAt(0x0201, 0x10)    // オフセット: +16
+				c.registers.P.Overflow = false  // オーバーフローフラグをクリア
+				c.bus.WriteByteAt(0x0200, 0x70) // BVS命令
+				c.bus.WriteByteAt(0x0201, 0x10) // オフセット: +16
 			},
 			expectedPC: 0x0202, // 分岐が行われないので、PC+2のみ
 		},
@@ -4525,9 +4525,9 @@ func TestBVC(t *testing.T) {
 			addrMode: Relative,
 			setupCPU: func(c *CPU) {
 				c.registers.PC = 0x0200
-				c.registers.P.Overflow = false // オーバーフローフラグをクリア
-				c.WriteByteAt(0x0200, 0x50)    // BVC命令
-				c.WriteByteAt(0x0201, 0x10)    // オフセット: +16
+				c.registers.P.Overflow = false  // オーバーフローフラグをクリア
+				c.bus.WriteByteAt(0x0200, 0x50) // BVC命令
+				c.bus.WriteByteAt(0x0201, 0x10) // オフセット: +16
 			},
 			expectedPC: 0x0212, // 0x0202 + 0x10 = 0x0212
 		},
@@ -4537,9 +4537,9 @@ func TestBVC(t *testing.T) {
 			addrMode: Relative,
 			setupCPU: func(c *CPU) {
 				c.registers.PC = 0x0200
-				c.registers.P.Overflow = false // オーバーフローフラグをクリア
-				c.WriteByteAt(0x0200, 0x50)    // BVC命令
-				c.WriteByteAt(0x0201, 0xF0)    // オフセット: -16 (2の補数表現)
+				c.registers.P.Overflow = false  // オーバーフローフラグをクリア
+				c.bus.WriteByteAt(0x0200, 0x50) // BVC命令
+				c.bus.WriteByteAt(0x0201, 0xF0) // オフセット: -16 (2の補数表現)
 			},
 			expectedPC: 0x01F2, // 0x0202 + 0xF0 (符号拡張で-16) = 0x01F2
 		},
@@ -4549,9 +4549,9 @@ func TestBVC(t *testing.T) {
 			addrMode: Relative,
 			setupCPU: func(c *CPU) {
 				c.registers.PC = 0x0200
-				c.registers.P.Overflow = true // オーバーフローフラグをセット
-				c.WriteByteAt(0x0200, 0x50)   // BVC命令
-				c.WriteByteAt(0x0201, 0x10)   // オフセット: +16
+				c.registers.P.Overflow = true   // オーバーフローフラグをセット
+				c.bus.WriteByteAt(0x0200, 0x50) // BVC命令
+				c.bus.WriteByteAt(0x0201, 0x10) // オフセット: +16
 			},
 			expectedPC: 0x0202, // 分岐が行われないので、PC+2のみ
 		},
@@ -4588,9 +4588,9 @@ func TestBCS(t *testing.T) {
 			addrMode: Relative,
 			setupCPU: func(c *CPU) {
 				c.registers.PC = 0x0200
-				c.registers.P.Carry = true  // キャリーフラグをセット
-				c.WriteByteAt(0x0200, 0xB0) // BCS命令
-				c.WriteByteAt(0x0201, 0x10) // オフセット: +16
+				c.registers.P.Carry = true      // キャリーフラグをセット
+				c.bus.WriteByteAt(0x0200, 0xB0) // BCS命令
+				c.bus.WriteByteAt(0x0201, 0x10) // オフセット: +16
 			},
 			expectedPC: 0x0212, // 0x0202 + 0x10 = 0x0212
 		},
@@ -4600,9 +4600,9 @@ func TestBCS(t *testing.T) {
 			addrMode: Relative,
 			setupCPU: func(c *CPU) {
 				c.registers.PC = 0x0200
-				c.registers.P.Carry = true  // キャリーフラグをセット
-				c.WriteByteAt(0x0200, 0xB0) // BCS命令
-				c.WriteByteAt(0x0201, 0xF0) // オフセット: -16 (2の補数表現)
+				c.registers.P.Carry = true      // キャリーフラグをセット
+				c.bus.WriteByteAt(0x0200, 0xB0) // BCS命令
+				c.bus.WriteByteAt(0x0201, 0xF0) // オフセット: -16 (2の補数表現)
 			},
 			expectedPC: 0x01F2, // 0x0202 + 0xF0 (符号拡張で-16) = 0x01F2
 		},
@@ -4612,9 +4612,9 @@ func TestBCS(t *testing.T) {
 			addrMode: Relative,
 			setupCPU: func(c *CPU) {
 				c.registers.PC = 0x0200
-				c.registers.P.Carry = false // キャリーフラグをクリア
-				c.WriteByteAt(0x0200, 0xB0) // BCS命令
-				c.WriteByteAt(0x0201, 0x10) // オフセット: +16
+				c.registers.P.Carry = false     // キャリーフラグをクリア
+				c.bus.WriteByteAt(0x0200, 0xB0) // BCS命令
+				c.bus.WriteByteAt(0x0201, 0x10) // オフセット: +16
 			},
 			expectedPC: 0x0202, // 分岐が行われないので、PC+2のみ
 		},
@@ -4651,9 +4651,9 @@ func TestBCC(t *testing.T) {
 			addrMode: Relative,
 			setupCPU: func(c *CPU) {
 				c.registers.PC = 0x0200
-				c.registers.P.Carry = false // キャリーフラグをクリア
-				c.WriteByteAt(0x0200, 0x90) // BCC命令
-				c.WriteByteAt(0x0201, 0x10) // オフセット: +16
+				c.registers.P.Carry = false     // キャリーフラグをクリア
+				c.bus.WriteByteAt(0x0200, 0x90) // BCC命令
+				c.bus.WriteByteAt(0x0201, 0x10) // オフセット: +16
 			},
 			expectedPC: 0x0212, // 0x0202 + 0x10 = 0x0212
 		},
@@ -4663,9 +4663,9 @@ func TestBCC(t *testing.T) {
 			addrMode: Relative,
 			setupCPU: func(c *CPU) {
 				c.registers.PC = 0x0200
-				c.registers.P.Carry = false // キャリーフラグをクリア
-				c.WriteByteAt(0x0200, 0x90) // BCC命令
-				c.WriteByteAt(0x0201, 0xF0) // オフセット: -16 (2の補数表現)
+				c.registers.P.Carry = false     // キャリーフラグをクリア
+				c.bus.WriteByteAt(0x0200, 0x90) // BCC命令
+				c.bus.WriteByteAt(0x0201, 0xF0) // オフセット: -16 (2の補数表現)
 			},
 			expectedPC: 0x01F2, // 0x0202 + 0xF0 (符号拡張で-16) = 0x01F2
 		},
@@ -4675,9 +4675,9 @@ func TestBCC(t *testing.T) {
 			addrMode: Relative,
 			setupCPU: func(c *CPU) {
 				c.registers.PC = 0x0200
-				c.registers.P.Carry = true  // キャリーフラグをセット
-				c.WriteByteAt(0x0200, 0x90) // BCC命令
-				c.WriteByteAt(0x0201, 0x10) // オフセット: +16
+				c.registers.P.Carry = true      // キャリーフラグをセット
+				c.bus.WriteByteAt(0x0200, 0x90) // BCC命令
+				c.bus.WriteByteAt(0x0201, 0x10) // オフセット: +16
 			},
 			expectedPC: 0x0202, // 分岐が行われないので、PC+2のみ
 		},
@@ -4714,9 +4714,9 @@ func TestBEQ(t *testing.T) {
 			addrMode: Relative,
 			setupCPU: func(c *CPU) {
 				c.registers.PC = 0x0200
-				c.registers.P.Zero = true   // ゼロフラグをセット
-				c.WriteByteAt(0x0200, 0xF0) // BEQ命令
-				c.WriteByteAt(0x0201, 0x10) // オフセット: +16
+				c.registers.P.Zero = true       // ゼロフラグをセット
+				c.bus.WriteByteAt(0x0200, 0xF0) // BEQ命令
+				c.bus.WriteByteAt(0x0201, 0x10) // オフセット: +16
 			},
 			expectedPC: 0x0212, // 0x0202 + 0x10 = 0x0212
 		},
@@ -4726,9 +4726,9 @@ func TestBEQ(t *testing.T) {
 			addrMode: Relative,
 			setupCPU: func(c *CPU) {
 				c.registers.PC = 0x0200
-				c.registers.P.Zero = true   // ゼロフラグをセット
-				c.WriteByteAt(0x0200, 0xF0) // BEQ命令
-				c.WriteByteAt(0x0201, 0xF0) // オフセット: -16 (2の補数表現)
+				c.registers.P.Zero = true       // ゼロフラグをセット
+				c.bus.WriteByteAt(0x0200, 0xF0) // BEQ命令
+				c.bus.WriteByteAt(0x0201, 0xF0) // オフセット: -16 (2の補数表現)
 			},
 			expectedPC: 0x01F2, // 0x0202 + 0xF0 (符号拡張で-16) = 0x01F2
 		},
@@ -4738,9 +4738,9 @@ func TestBEQ(t *testing.T) {
 			addrMode: Relative,
 			setupCPU: func(c *CPU) {
 				c.registers.PC = 0x0200
-				c.registers.P.Zero = false  // ゼロフラグをクリア
-				c.WriteByteAt(0x0200, 0xF0) // BEQ命令
-				c.WriteByteAt(0x0201, 0x10) // オフセット: +16
+				c.registers.P.Zero = false      // ゼロフラグをクリア
+				c.bus.WriteByteAt(0x0200, 0xF0) // BEQ命令
+				c.bus.WriteByteAt(0x0201, 0x10) // オフセット: +16
 			},
 			expectedPC: 0x0202, // 分岐が行われないので、PC+2のみ
 		},
@@ -4777,9 +4777,9 @@ func TestBNE(t *testing.T) {
 			addrMode: Relative,
 			setupCPU: func(c *CPU) {
 				c.registers.PC = 0x0200
-				c.registers.P.Zero = false  // ゼロフラグをクリア
-				c.WriteByteAt(0x0200, 0xD0) // BNE命令
-				c.WriteByteAt(0x0201, 0x10) // オフセット: +16
+				c.registers.P.Zero = false      // ゼロフラグをクリア
+				c.bus.WriteByteAt(0x0200, 0xD0) // BNE命令
+				c.bus.WriteByteAt(0x0201, 0x10) // オフセット: +16
 			},
 			expectedPC: 0x0212, // 0x0202 + 0x10 = 0x0212
 		},
@@ -4789,9 +4789,9 @@ func TestBNE(t *testing.T) {
 			addrMode: Relative,
 			setupCPU: func(c *CPU) {
 				c.registers.PC = 0x0200
-				c.registers.P.Zero = false  // ゼロフラグをクリア
-				c.WriteByteAt(0x0200, 0xD0) // BNE命令
-				c.WriteByteAt(0x0201, 0xF0) // オフセット: -16 (2の補数表現)
+				c.registers.P.Zero = false      // ゼロフラグをクリア
+				c.bus.WriteByteAt(0x0200, 0xD0) // BNE命令
+				c.bus.WriteByteAt(0x0201, 0xF0) // オフセット: -16 (2の補数表現)
 			},
 			expectedPC: 0x01F2, // 0x0202 + 0xF0 (符号拡張で-16) = 0x01F2
 		},
@@ -4801,9 +4801,9 @@ func TestBNE(t *testing.T) {
 			addrMode: Relative,
 			setupCPU: func(c *CPU) {
 				c.registers.PC = 0x0200
-				c.registers.P.Zero = true   // ゼロフラグをセット
-				c.WriteByteAt(0x0200, 0xD0) // BNE命令
-				c.WriteByteAt(0x0201, 0x10) // オフセット: +16
+				c.registers.P.Zero = true       // ゼロフラグをセット
+				c.bus.WriteByteAt(0x0200, 0xD0) // BNE命令
+				c.bus.WriteByteAt(0x0201, 0x10) // オフセット: +16
 			},
 			expectedPC: 0x0202, // 分岐が行われないので、PC+2のみ
 		},
