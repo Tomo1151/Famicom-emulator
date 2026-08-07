@@ -169,8 +169,8 @@ Config structure:
 | Mute / Unmute APU 3ch                                |  3  |
 | Mute / Unmute APU 4ch                                |  4  |
 | Mute / Unmute APU 5ch                                |  5  |
-| Emulation speed down                                 |  9  |
-| Emulation speed up                                   |  0  |
+| Emulation speed down                                 |  ←  |
+| Emulation speed up                                   |  →  |
 
 ## Dependencies
 
