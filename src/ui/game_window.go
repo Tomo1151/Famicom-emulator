@@ -135,3 +135,8 @@ func (g *GameWindow) Close() {
 		g.window.Destroy()
 	}
 }
+
+// MARK: アイコンのセットメソッド
+func (g *GameWindow) SetIcon(icon *sdl.Surface) {
+	g.window.SetIcon(icon)
+}

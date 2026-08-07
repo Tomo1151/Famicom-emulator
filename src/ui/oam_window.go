@@ -233,3 +233,8 @@ func (o *OAMWindow) requestClose() {
 		o.onClose(o.ID())
 	}
 }
+
+// MARK: アイコンのセットメソッド
+func (o *OAMWindow) SetIcon(icon *sdl.Surface) {
+	o.window.SetIcon(icon)
+}

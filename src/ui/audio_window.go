@@ -227,3 +227,8 @@ func (aw *AudioWindow) requestClose() {
 		aw.onClose(aw.ID())
 	}
 }
+
+// MARK: アイコンのセットメソッド
+func (aw *AudioWindow) SetIcon(icon *sdl.Surface) {
+	aw.window.SetIcon(icon)
+}

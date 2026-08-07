@@ -4,6 +4,11 @@ import (
 	"Famicom-emulator/apu"
 	"Famicom-emulator/ppu"
 
+	"fmt"
+	"image"
+	_ "image/png"
+	"os"
+
 	"github.com/veandco/go-sdl2/sdl"
 )
 
@@ -14,20 +19,37 @@ type Window interface {
 	Update()
 	Render()
 	Close()
+	SetIcon(*sdl.Surface)
 }
 
 // MARK: WindowManager の定義
 type WindowManager struct {
+	icon    *sdl.Surface
 	windows map[uint32]Window
 }
 
 // MARK: WindowManager の作成メソッド
 func NewWindowManager() *WindowManager {
-	return &WindowManager{windows: make(map[uint32]Window)}
+	// アイコン画像のロード
+	file, err := os.Open("../icon.png")
+	if err != nil {
+		fmt.Printf("Error: icon file not found: %v", err)
+	}
+	defer file.Close()
+
+	img, _, err := image.Decode(file)
+	if err != nil {
+		fmt.Printf("Error: icon image decode failed: %v", err)
+	}
+	icon, err := createSurfaceFromImage(img)
+
+	return &WindowManager{icon: icon, windows: make(map[uint32]Window)}
 }
 
 // MARK: ウィンドウの登録メソッド
 func (wm *WindowManager) Add(w Window) {
+	// アイコンとウィンドウのセット
+	w.SetIcon(wm.icon)
 	wm.windows[w.ID()] = w
 }
 
@@ -83,6 +105,9 @@ func (wm *WindowManager) CloseAll() {
 	for id := range wm.windows {
 		wm.Remove(id)
 	}
+
+	// アイコン画像の解放
+	wm.icon.Free()
 }
 
 // MARK: ID指定でイベントをウィンドウに投げるメソッド
@@ -163,4 +188,41 @@ func (wm *WindowManager) ToggleOAMWindow(p *ppu.PPU, scale int) (uint32, error) 
 	}
 	wm.Add(ow)
 	return ow.ID(), nil
+}
+
+// MARK: 画像からSDL_Surfaceへ変換するメソッド
+func createSurfaceFromImage(img image.Image) (*sdl.Surface, error) {
+	bounds := img.Bounds()
+	width := int32(bounds.Dx())
+	height := int32(bounds.Dy())
+
+	surface, err := sdl.CreateRGBSurface(
+		0,
+		width,
+		height,
+		32,
+		0x000000FF,
+		0x0000FF00,
+		0x00FF0000,
+		0xFF000000,
+	)
+
+	if err != nil {
+		return nil, err
+	}
+
+	pixels := surface.Pixels()
+	idx := 0
+	for y := bounds.Min.Y; y < bounds.Max.Y; y++ {
+		for x := bounds.Min.X; x < bounds.Max.X; x++ {
+			r, g, b, a := img.At(x, y).RGBA()
+			pixels[idx+0] = byte(r >> 8)
+			pixels[idx+1] = byte(g >> 8)
+			pixels[idx+2] = byte(b >> 8)
+			pixels[idx+3] = byte(a >> 8)
+			idx += 4
+		}
+	}
+
+	return surface, err
 }

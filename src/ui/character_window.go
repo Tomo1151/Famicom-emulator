@@ -214,3 +214,8 @@ func (c *CharacterWindow) requestClose() {
 		c.onClose(c.ID())
 	}
 }
+
+// MARK: アイコンのセットメソッド
+func (c *CharacterWindow) SetIcon(icon *sdl.Surface) {
+	c.window.SetIcon(icon)
+}

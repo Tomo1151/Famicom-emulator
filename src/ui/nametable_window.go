@@ -195,3 +195,8 @@ func (n *NameTableWindow) requestClose() {
 		n.onClose(n.ID())
 	}
 }
+
+// MARK: アイコンのセットメソッド
+func (n *NameTableWindow) SetIcon(icon *sdl.Surface) {
+	n.window.SetIcon(icon)
+}
