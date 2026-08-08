@@ -1567,18 +1567,18 @@ func generateInstructionSet(c *CPU) instructionSet {
 	}
 
 	// AHX命令 (AXA / SHA)
-	instructionSet[0x9F] = instruction{
+	instructionSet[0x93] = instruction{
 		Mnemonic:       "AHX",
-		Opcode:         0x9F,
+		Opcode:         0x93,
 		AddressingMode: IndirectIndexed,
 		Bytes:          2,
 		Cycles:         6,
 		Handler:        c.ahx,
 	}
 
-	instructionSet[0x93] = instruction{
+	instructionSet[0x9F] = instruction{
 		Mnemonic:       "AHX",
-		Opcode:         0x93,
+		Opcode:         0x9F,
 		AddressingMode: AbsoluteYIndexed,
 		Bytes:          3,
 		Cycles:         5,
